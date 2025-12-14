@@ -22,6 +22,11 @@
 		emails = data.props.emails;
 	}
 
+	type Provider = {
+		name: string;
+		usage_required: boolean;
+	};
+
 	let new_email: string = '';
 	let public_url: string = data.props.publicUrl;
 	let immichIntegration = data.props.immichIntegration;
@@ -31,6 +36,9 @@
 	let wandererEnabled = data.props.wandererEnabled;
 	let wandererExpired = data.props.wandererExpired;
 	let activeSection: string = 'profile';
+
+	// typed alias for social providers to satisfy TypeScript
+	let socialProviders: Provider[] = data.props.socialProviders ?? [];
 
 	// Initialize activeSection from URL on mount
 	onMount(() => {
@@ -732,7 +740,7 @@
 							</div>
 
 							<!-- Social Auth & Password Disable -->
-							{#if data.props.socialProviders && data.props.socialProviders.length > 0}
+							{#if socialProviders && socialProviders.length > 0}
 								<div class="bg-base-100 rounded-2xl shadow-xl p-8">
 									<div class="flex items-center gap-4 mb-6">
 										<div class="p-3 bg-info/10 rounded-xl">
@@ -752,16 +760,21 @@
 												<div>
 													<h3 class="font-semibold">{$t('settings.password_auth')}</h3>
 													<p class="text-sm text-base-content/70">
-														{user.disable_password
+														{user.disable_password ||
+														(socialProviders && socialProviders.some((p) => p.usage_required))
 															? $t('settings.password_login_disabled')
 															: $t('settings.password_login_enabled')}
 													</p>
 												</div>
 												<div class="flex items-center gap-4">
 													<div
-														class="badge {user.disable_password ? 'badge-error' : 'badge-success'}"
+														class="badge {user.disable_password ||
+														(socialProviders && socialProviders.some((p) => p.usage_required))
+															? 'badge-error'
+															: 'badge-success'}"
 													>
-														{user.disable_password
+														{user.disable_password ||
+														(socialProviders && socialProviders.some((p) => p.usage_required))
 															? $t('settings.disabled')
 															: $t('settings.enabled')}
 													</div>
@@ -769,7 +782,12 @@
 														type="checkbox"
 														bind:checked={user.disable_password}
 														on:change={disablePassword}
-														class="toggle toggle-primary"
+														disabled={socialProviders &&
+															socialProviders.some((p) => p.usage_required)}
+														class="toggle toggle-primary {socialProviders &&
+														socialProviders.some((p) => p.usage_required)
+															? 'toggle-disabled'
+															: ''}"
 													/>
 												</div>
 											</div>
