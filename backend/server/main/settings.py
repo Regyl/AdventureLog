@@ -259,6 +259,8 @@ SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True  # Auto-link by email
 SOCIALACCOUNT_AUTO_SIGNUP = True  # Allow auto-signup post adapter checks
 
+FORCE_SOCIALACCOUNT_LOGIN = getenv('FORCE_SOCIALACCOUNT_LOGIN', 'false').lower() == 'true' # When true, only social login is allowed (no password login) and the login page will show only social providers or redirect directly to the first provider if only one is configured.
+
 if getenv('EMAIL_BACKEND', 'console') == 'console':
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 else:
