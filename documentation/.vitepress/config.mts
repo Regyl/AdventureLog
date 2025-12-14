@@ -219,6 +219,10 @@ export default defineConfig({
           },
           { text: "SMTP Email", link: "/docs/configuration/email" },
           { text: "Umami Analytics", link: "/docs/configuration/analytics" },
+          {
+            text: "Advanced Configuration",
+            link: "/docs/configuration/advanced_configuration",
+          },
         ],
       },
       {
