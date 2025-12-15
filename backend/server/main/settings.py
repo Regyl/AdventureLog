@@ -225,8 +225,11 @@ TEMPLATES = [
 DISABLE_REGISTRATION = getenv('DISABLE_REGISTRATION', 'false').lower() == 'true'
 DISABLE_REGISTRATION_MESSAGE = getenv('DISABLE_REGISTRATION_MESSAGE', 'Registration is disabled. Please contact the administrator if you need an account.')
 
+SOCIALACCOUNT_ALLOW_SIGNUP = getenv('SOCIALACCOUNT_ALLOW_SIGNUP', 'false').lower() == 'true'
+
 AUTH_USER_MODEL = 'users.CustomUser'
-ACCOUNT_ADAPTER = 'users.adapters.NoNewUsersAccountAdapter'
+ACCOUNT_ADAPTER = 'users.adapters.CustomAccountAdapter'
+SOCIALACCOUNT_ADAPTER = 'users.adapters.CustomSocialAccountAdapter'
 ACCOUNT_SIGNUP_FORM_CLASS = 'users.form_overrides.CustomSignupForm'
 
 SESSION_SAVE_EVERY_REQUEST = True
