@@ -14,6 +14,7 @@
 	import { dndzone, TRIGGERS, SHADOW_ITEM_MARKER_PROPERTY_NAME } from 'svelte-dnd-action';
 	import { flip } from 'svelte/animate';
 	import CalendarBlank from '~icons/mdi/calendar-blank';
+	import Bed from '~icons/mdi/bed';
 	import LocationCard from '$lib/components/LocationCard.svelte';
 	import TransportationCard from '$lib/components/TransportationCard.svelte';
 	import LodgingCard from '$lib/components/LodgingCard.svelte';
@@ -35,10 +36,38 @@
 		date: string;
 		displayDate: string;
 		items: ResolvedItineraryItem[];
+		overnightLodging: Lodging[]; // Lodging where guest is staying overnight (not check-in day)
 	};
 
 	$: days = groupItemsByDay(collection);
 	$: unscheduledItems = getUnscheduledItems(collection);
+
+	/**
+	 * Get lodging items where the guest is staying overnight on a given date
+	 * (i.e., the date is between check_in and check_out, but NOT the check_in date itself)
+	 */
+	function getOvernightLodgingForDate(collection: Collection, dateISO: string): Lodging[] {
+		if (!collection.lodging) return [];
+
+		const targetDate = DateTime.fromISO(dateISO).startOf('day');
+
+		return collection.lodging.filter((lodging) => {
+			if (!lodging.check_in || !lodging.check_out) return false;
+
+			// Extract just the date portion (YYYY-MM-DD) to avoid timezone shifts
+			// check_in/check_out are stored as UTC midnight (e.g., "2025-06-28T00:00:00Z")
+			const checkInDateStr = lodging.check_in.split('T')[0];
+			const checkOutDateStr = lodging.check_out.split('T')[0];
+
+			const checkIn = DateTime.fromISO(checkInDateStr).startOf('day');
+			const checkOut = DateTime.fromISO(checkOutDateStr).startOf('day');
+
+			// The guest is staying overnight if:
+			// 1. The target date is AFTER the check-in date (not on check-in day - that's when we show full card)
+			// 2. The target date is BEFORE the check-out date (on check-out day they leave, no overnight)
+			return targetDate > checkIn && targetDate < checkOut;
+		});
+	}
 
 	function resolveItineraryItem(
 		item: CollectionItineraryItem,
@@ -106,10 +135,12 @@
 		for (let dt = start; dt <= end; dt = dt.plus({ days: 1 })) {
 			const iso = dt.toISODate();
 			const items = (grouped.get(iso) || []).sort((a, b) => a.order - b.order);
+			const overnightLodging = getOvernightLodgingForDate(collection, iso);
 			days.push({
 				date: iso,
 				displayDate: dt.toFormat('cccc, LLLL d, yyyy'),
-				items
+				items,
+				overnightLodging
 			});
 		}
 
@@ -338,6 +369,43 @@
 							</div>
 						{/if}
 					</div>
+
+					<!-- Overnight Lodging Indicator -->
+					{#if day.overnightLodging.length > 0}
+						<div class="mt-4 pt-4 border-t border-base-300 border-dashed">
+							<div class="flex items-center gap-2 mb-2 opacity-70">
+								<Bed class="w-4 h-4" />
+								<span class="text-sm font-medium">Staying overnight</span>
+							</div>
+							<div class="space-y-2">
+								{#each day.overnightLodging as lodging}
+									{@const checkOut = lodging.check_out
+										? DateTime.fromISO(lodging.check_out.split('T')[0]).toFormat('LLL d')
+										: null}
+									<div
+										class="flex items-center gap-3 bg-base-100 rounded-lg px-4 py-3 border border-base-300"
+									>
+										<div
+											class="flex items-center justify-center w-8 h-8 rounded-full bg-info/20 text-info"
+										>
+											<Bed class="w-4 h-4" />
+										</div>
+										<div class="flex-1 min-w-0">
+											<p class="font-medium truncate">{lodging.name}</p>
+											{#if lodging.location}
+												<p class="text-xs opacity-60 truncate">{lodging.location}</p>
+											{/if}
+										</div>
+										{#if checkOut}
+											<div class="badge badge-ghost badge-sm">
+												Check-out: {checkOut}
+											</div>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
 				</div>
 			</div>
 		{/each}
