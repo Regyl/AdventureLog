@@ -58,6 +58,8 @@
 
 	let acknowledgeRestoreOverride: boolean = false;
 
+	// Indicates restore operation in progress to disable button and show loader
+	let isRestoring: boolean = false;
 	let newImmichIntegration: ImmichIntegration = {
 		server_url: '',
 		api_key: '',
@@ -101,6 +103,11 @@
 		}
 		if (browser && $page.form?.error) {
 			addToast('error', $t('settings.update_error'));
+		}
+
+		// Stop any restoring loader when a form result (success or error) is present
+		if (browser && $page.form) {
+			isRestoring = false;
 		}
 	}
 
@@ -1384,6 +1391,7 @@
 										method="post"
 										action="?/restoreData"
 										use:enhance
+										on:submit={() => (isRestoring = true)}
 										enctype="multipart/form-data"
 										class="space-y-4"
 									>
@@ -1448,8 +1456,11 @@
 											<button
 												type="submit"
 												class="btn btn-warning"
-												disabled={!acknowledgeRestoreOverride}
+												disabled={!acknowledgeRestoreOverride || isRestoring}
 											>
+												{#if isRestoring}
+													<span class="loading loading-spinner loading-sm mr-2"></span>
+												{/if}
 												🚀 {$t('settings.restore_data')}
 											</button>
 										</div>

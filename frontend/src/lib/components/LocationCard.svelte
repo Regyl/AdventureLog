@@ -8,7 +8,10 @@
 	import FileDocumentEdit from '~icons/mdi/file-document-edit';
 	import TrashCan from '~icons/mdi/trash-can-outline';
 	import Calendar from '~icons/mdi/calendar';
+	import Clock from '~icons/mdi/clock-outline';
 	import MapMarker from '~icons/mdi/map-marker';
+	import LinkIcon from '~icons/mdi/link-variant';
+	import Check from '~icons/mdi/check';
 	import { addToast } from '$lib/toasts';
 	import Link from '~icons/mdi/link-variant';
 	import LinkVariantRemove from '~icons/mdi/link-variant-remove';
@@ -31,6 +34,18 @@
 
 	let isCollectionModalOpen: boolean = false;
 	let isWarningModalOpen: boolean = false;
+	let copied = false;
+
+	async function copyLink() {
+		try {
+			const url = `${location.origin}/locations/${adventure.id}`;
+			await navigator.clipboard.writeText(url);
+			copied = true;
+			setTimeout(() => (copied = false), 2000);
+		} catch (e) {
+			addToast('error', $t('adventures.copy_failed') || 'Copy failed');
+		}
+	}
 
 	export let adventure: Location;
 	let displayActivityTypes: string[] = [];
@@ -72,10 +87,6 @@
 		: adventure.user?.username || 'Unknown User';
 
 	// Helper functions for display
-	function formatVisitCount() {
-		const count = adventure.visits.length;
-		return count > 1 ? `${count} ${$t('adventures.visits')}` : `${count} ${$t('adventures.visit')}`;
-	}
 
 	function renderStars(rating: number) {
 		const stars = [];
@@ -185,32 +196,44 @@
 {/if}
 
 <div
-	class="card w-full max-w-md bg-base-300 shadow-2xl hover:shadow-3xl transition-all duration-300 border border-base-300 hover:border-primary/20 group"
+	class="card w-full max-w-md bg-base-300 shadow hover:shadow-md transition-all duration-200 border border-base-300 group"
+	aria-label="location-card"
 >
 	<!-- Image Section with Overlay -->
 	<div class="relative overflow-hidden rounded-t-2xl">
 		<CardCarousel images={adventure.images} icon={adventure.category?.icon} name={adventure.name} />
 
-		<!-- Status Overlay -->
-		<div class="absolute top-4 left-4 flex flex-col gap-2">
+		<!-- Status Overlay (icon-only) -->
+		<div class="absolute top-2 left-4 flex items-center gap-3">
 			<div
-				class="badge badge-sm {adventure.is_visited ? 'badge-success' : 'badge-warning'} shadow-lg"
+				class="tooltip tooltip-right"
+				data-tip={adventure.is_visited ? $t('adventures.visited') : $t('adventures.not_visited')}
 			>
-				{adventure.is_visited ? $t('adventures.visited') : $t('adventures.planned')}
+				{#if adventure.is_visited}
+					<div class="badge badge-sm badge-success p-1 rounded-full shadow-sm">
+						<Calendar class="w-4 h-4" />
+					</div>
+				{:else}
+					<div class="badge badge-sm badge-warning p-1 rounded-full shadow-sm">
+						<Clock class="w-4 h-4" />
+					</div>
+				{/if}
 			</div>
 			{#if outsideCollectionRange}
-				<div class="badge badge-sm badge-error shadow-lg">{$t('adventures.out_of_range')}</div>
+				<div class="badge badge-xs badge-error shadow">{$t('adventures.out_of_range')}</div>
 			{/if}
 		</div>
 
 		<!-- Privacy Indicator -->
-		<div class="absolute top-4 right-4">
+		<div class="absolute top-2 right-4">
 			<div
 				class="tooltip tooltip-left"
 				data-tip={adventure.is_public ? $t('adventures.public') : $t('adventures.private')}
 			>
 				<div
-					class="btn btn-circle btn-sm btn-ghost bg-black/20 backdrop-blur-sm border-0 text-white"
+					class="badge badge-sm p-1 rounded-full text-base-content shadow-sm"
+					role="img"
+					aria-label={adventure.is_public ? $t('adventures.public') : $t('adventures.private')}
 				>
 					{#if adventure.is_public}
 						<Eye class="w-4 h-4" />
@@ -224,10 +247,13 @@
 		<!-- Category Badge -->
 		{#if adventure.category}
 			<div class="absolute bottom-4 left-4">
-				<div class="badge badge-primary shadow-lg font-medium">
+				<a
+					href="/locations?types={adventure.category.name}"
+					class="badge badge-primary shadow-lg font-medium cursor-pointer hover:brightness-110 transition-all"
+				>
 					{adventure.category.display_name}
 					{adventure.category.icon}
-				</div>
+				</a>
 			</div>
 		{/if}
 
@@ -236,7 +262,7 @@
 			<div class="absolute bottom-4 right-4">
 				<div class="tooltip tooltip-left" data-tip={creatorDisplayName}>
 					<div class="avatar">
-						<div class="w-8 h-8 rounded-full ring-2 ring-white/50 shadow-lg">
+						<div class="w-7 h-7 rounded-full ring-2 ring-white/40 shadow">
 							{#if adventure.user.profile_pic}
 								<img
 									src={adventure.user.profile_pic}
@@ -245,7 +271,7 @@
 								/>
 							{:else}
 								<div
-									class="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center text-primary-content font-semibold text-xs shadow-lg"
+									class="w-7 h-7 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center text-primary-content font-semibold text-xs"
 								>
 									{creatorInitials.toUpperCase()}
 								</div>
@@ -258,28 +284,110 @@
 	</div>
 
 	<!-- Content Section -->
-	<div class="card-body p-6 space-y-4">
-		<!-- Header Section -->
-		<div class="space-y-3">
+	<div class="card-body p-4 space-y-3">
+		<!-- Header: title + compact actions -->
+		<div class="flex items-start justify-between gap-3">
 			<a
 				href="/locations/{adventure.id}"
-				class="text-xl font-bold text-left hover:text-primary transition-colors duration-200 line-clamp-2 group-hover:underline block"
+				class="text-lg font-semibold hover:text-primary transition-colors duration-200 line-clamp-2"
 			>
 				{adventure.name}
 			</a>
 
-			<!-- Location -->
+			<div class="flex items-center gap-2">
+				<button
+					class="btn btn-sm p-1 text-base-content"
+					aria-label="open-details"
+					on:click={() => goto(`/locations/${adventure.id}`)}
+				>
+					<Launch class="w-4 h-4" />
+				</button>
+
+				{#if (adventure.user && adventure.user.uuid == user?.uuid) || (collection && user && collection.shared_with?.includes(user.uuid)) || (collection && user && collection.user == user.uuid)}
+					<div class="dropdown dropdown-end">
+						<div tabindex="0" role="button" class="btn btn-square btn-sm p-1 text-base-content">
+							<DotsHorizontal class="w-5 h-5" />
+						</div>
+						<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+						<ul
+							tabindex="0"
+							class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300"
+						>
+							<li>
+								<button on:click={editAdventure} class="flex items-center gap-2">
+									<FileDocumentEdit class="w-4 h-4" />
+									{$t('adventures.edit_location')}
+								</button>
+							</li>
+							{#if user?.uuid == adventure.user?.uuid}
+								<li>
+									<button
+										on:click={() => (isCollectionModalOpen = true)}
+										class="flex items-center gap-2"
+									>
+										<Plus class="w-4 h-4" />
+										{$t('collection.manage_collections')}
+									</button>
+								</li>
+							{:else if collection && user && collection.user == user.uuid}
+								<li>
+									<button
+										on:click={() =>
+											removeFromCollection(new CustomEvent('unlink', { detail: collection.id }))}
+										class="flex items-center gap-2"
+									>
+										<LinkVariantRemove class="w-4 h-4" />
+										{$t('adventures.remove_from_collection')}
+									</button>
+								</li>
+							{/if}
+
+							{#if adventure.is_public}
+								<li>
+									<button on:click={copyLink} class="flex items-center gap-2">
+										{#if copied}
+											<Check class="w-4 h-4 text-success" />
+											<span>{$t('adventures.link_copied')}</span>
+										{:else}
+											<LinkIcon class="w-4 h-4" />
+											{$t('adventures.copy_link')}
+										{/if}
+									</button>
+								</li>
+							{/if}
+
+							{#if user.uuid == adventure.user?.uuid}
+								<div class="divider my-1"></div>
+								<li>
+									<button
+										id="delete_adventure"
+										data-umami-event="Delete Adventure"
+										class="text-error flex items-center gap-2"
+										on:click={() => (isWarningModalOpen = true)}
+									>
+										<TrashCan class="w-4 h-4" />
+										{$t('adventures.delete')}
+									</button>
+								</li>
+							{/if}
+						</ul>
+					</div>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Inline stats: location, rating, visits -->
+		<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70 min-w-0">
 			{#if adventure.location}
-				<div class="flex items-center gap-2 text-base-content/70">
+				<div class="flex items-center gap-1 min-w-0">
 					<MapMarker class="w-4 h-4 text-primary" />
-					<span class="text-sm font-medium truncate">{adventure.location}</span>
+					<span class="truncate max-w-[18rem]">{adventure.location}</span>
 				</div>
 			{/if}
 
-			<!-- Rating -->
 			{#if adventure.rating}
-				<div class="flex items-center gap-2">
-					<div class="flex">
+				<div class="flex items-center gap-1">
+					<div class="flex -ml-1">
 						{#each renderStars(adventure.rating) as filled}
 							{#if filled}
 								<Star class="w-4 h-4 text-warning fill-current" />
@@ -288,100 +396,34 @@
 							{/if}
 						{/each}
 					</div>
-					<span class="text-sm text-base-content/60">({adventure.rating}/5)</span>
+					<span class="text-xs text-base-content/60">({adventure.rating}/5)</span>
 				</div>
 			{/if}
 		</div>
 
-		<!-- Stats Section -->
-		{#if adventure.visits.length > 0}
-			<div class="flex items-center gap-2 p-3 bg-base-200 rounded-lg">
-				<Calendar class="w-4 h-4 text-primary" />
-				<span class="text-sm font-medium">{formatVisitCount()}</span>
-			</div>
-		{/if}
-
-		<!-- Actions Section -->
-		{#if !readOnly}
-			<div class="pt-4 border-t border-base-300">
-				{#if type != 'link'}
-					<div class="flex justify-between items-center">
-						<button
-							class="btn btn-base-300 btn-sm flex-1 mr-2"
-							on:click={() => goto(`/locations/${adventure.id}`)}
-						>
-							<Launch class="w-4 h-4" />
-							{$t('adventures.open_details')}
-						</button>
-
-						{#if (adventure.user && adventure.user.uuid == user?.uuid) || (collection && user && collection.shared_with?.includes(user.uuid)) || (collection && user && collection.user == user.uuid)}
-							<div class="dropdown dropdown-end">
-								<div tabindex="0" role="button" class="btn btn-square btn-sm btn-base-300">
-									<DotsHorizontal class="w-5 h-5" />
-								</div>
-								<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
-								<ul
-									tabindex="0"
-									class="dropdown-content menu bg-base-100 rounded-box z-[1] w-56 p-2 shadow-xl border border-base-300"
-								>
-									<li>
-										<button on:click={editAdventure} class="flex items-center gap-2">
-											<FileDocumentEdit class="w-4 h-4" />
-											{$t('adventures.edit_location')}
-										</button>
-									</li>
-
-									{#if user?.uuid == adventure.user?.uuid}
-										<li>
-											<button
-												on:click={() => (isCollectionModalOpen = true)}
-												class="flex items-center gap-2"
-											>
-												<Plus class="w-4 h-4" />
-												{$t('collection.manage_collections')}
-											</button>
-										</li>
-									{:else if collection && user && collection.user == user.uuid}
-										<li>
-											<button
-												on:click={() =>
-													removeFromCollection(
-														new CustomEvent('unlink', { detail: collection.id })
-													)}
-												class="flex items-center gap-2"
-											>
-												<LinkVariantRemove class="w-4 h-4" />
-												{$t('adventures.remove_from_collection')}
-											</button>
-										</li>
-									{/if}
-									{#if user.uuid == adventure.user?.uuid}
-										<div class="divider my-1"></div>
-										<li>
-											<button
-												id="delete_adventure"
-												data-umami-event="Delete Adventure"
-												class="text-error flex items-center gap-2"
-												on:click={() => (isWarningModalOpen = true)}
-											>
-												<TrashCan class="w-4 h-4" />
-												{$t('adventures.delete')}
-											</button>
-										</li>
-									{/if}
-								</ul>
-							</div>
-						{/if}
-					</div>
-				{:else}
-					<button class="btn btn-primary btn-block" on:click={link}>
-						<Link class="w-4 h-4" />
-						Link Adventure
-					</button>
+		<!-- Tags (compact) -->
+		{#if displayActivityTypes.length > 0}
+			<div class="flex flex-wrap gap-2">
+				{#each displayActivityTypes as tag}
+					<span class="badge badge-ghost badge-sm">{tag}</span>
+				{/each}
+				{#if remainingCount > 0}
+					<span class="badge badge-ghost badge-sm">+{remainingCount}</span>
 				{/if}
 			</div>
 		{/if}
 	</div>
+
+	{#if !readOnly}
+		{#if type == 'link'}
+			<div class="card-body p-4 pt-0">
+				<button class="btn btn-primary btn-block btn-sm" on:click={link}>
+					<Link class="w-4 h-4 mr-2" />
+					Link Adventure
+				</button>
+			</div>
+		{/if}
+	{/if}
 </div>
 
 <style>

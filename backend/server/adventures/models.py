@@ -674,3 +674,54 @@ class Activity(models.Model):
     class Meta:
         verbose_name = "Activity"
         verbose_name_plural = "Activities"
+
+class CollectionItineraryItem(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    collection = models.ForeignKey(
+        Collection,
+        on_delete=models.CASCADE,
+        related_name="itinerary_items"
+    )
+
+    # Generic reference to Visit, Transportation, Lodging, Note, etc
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.UUIDField()
+    item = GenericForeignKey("content_type", "object_id")
+
+    # Placement (planning concern, not content concern)
+    date = models.DateField(blank=True, null=True)
+    order = models.PositiveIntegerField(help_text="Manual order within a day")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["date", "order"]
+        unique_together = ("collection", "date", "order")
+
+    def __str__(self):
+        return f"{self.collection.name} - {self.content_type.model} - {self.date} ({self.order})"
+    
+    @property
+    def start_datetime(self):
+        obj = self.item
+
+        for field in ("start_date", "check_in", "date"):
+            if hasattr(obj, field):
+                value = getattr(obj, field)
+                if value:
+                    return value
+
+        return None
+
+    @property
+    def end_datetime(self):
+        obj = self.item
+
+        for field in ("end_date", "check_out"):
+            if hasattr(obj, field):
+                value = getattr(obj, field)
+                if value:
+                    return value
+
+        return None

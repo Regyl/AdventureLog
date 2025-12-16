@@ -4,9 +4,9 @@ from django.db import transaction
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from adventures.models import Collection, Location, Transportation, Note, Checklist, CollectionInvite, ContentImage
+from adventures.models import Collection, Location, Transportation, Note, Checklist, CollectionInvite, ContentImage, CollectionItineraryItem
 from adventures.permissions import CollectionShared
-from adventures.serializers import CollectionSerializer, CollectionInviteSerializer, UltraSlimCollectionSerializer
+from adventures.serializers import CollectionSerializer, CollectionInviteSerializer, UltraSlimCollectionSerializer, CollectionItineraryItemSerializer
 from users.models import CustomUser as User
 from adventures.utils import pagination
 from users.serializers import CustomUserDetailsSerializer as UserSerializer
@@ -182,6 +182,14 @@ class CollectionViewSet(viewsets.ModelViewSet):
         queryset = self.apply_sorting(queryset)
         serializer = self.get_serializer(queryset, many=True)
        
+        return Response(serializer.data)
+    
+    # get view to get all the itinerary items for the collection
+    @action(detail=True, methods=['get'])
+    def itinerary(self, request, pk=None):
+        collection = self.get_object()
+        itinerary_items = CollectionItineraryItem.objects.filter(collection=collection)
+        serializer = CollectionItineraryItemSerializer(itinerary_items, many=True)
         return Response(serializer.data)
     
     # this make the is_public field of the collection cascade to the locations

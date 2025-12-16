@@ -18,6 +18,9 @@
 
 	import Eye from '~icons/mdi/eye';
 	import EyeOff from '~icons/mdi/eye-off';
+	import Star from '~icons/mdi/star';
+	import StarOutline from '~icons/mdi/star-outline';
+	import DotsHorizontal from '~icons/mdi/dots-horizontal';
 
 	function getTransportationIcon(type: string) {
 		if (type in TRANSPORTATION_TYPES_ICONS) {
@@ -26,6 +29,15 @@
 			return '🚗';
 		}
 	}
+
+	function renderStars(rating: number) {
+		const stars = [];
+		for (let i = 1; i <= 5; i++) {
+			stars.push(i <= rating);
+		}
+		return stars;
+	}
+
 	const dispatch = createEventDispatcher();
 
 	export let transportation: Transportation;
@@ -77,7 +89,8 @@
 {/if}
 
 <div
-	class="card w-full max-w-md bg-base-300 text-base-content shadow-2xl hover:shadow-3xl transition-all duration-300 border border-base-300 hover:border-primary/20 group"
+	class="card w-full max-w-md bg-base-300 shadow hover:shadow-md transition-all duration-200 border border-base-300 group"
+	aria-label="transportation-card"
 >
 	<!-- Image Section with Overlay -->
 	<div class="relative overflow-hidden rounded-t-2xl">
@@ -88,13 +101,15 @@
 		/>
 
 		<!-- Privacy Indicator -->
-		<div class="absolute top-4 right-4">
+		<div class="absolute top-2 right-4">
 			<div
 				class="tooltip tooltip-left"
 				data-tip={transportation.is_public ? $t('adventures.public') : $t('adventures.private')}
 			>
 				<div
-					class="btn btn-circle btn-sm btn-ghost bg-black/20 backdrop-blur-sm border-0 text-white"
+					class="badge badge-sm p-1 rounded-full text-base-content shadow-sm"
+					role="img"
+					aria-label={transportation.is_public ? $t('adventures.public') : $t('adventures.private')}
 				>
 					{#if transportation.is_public}
 						<Eye class="w-4 h-4" />
@@ -104,6 +119,13 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Out of Range Badge -->
+		{#if outsideCollectionRange}
+			<div class="absolute top-2 left-4">
+				<div class="badge badge-xs badge-error shadow">{$t('adventures.out_of_range')}</div>
+			</div>
+		{/if}
 
 		<!-- Category Badge -->
 		{#if transportation.type}
@@ -116,105 +138,116 @@
 		{/if}
 	</div>
 
-	<div class="card-body p-6 space-y-6">
+	<div class="card-body p-4 space-y-3">
 		<!-- Header -->
-		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-			<h2 class="text-xl font-bold truncate">{transportation.name}</h2>
-			<div class="flex flex-wrap gap-2">
-				<div class="badge badge-secondary">
-					{$t(`transportation.modes.${transportation.type}`)}
-					{getTransportationIcon(transportation.type)}
-				</div>
-				{#if transportation.type === 'plane' && transportation.flight_number}
-					<div class="badge badge-neutral">{transportation.flight_number}</div>
-				{/if}
-				{#if outsideCollectionRange}
-					<div class="badge badge-error">{$t('adventures.out_of_range')}</div>
-				{/if}
-			</div>
-		</div>
+		<div class="flex items-start justify-between gap-3">
+			<h2 class="text-lg font-semibold line-clamp-2">{transportation.name}</h2>
 
-		<!-- Route Info -->
-		<div class="space-y-3">
-			{#if transportation.from_location}
-				<div class="flex gap-2 text-sm">
-					<span class="font-medium whitespace-nowrap">{$t('adventures.from')}:</span>
-					<span class="break-words">{transportation.from_location}</span>
-				</div>
-			{/if}
-
-			{#if transportation.to_location}
-				<div class="flex gap-2 text-sm">
-					<span class="font-medium whitespace-nowrap">{$t('adventures.to')}:</span>
-					<span class="break-words">{transportation.to_location}</span>
-				</div>
-			{/if}
-
-			{#if transportation.distance && !isNaN(+transportation.distance)}
-				<div class="flex gap-2 text-sm">
-					<span class="font-medium whitespace-nowrap">{$t('adventures.distance')}:</span>
-					<span>
-						{(+transportation.distance).toFixed(1)} km / {toMiles(transportation.distance)} mi
-					</span>
+			{#if transportation.user === user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid))}
+				<div class="dropdown dropdown-end">
+					<div tabindex="0" role="button" class="btn btn-square btn-sm p-1 text-base-content">
+						<DotsHorizontal class="w-5 h-5" />
+					</div>
+					<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+					<ul
+						tabindex="0"
+						class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300"
+					>
+						<li>
+							<button on:click={editTransportation} class="flex items-center gap-2">
+								<FileDocumentEdit class="w-4 h-4" />
+								{$t('transportation.edit')}
+							</button>
+						</li>
+						<div class="divider my-1"></div>
+						<li>
+							<button
+								class="text-error flex items-center gap-2"
+								on:click={() => (isWarningModalOpen = true)}
+							>
+								<TrashCanOutline class="w-4 h-4" />
+								{$t('adventures.delete')}
+							</button>
+						</li>
+					</ul>
 				</div>
 			{/if}
 		</div>
 
-		<!-- Time Info -->
-		<div class="space-y-3">
+		<!-- Route Info (Compact) -->
+		<div class="space-y-2">
+			{#if transportation.from_location && transportation.to_location}
+				<div class="flex items-center gap-2 text-sm text-base-content/70">
+					<span class="font-medium">{$t('adventures.route')}:</span>
+					<span class="truncate">{transportation.from_location} → {transportation.to_location}</span
+					>
+				</div>
+			{:else if transportation.from_location}
+				<div class="flex items-center gap-2 text-sm text-base-content/70">
+					<span class="font-medium">{$t('adventures.from')}:</span>
+					<span class="truncate">{transportation.from_location}</span>
+				</div>
+			{:else if transportation.to_location}
+				<div class="flex items-center gap-2 text-sm text-base-content/70">
+					<span class="font-medium">{$t('adventures.to')}:</span>
+					<span class="truncate">{transportation.to_location}</span>
+				</div>
+			{/if}
+
+			{#if transportation.type === 'plane' && transportation.flight_number}
+				<div class="flex items-center gap-2 text-sm text-base-content/70">
+					<span class="font-medium">{$t('adventures.flight')}:</span>
+					<span>{transportation.flight_number}</span>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Inline Stats -->
+		<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70">
 			{#if transportation.date}
-				<div class="flex gap-2 text-sm">
-					<span class="font-medium whitespace-nowrap">{$t('adventures.start')}:</span>
-					<span>
+				<div class="flex items-center gap-1">
+					<span class="font-medium">
 						{#if isAllDay(transportation.date) && (!transportation.end_date || isAllDay(transportation.end_date))}
 							{formatAllDayDate(transportation.date)}
 						{:else}
 							{formatDateInTimezone(transportation.date, transportation.start_timezone)}
-							{#if transportation.start_timezone}
-								<span class="ml-1 text-xs opacity-60">({transportation.start_timezone})</span>
-							{/if}
 						{/if}
 					</span>
 				</div>
 			{/if}
 
-			{#if transportation.end_date}
-				<div class="flex gap-2 text-sm">
-					<span class="font-medium whitespace-nowrap">{$t('adventures.end')}:</span>
-					<span>
-						{#if isAllDay(transportation.end_date) && (!transportation.date || isAllDay(transportation.date))}
-							{formatAllDayDate(transportation.end_date)}
-						{:else}
-							{formatDateInTimezone(transportation.end_date, transportation.end_timezone)}
-							{#if transportation.end_timezone}
-								<span class="ml-1 text-xs opacity-60">({transportation.end_timezone})</span>
+			{#if transportation.distance && !isNaN(+transportation.distance)}
+				<div class="badge badge-ghost badge-sm">
+					{user?.measurement_system === 'imperial'
+						? `${toMiles(transportation.distance)} mi`
+						: `${(+transportation.distance).toFixed(1)} km`}
+				</div>
+			{/if}
+
+			{#if transportation.rating}
+				<div class="flex items-center gap-1">
+					<div class="flex -ml-1">
+						{#each renderStars(transportation.rating) as filled}
+							{#if filled}
+								<Star class="w-4 h-4 text-warning fill-current" />
+							{:else}
+								<StarOutline class="w-4 h-4 text-base-content/30" />
 							{/if}
-						{/if}
-					</span>
+						{/each}
+					</div>
+					<span class="text-xs text-base-content/60">({transportation.rating}/5)</span>
 				</div>
 			{/if}
 		</div>
-
-		<!-- Actions -->
-		{#if transportation.user === user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid))}
-			<div class="pt-4 border-t border-base-300 flex justify-end gap-2">
-				<button
-					class="btn btn-neutral btn-sm flex items-center gap-1"
-					on:click={editTransportation}
-					title={$t('transportation.edit')}
-				>
-					<FileDocumentEdit class="w-5 h-5" />
-					<span>{$t('transportation.edit')}</span>
-				</button>
-				<button
-					class="btn btn-secondary btn-sm flex items-center gap-1"
-					on:click={() => (isWarningModalOpen = true)}
-					title={$t('adventures.delete')}
-				>
-					<TrashCanOutline class="w-5 h-5" />
-					<span>{$t('adventures.delete')}</span>
-				</button>
-			</div>
-		{/if}
 	</div>
 </div>
+
+<style>
+	.line-clamp-2 {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+</style>

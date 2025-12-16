@@ -9,6 +9,10 @@
 	import TrashCan from '~icons/mdi/trash-can';
 	import Calendar from '~icons/mdi/calendar';
 	import DeleteWarning from './DeleteWarning.svelte';
+	import DotsHorizontal from '~icons/mdi/dots-horizontal';
+	import FileDocumentEdit from '~icons/mdi/file-document-edit';
+	import CheckCircle from '~icons/mdi/check-circle';
+	import CheckboxBlankCircleOutline from '~icons/mdi/checkbox-blank-circle-outline';
 	import { isEntityOutsideCollectionDateRange } from '$lib/dateUtils';
 
 	export let checklist: Checklist;
@@ -52,53 +56,107 @@
 	/>
 {/if}
 <div
-	class="card w-full max-w-md bg-base-300 text-base-content shadow-2xl hover:shadow-3xl transition-all duration-300 border border-base-300 hover:border-primary/20 group"
+	class="card w-full max-w-md bg-base-300 shadow hover:shadow-md transition-all duration-200 border border-base-300 group"
+	aria-label="checklist-card"
 >
-	<div class="card-body p-6 space-y-4">
+	<div class="card-body p-4 space-y-3">
 		<!-- Header -->
-		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-			<h2 class="text-xl font-bold break-words">{checklist.name}</h2>
-			<div class="flex flex-wrap gap-2">
-				<div class="badge badge-primary">{$t('adventures.checklist')}</div>
-				{#if outsideCollectionRange}
-					<div class="badge badge-error">{$t('adventures.out_of_range')}</div>
-				{/if}
+		<div class="flex items-start justify-between gap-3">
+			<div class="flex-1 min-w-0">
+				<h2 class="text-lg font-semibold line-clamp-2">{checklist.name}</h2>
+				<div class="flex flex-wrap items-center gap-2 mt-2">
+					<div class="badge badge-primary badge-sm">{$t('adventures.checklist')}</div>
+					{#if outsideCollectionRange}
+						<div class="badge badge-error badge-xs">{$t('adventures.out_of_range')}</div>
+					{/if}
+				</div>
 			</div>
+
+			{#if checklist.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid))}
+				<div class="dropdown dropdown-end">
+					<div tabindex="0" role="button" class="btn btn-square btn-sm p-1 text-base-content">
+						<DotsHorizontal class="w-5 h-5" />
+					</div>
+					<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+					<ul
+						tabindex="0"
+						class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300"
+					>
+						<li>
+							<button on:click={editChecklist} class="flex items-center gap-2">
+								<FileDocumentEdit class="w-4 h-4" />
+								{$t('notes.open')}
+							</button>
+						</li>
+						<div class="divider my-1"></div>
+						<li>
+							<button
+								class="text-error flex items-center gap-2"
+								on:click={() => (isWarningModalOpen = true)}
+							>
+								<TrashCan class="w-4 h-4" />
+								{$t('adventures.delete')}
+							</button>
+						</li>
+					</ul>
+				</div>
+			{/if}
 		</div>
 
-		<!-- Checklist Stats -->
+		<!-- Checklist Items Preview -->
 		{#if checklist.items.length > 0}
-			<p class="text-sm">
-				{checklist.items.length}
-				{checklist.items.length > 1 ? $t('checklist.items') : $t('checklist.item')}
-			</p>
-		{/if}
-
-		<!-- Date -->
-		{#if checklist.date && checklist.date !== ''}
-			<div class="inline-flex items-center gap-2 text-sm">
-				<Calendar class="w-5 h-5 text-primary" />
-				<p>{new Date(checklist.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}</p>
+			<div class="space-y-2">
+				{#each checklist.items.slice(0, 3) as item}
+					<div class="flex items-center gap-2 text-sm text-base-content/70">
+						{#if item.is_checked}
+							<CheckCircle class="w-4 h-4 text-success flex-shrink-0" />
+						{:else}
+							<CheckboxBlankCircleOutline class="w-4 h-4 flex-shrink-0" />
+						{/if}
+						<span
+							class="truncate"
+							class:line-through={item.is_checked}
+							class:opacity-60={item.is_checked}
+						>
+							{item.name}
+						</span>
+					</div>
+				{/each}
+				{#if checklist.items.length > 3}
+					<div class="text-sm text-base-content/60 pl-6">
+						+{checklist.items.length - 3}
+						{$t('checklist.more_items')}
+					</div>
+				{/if}
 			</div>
 		{/if}
 
-		<!-- Actions -->
-		<div class="pt-4 border-t border-base-300 flex justify-end gap-2">
-			<button class="btn btn-neutral btn-sm flex items-center gap-1" on:click={editChecklist}>
-				<Launch class="w-5 h-5" />
-				{$t('notes.open')}
-			</button>
-			{#if checklist.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid))}
-				<button
-					id="delete_adventure"
-					data-umami-event="Delete Checklist"
-					class="btn btn-secondary btn-sm flex items-center gap-1"
-					on:click={() => (isWarningModalOpen = true)}
-				>
-					<TrashCan class="w-5 h-5" />
-					{$t('adventures.delete')}
-				</button>
+		<!-- Inline Stats -->
+		<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70">
+			{#if checklist.date && checklist.date !== ''}
+				<div class="flex items-center gap-1">
+					<Calendar class="w-4 h-4 text-primary" />
+					<span>{new Date(checklist.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span>
+				</div>
+			{/if}
+
+			{#if checklist.items.length > 0}
+				{@const completedCount = checklist.items.filter((item) => item.is_checked).length}
+				<div class="badge badge-ghost badge-sm">
+					{completedCount}/{checklist.items.length}
+					{$t('checklist.completed')}
+				</div>
 			{/if}
 		</div>
 	</div>
 </div>
+
+<style>
+	.line-clamp-2 {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+</style>

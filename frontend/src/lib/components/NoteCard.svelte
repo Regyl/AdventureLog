@@ -15,6 +15,9 @@
 	import TrashCan from '~icons/mdi/trash-can';
 	import Calendar from '~icons/mdi/calendar';
 	import DeleteWarning from './DeleteWarning.svelte';
+	import DotsHorizontal from '~icons/mdi/dots-horizontal';
+	import FileDocumentEdit from '~icons/mdi/file-document-edit';
+	import LinkVariant from '~icons/mdi/link-variant';
 	import { isEntityOutsideCollectionDateRange } from '$lib/dateUtils';
 
 	export let note: Note;
@@ -60,76 +63,116 @@
 {/if}
 
 <div
-	class="card w-full max-w-md bg-base-300 text-base-content shadow-2xl hover:shadow-3xl transition-all duration-300 border border-base-300 hover:border-primary/20 group"
+	class="card w-full max-w-md bg-base-300 shadow hover:shadow-md transition-all duration-200 border border-base-300 group"
+	aria-label="note-card"
 >
-	<div class="card-body p-6 space-y-4">
+	<div class="card-body p-4 space-y-3">
 		<!-- Header -->
-		<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-			<h2 class="text-xl font-bold break-words">{note.name}</h2>
-			<div class="flex flex-wrap gap-2">
-				<div class="badge badge-primary">{$t('adventures.note')}</div>
-				{#if outsideCollectionRange}
-					<div class="badge badge-error">{$t('adventures.out_of_range')}</div>
-				{/if}
+		<div class="flex items-start justify-between gap-3">
+			<div class="flex-1 min-w-0">
+				<h2 class="text-lg font-semibold line-clamp-2">{note.name}</h2>
+				<div class="flex flex-wrap items-center gap-2 mt-2">
+					<div class="badge badge-primary badge-sm">{$t('adventures.note')}</div>
+					{#if outsideCollectionRange}
+						<div class="badge badge-error badge-xs">{$t('adventures.out_of_range')}</div>
+					{/if}
+				</div>
 			</div>
+
+			{#if note.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid))}
+				<div class="dropdown dropdown-end">
+					<div tabindex="0" role="button" class="btn btn-square btn-sm p-1 text-base-content">
+						<DotsHorizontal class="w-5 h-5" />
+					</div>
+					<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+					<ul
+						tabindex="0"
+						class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300"
+					>
+						<li>
+							<button on:click={editNote} class="flex items-center gap-2">
+								<FileDocumentEdit class="w-4 h-4" />
+								{$t('notes.open')}
+							</button>
+						</li>
+						<div class="divider my-1"></div>
+						<li>
+							<button
+								class="text-error flex items-center gap-2"
+								on:click={() => (isWarningModalOpen = true)}
+							>
+								<TrashCan class="w-4 h-4" />
+								{$t('adventures.delete')}
+							</button>
+						</li>
+					</ul>
+				</div>
+			{/if}
 		</div>
 
-		<!-- Note Content -->
+		<!-- Note Content Preview -->
 		{#if note.content && note.content?.length > 0}
 			<article
-				class="prose overflow-auto max-h-72 max-w-full p-4 border border-base-300 bg-base-100 rounded-lg"
+				class="prose prose-sm max-w-none overflow-hidden max-h-32 text-sm text-base-content/70 line-clamp-4"
 			>
 				{@html renderMarkdown(note.content || '')}
 			</article>
 		{/if}
 
-		<!-- Links -->
-		{#if note.links && note.links?.length > 0}
-			<div class="space-y-1">
-				<p class="text-sm font-medium">
+		<!-- Inline Stats -->
+		<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70">
+			{#if note.date && note.date !== ''}
+				<div class="flex items-center gap-1">
+					<Calendar class="w-4 h-4 text-primary" />
+					<span>{new Date(note.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span>
+				</div>
+			{/if}
+
+			{#if note.links && note.links?.length > 0}
+				<div class="badge badge-ghost badge-sm">
+					<LinkVariant class="w-3 h-3 mr-1" />
 					{note.links.length}
 					{note.links.length > 1 ? $t('adventures.links') : $t('adventures.link')}
-				</p>
-				<ul class="list-disc pl-5 text-sm">
-					{#each note.links.slice(0, 3) as link}
-						<li>
-							<a class="link link-primary" href={link} target="_blank" rel="noopener noreferrer">
-								{link.split('//')[1]?.split('/', 1)[0]}
-							</a>
-						</li>
-					{/each}
-					{#if note.links.length > 3}
-						<li>…</li>
-					{/if}
-				</ul>
-			</div>
-		{/if}
-
-		<!-- Date -->
-		{#if note.date && note.date !== ''}
-			<div class="inline-flex items-center gap-2 text-sm">
-				<Calendar class="w-5 h-5 text-primary" />
-				<p>{new Date(note.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}</p>
-			</div>
-		{/if}
-
-		<!-- Actions -->
-		<div class="pt-4 border-t border-base-300 flex justify-end gap-2">
-			<button class="btn btn-neutral btn-sm flex items-center gap-1" on:click={editNote}>
-				<Launch class="w-5 h-5" />
-				{$t('notes.open')}
-			</button>
-			{#if note.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid))}
-				<button
-					id="delete_adventure"
-					data-umami-event="Delete Adventure"
-					class="btn btn-secondary btn-sm flex items-center gap-1"
-					on:click={() => (isWarningModalOpen = true)}
-				>
-					<TrashCan class="w-5 h-5" />
-					{$t('adventures.delete')}
-				</button>
+				</div>
 			{/if}
 		</div>
+
+		<!-- Links Preview (compact) -->
+		{#if note.links && note.links?.length > 0}
+			<div class="flex flex-wrap gap-2">
+				{#each note.links.slice(0, 2) as link}
+					<a
+						class="badge badge-outline badge-sm hover:badge-primary transition-colors"
+						href={link}
+						target="_blank"
+						rel="noopener noreferrer"
+					>
+						<LinkVariant class="w-3 h-3 mr-1" />
+						{link.split('//')[1]?.split('/', 1)[0]}
+					</a>
+				{/each}
+				{#if note.links.length > 2}
+					<span class="badge badge-ghost badge-sm">+{note.links.length - 2}</span>
+				{/if}
+			</div>
+		{/if}
 	</div>
 </div>
+
+<style>
+	.line-clamp-2 {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+
+	.line-clamp-4 {
+		display: -webkit-box;
+		-webkit-line-clamp: 4;
+		line-clamp: 4;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+</style>

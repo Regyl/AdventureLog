@@ -11,6 +11,12 @@
 	import { formatAllDayDate } from '$lib/dateUtils';
 	import { isAllDay } from '$lib';
 	import CardCarousel from './CardCarousel.svelte';
+	import Eye from '~icons/mdi/eye';
+	import EyeOff from '~icons/mdi/eye-off';
+	import Star from '~icons/mdi/star';
+	import StarOutline from '~icons/mdi/star-outline';
+	import MapMarker from '~icons/mdi/map-marker';
+	import DotsHorizontal from '~icons/mdi/dots-horizontal';
 
 	const dispatch = createEventDispatcher();
 
@@ -21,6 +27,15 @@
 			return '🏨';
 		}
 	}
+
+	function renderStars(rating: number) {
+		const stars = [];
+		for (let i = 1; i <= 5; i++) {
+			stars.push(i <= rating);
+		}
+		return stars;
+	}
+
 	export let lodging: Lodging;
 	export let user: User | null = null;
 	export let collection: Collection | null = null;
@@ -68,11 +83,39 @@
 {/if}
 
 <div
-	class="card w-full max-w-md bg-base-300 text-base-content shadow-2xl hover:shadow-3xl transition-all duration-300 border border-base-300 hover:border-primary/20 group"
+	class="card w-full max-w-md bg-base-300 shadow hover:shadow-md transition-all duration-200 border border-base-300 group"
+	aria-label="lodging-card"
 >
 	<!-- Image Section with Overlay -->
 	<div class="relative overflow-hidden rounded-t-2xl">
 		<CardCarousel images={lodging.images} icon={getLodgingIcon(lodging.type)} name={lodging.name} />
+
+		<!-- Privacy Indicator -->
+		<div class="absolute top-2 right-4">
+			<div
+				class="tooltip tooltip-left"
+				data-tip={lodging.is_public ? $t('adventures.public') : $t('adventures.private')}
+			>
+				<div
+					class="badge badge-sm p-1 rounded-full text-base-content shadow-sm"
+					role="img"
+					aria-label={lodging.is_public ? $t('adventures.public') : $t('adventures.private')}
+				>
+					{#if lodging.is_public}
+						<Eye class="w-4 h-4" />
+					{:else}
+						<EyeOff class="w-4 h-4" />
+					{/if}
+				</div>
+			</div>
+		</div>
+
+		<!-- Out of Range Badge -->
+		{#if outsideCollectionRange}
+			<div class="absolute top-2 left-4">
+				<div class="badge badge-xs badge-error shadow">{$t('adventures.out_of_range')}</div>
+			</div>
+		{/if}
 
 		<!-- Category Badge -->
 		{#if lodging.type}
@@ -84,103 +127,117 @@
 			</div>
 		{/if}
 	</div>
-	<div class="card-body p-6 space-y-4">
+	<div class="card-body p-4 space-y-3">
 		<!-- Header -->
-		<div class="flex flex-col gap-3">
-			<h2 class="text-xl font-bold break-words">{lodging.name}</h2>
-			<div class="flex flex-wrap gap-2">
-				<div class="badge badge-secondary">
-					{$t(`lodging.${lodging.type}`)}
-					{getLodgingIcon(lodging.type)}
-				</div>
-				{#if outsideCollectionRange}
-					<div class="badge badge-error">{$t('adventures.out_of_range')}</div>
-				{/if}
-			</div>
-		</div>
+		<div class="flex items-start justify-between gap-3">
+			<h2 class="text-lg font-semibold line-clamp-2">{lodging.name}</h2>
 
-		<!-- Location Info -->
-		<div class="space-y-2">
-			{#if lodging.location}
-				<div class="flex items-center gap-2">
-					<span class="text-sm font-medium">{$t('adventures.location')}:</span>
-					<p class="text-sm break-words">{lodging.location}</p>
+			{#if lodging.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid))}
+				<div class="dropdown dropdown-end">
+					<div tabindex="0" role="button" class="btn btn-square btn-sm p-1 text-base-content">
+						<DotsHorizontal class="w-5 h-5" />
+					</div>
+					<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+					<ul
+						tabindex="0"
+						class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300"
+					>
+						<li>
+							<button on:click={editTransportation} class="flex items-center gap-2">
+								<FileDocumentEdit class="w-4 h-4" />
+								{$t('transportation.edit')}
+							</button>
+						</li>
+						<div class="divider my-1"></div>
+						<li>
+							<button
+								class="text-error flex items-center gap-2"
+								on:click={() => (isWarningModalOpen = true)}
+							>
+								<TrashCanOutline class="w-4 h-4" />
+								{$t('adventures.delete')}
+							</button>
+						</li>
+					</ul>
 				</div>
 			{/if}
-
-			<div class="space-y-3">
-				{#if lodging.check_in}
-					<div class="flex gap-2 text-sm">
-						<span class="font-medium whitespace-nowrap">{$t('adventures.check_in')}:</span>
-						<span>
-							{#if isAllDay(lodging.check_in)}
-								{formatAllDayDate(lodging.check_in)}
-							{:else}
-								{formatDateInTimezone(lodging.check_in, lodging.timezone)}
-								{#if lodging.timezone}
-									<span class="ml-1 text-xs opacity-60">({lodging.timezone})</span>
-								{/if}
-							{/if}
-						</span>
-					</div>
-				{/if}
-
-				{#if lodging.check_out}
-					<div class="flex gap-2 text-sm">
-						<span class="font-medium whitespace-nowrap">{$t('adventures.check_out')}:</span>
-						<span>
-							{#if isAllDay(lodging.check_out)}
-								{formatAllDayDate(lodging.check_out)}
-							{:else}
-								{formatDateInTimezone(lodging.check_out, lodging.timezone)}
-								{#if lodging.timezone}
-									<span class="ml-1 text-xs opacity-60">({lodging.timezone})</span>
-								{/if}
-							{/if}
-						</span>
-					</div>
-				{/if}
-			</div>
 		</div>
 
-		<!-- Reservation Info -->
-		{#if lodging.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid))}
-			<div class="space-y-2">
-				{#if lodging.reservation_number}
-					<div class="flex items-center gap-2">
-						<span class="text-sm font-medium">{$t('adventures.reservation_number')}:</span>
-						<p class="text-sm break-all">{lodging.reservation_number}</p>
-					</div>
-				{/if}
-				{#if lodging.price}
-					<div class="flex items-center gap-2">
-						<span class="text-sm font-medium">{$t('adventures.price')}:</span>
-						<p class="text-sm">{lodging.price}</p>
-					</div>
-				{/if}
+		<!-- Location Info (Compact) -->
+		{#if lodging.location}
+			<div class="flex items-center gap-2 text-sm text-base-content/70">
+				<MapMarker class="w-4 h-4 text-primary" />
+				<span class="truncate max-w-[18rem]">{lodging.location}</span>
 			</div>
 		{/if}
 
-		<!-- Actions -->
+		<!-- Inline Stats -->
+		<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70">
+			{#if lodging.check_in}
+				<div class="flex items-center gap-1">
+					<span class="font-medium">
+						{#if isAllDay(lodging.check_in)}
+							{formatAllDayDate(lodging.check_in)}
+						{:else}
+							{formatDateInTimezone(lodging.check_in, lodging.timezone)}
+						{/if}
+					</span>
+				</div>
+			{/if}
+
+			{#if lodging.check_out && lodging.check_in}
+				<span class="text-base-content/40">→</span>
+				<div class="flex items-center gap-1">
+					<span class="font-medium">
+						{#if isAllDay(lodging.check_out)}
+							{formatAllDayDate(lodging.check_out)}
+						{:else}
+							{formatDateInTimezone(lodging.check_out, lodging.timezone)}
+						{/if}
+					</span>
+				</div>
+			{/if}
+
+			{#if lodging.rating}
+				<div class="flex items-center gap-1">
+					<div class="flex -ml-1">
+						{#each renderStars(lodging.rating) as filled}
+							{#if filled}
+								<Star class="w-4 h-4 text-warning fill-current" />
+							{:else}
+								<StarOutline class="w-4 h-4 text-base-content/30" />
+							{/if}
+						{/each}
+					</div>
+					<span class="text-xs text-base-content/60">({lodging.rating}/5)</span>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Additional Info (for owner only) -->
 		{#if lodging.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid))}
-			<div class="pt-4 border-t border-base-300 flex justify-end gap-2">
-				<button
-					class="btn btn-neutral btn-sm flex items-center gap-1"
-					on:click={editTransportation}
-					title={$t('transportation.edit')}
-				>
-					<FileDocumentEdit class="w-5 h-5" />
-					<span>{$t('transportation.edit')}</span>
-				</button>
-				<button
-					on:click={() => (isWarningModalOpen = true)}
-					class="btn btn-secondary btn-sm flex items-center gap-1"
-					title={$t('adventures.delete')}
-				>
-					<TrashCanOutline class="w-5 h-5" />
-					<span>{$t('adventures.delete')}</span>
-				</button>
+			<div class="flex flex-wrap gap-2">
+				{#if lodging.reservation_number}
+					<div class="badge badge-ghost badge-sm">
+						{$t('adventures.reservation')}: {lodging.reservation_number}
+					</div>
+				{/if}
+				{#if lodging.price}
+					<div class="badge badge-ghost badge-sm">
+						{lodging.price}
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>
 </div>
+
+<style>
+	.line-clamp-2 {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+</style>

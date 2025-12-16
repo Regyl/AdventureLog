@@ -178,7 +178,7 @@
 				<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
 					{#each recentAdventures as adventure}
 						<div class="adventure-card">
-							<LocationCard {adventure} user={data.user} readOnly />
+							<LocationCard {adventure} readOnly user={null} />
 						</div>
 					{/each}
 				</div>
