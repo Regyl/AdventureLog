@@ -51,21 +51,32 @@
 
 		const targetDate = DateTime.fromISO(dateISO).startOf('day');
 
+		// Helper: only include lodging that has been added to the itinerary
+		function isLodgingScheduled(lodgingId: any): boolean {
+			return !!collection.itinerary?.some((it) => {
+				const objectType = it.item?.type || '';
+				return objectType === 'lodging' && it.object_id === lodgingId;
+			});
+		}
+
 		return collection.lodging.filter((lodging) => {
+			// Only consider lodging entries that have both check-in and check-out
 			if (!lodging.check_in || !lodging.check_out) return false;
 
+			// Skip lodgings that are not scheduled in the itinerary
+			if (!isLodgingScheduled(lodging.id)) return false;
+
 			// Extract just the date portion (YYYY-MM-DD) to avoid timezone shifts
-			// check_in/check_out are stored as UTC midnight (e.g., "2025-06-28T00:00:00Z")
 			const checkInDateStr = lodging.check_in.split('T')[0];
 			const checkOutDateStr = lodging.check_out.split('T')[0];
 
 			const checkIn = DateTime.fromISO(checkInDateStr).startOf('day');
 			const checkOut = DateTime.fromISO(checkOutDateStr).startOf('day');
 
-			// The guest is staying overnight if:
-			// 1. The target date is AFTER the check-in date (not on check-in day - that's when we show full card)
-			// 2. The target date is BEFORE the check-out date (on check-out day they leave, no overnight)
-			return targetDate > checkIn && targetDate < checkOut;
+			// The guest is staying overnight if the target date is between
+			// check-in (inclusive) and check-out (exclusive). This includes the
+			// check-in night as requested.
+			return targetDate >= checkIn && targetDate < checkOut;
 		});
 	}
 
@@ -247,7 +258,7 @@
 					</div>
 
 					<!-- Day Items -->
-					<div class="space-y-4">
+					<div>
 						{#if day.items.length === 0}
 							<div
 								class="card bg-base-100 shadow-sm border border-dashed border-base-300 p-4 text-center"
@@ -263,11 +274,13 @@
 									items: day.items,
 									flipDurationMs,
 									dropTargetStyle: { outline: 'none', border: 'none' },
-									dragDisabled: false
+									dragDisabled: false,
+									dragHandle: '.itinerary-drag-handle',
+									dropFromOthersDisabled: true
 								}}
 								on:consider={(e) => handleDndConsider(dayIndex, e)}
 								on:finalize={(e) => handleDndFinalize(dayIndex, e)}
-								class="space-y-4"
+								class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"
 							>
 								{#each day.items as item, index (item.id)}
 									{@const objectType = item.item?.type || ''}
@@ -276,7 +289,7 @@
 									{@const isDraggingShadow = item[SHADOW_ITEM_MARKER_PROPERTY_NAME]}
 
 									<div
-										class="group relative transition-all duration-200 {isDraggingShadow
+										class="group relative transition-all duration-200 pointer-events-auto h-full {isDraggingShadow
 											? 'opacity-40 scale-95'
 											: 'hover:shadow-lg'}"
 										animate:flip={{ duration: flipDurationMs }}
@@ -284,15 +297,18 @@
 										{#if resolvedObj}
 											<!-- Drag Handle Container -->
 											<div
-												class="absolute -left-3 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+												class="absolute left-2 top-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
 												title="Drag to reorder"
 											>
 												<div
-													class="bg-base-300 hover:bg-primary hover:text-primary-content rounded-lg p-2 cursor-grab active:cursor-grabbing shadow-md transition-all duration-200 hover:scale-110"
+													class="itinerary-drag-handle btn btn-circle btn-xs btn-ghost bg-base-100/80 backdrop-blur-sm shadow-sm hover:bg-base-200 cursor-grab active:cursor-grabbing"
+													aria-label="Drag to reorder"
+													role="button"
+													tabindex="0"
 												>
 													<svg
 														xmlns="http://www.w3.org/2000/svg"
-														class="h-5 w-5"
+														class="h-3 w-3"
 														fill="none"
 														viewBox="0 0 24 24"
 														stroke="currentColor"
@@ -300,28 +316,27 @@
 														<path
 															stroke-linecap="round"
 															stroke-linejoin="round"
-															stroke-width="2.5"
-															d="M8 9h8M8 15h8"
+															stroke-width="2"
+															d="M4 8h16M4 16h16"
 														/>
 													</svg>
 												</div>
 											</div>
 
 											<!-- Order Badge -->
-											<div class="absolute -left-3 -top-3 z-10">
+											<div class="absolute right-2 top-2 z-10">
 												<div
-													class="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-content font-bold text-xs shadow-lg"
+													class="badge badge-primary badge-sm font-bold shadow-md"
+													title="Item order"
 												>
-													{index + 1}
+													#{index + 1}
 												</div>
 											</div>
 
 											<!-- Multi-day indicator for lodging -->
 											{#if multiDay && objectType === 'lodging'}
-												<div class="absolute -right-3 -top-3 z-10">
-													<div
-														class="badge badge-info badge-sm shadow-lg gap-1 px-3 py-3 font-semibold"
-													>
+												<div class="absolute left-2 bottom-2 z-10">
+													<div class="badge badge-info badge-xs gap-1 shadow-sm">
 														<svg
 															xmlns="http://www.w3.org/2000/svg"
 															class="h-3 w-3"
@@ -333,19 +348,24 @@
 																stroke-linecap="round"
 																stroke-linejoin="round"
 																stroke-width="2"
-																d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+																d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
 															/>
 														</svg>
-														Overnight
+														Multi-day
 													</div>
 												</div>
 											{/if}
 
-											<!-- Card with smooth transition -->
-											<div class="transition-all duration-200">
+											<!-- Card with smooth transition and proper sizing for grid -->
+											<div class="transition-all duration-200 h-full">
 												<!-- Display the appropriate card based on type -->
 												{#if objectType === 'location'}
-													<LocationCard adventure={resolvedObj} {user} collection={null} />
+													<LocationCard
+														adventure={resolvedObj}
+														{user}
+														{collection}
+														compact={true}
+													/>
 												{:else if objectType === 'transportation'}
 													<TransportationCard transportation={resolvedObj} {user} {collection} />
 												{:else if objectType === 'lodging'}
@@ -429,9 +449,9 @@
 					</p>
 
 					<!-- Unscheduled Items List -->
-					<div class="space-y-4">
+					<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
 						{#each unscheduledItems as { type, item }}
-							<div class="relative opacity-60 hover:opacity-100 transition-opacity">
+							<div class="relative opacity-60 hover:opacity-100 transition-opacity h-full">
 								<!-- "Add to itinerary" indicator -->
 								<div class="absolute -right-2 top-2 z-10">
 									<button class="btn btn-circle btn-sm btn-primary" title="Add to itinerary">

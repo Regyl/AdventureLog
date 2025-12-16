@@ -30,6 +30,7 @@
 	export let user: User | null;
 	export let collection: Collection | null = null;
 	export let readOnly: boolean = false;
+	export let compact: boolean = false; // For compact grid display in itinerary
 
 	let isCollectionModalOpen: boolean = false;
 	let isWarningModalOpen: boolean = false;
@@ -268,12 +269,22 @@
 	</div>
 
 	<!-- Content Section -->
-	<div class="card-body p-4 space-y-3">
+	<div
+		class="card-body space-y-2"
+		class:p-3={compact}
+		class:p-4={!compact}
+		class:space-y-2={compact}
+		class:space-y-3={!compact}
+	>
 		<!-- Header: title + compact actions -->
-		<div class="flex items-start justify-between gap-3">
+		<div class="flex items-start justify-between gap-2">
 			<a
 				href="/locations/{adventure.id}"
-				class="text-lg font-semibold hover:text-primary transition-colors duration-200 line-clamp-2"
+				class="hover:text-primary transition-colors duration-200 line-clamp-2"
+				class:text-base={compact}
+				class:text-lg={!compact}
+				class:font-semibold={!compact}
+				class:font-medium={compact}
 			>
 				{adventure.name}
 			</a>
@@ -288,14 +299,12 @@
 				</button>
 
 				{#if (adventure.user && adventure.user.uuid == user?.uuid) || (collection && user && collection.shared_with?.includes(user.uuid)) || (collection && user && collection.user == user.uuid)}
-					<div class="dropdown dropdown-end">
-						<div tabindex="0" role="button" class="btn btn-square btn-sm p-1 text-base-content">
+					<details class="dropdown dropdown-end relative z-50">
+						<summary class="btn btn-square btn-sm p-1 text-base-content">
 							<DotsHorizontal class="w-5 h-5" />
-						</div>
-						<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+						</summary>
 						<ul
-							tabindex="0"
-							class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300"
+							class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow-lg border border-base-300"
 						>
 							<li>
 								<button on:click={editAdventure} class="flex items-center gap-2">
@@ -355,13 +364,19 @@
 								</li>
 							{/if}
 						</ul>
-					</div>
+					</details>
 				{/if}
 			</div>
 		</div>
 
 		<!-- Inline stats: location, rating, visits -->
-		<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70 min-w-0">
+		<div
+			class="flex flex-wrap items-center text-base-content/70 min-w-0"
+			class:gap-2={compact}
+			class:gap-3={!compact}
+			class:text-xs={compact}
+			class:text-sm={!compact}
+		>
 			{#if adventure.location}
 				<div class="flex items-center gap-1 min-w-0">
 					<MapMarker class="w-4 h-4 text-primary" />

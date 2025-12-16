@@ -127,6 +127,7 @@
 	<ImageDisplayModal
 		images={heroImages}
 		initialIndex={modalInitialIndex}
+		name={collection.name}
 		on:close={closeImageModal}
 	/>
 {/if}
