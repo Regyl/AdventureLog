@@ -7,7 +7,7 @@
 	import { t } from 'svelte-i18n';
 	import DeleteWarning from './DeleteWarning.svelte';
 	import { LODGING_TYPES_ICONS } from '$lib';
-	import { formatDateInTimezone, isEntityOutsideCollectionDateRange } from '$lib/dateUtils';
+	import { formatDateInTimezone } from '$lib/dateUtils';
 	import { formatAllDayDate } from '$lib/dateUtils';
 	import { isAllDay } from '$lib';
 	import CardCarousel from './CardCarousel.svelte';
@@ -44,14 +44,6 @@
 
 	function editTransportation() {
 		dispatch('edit', lodging);
-	}
-
-	let outsideCollectionRange: boolean = false;
-
-	$: {
-		if (collection) {
-			outsideCollectionRange = isEntityOutsideCollectionDateRange(lodging, collection);
-		}
 	}
 
 	async function deleteTransportation() {
@@ -109,13 +101,6 @@
 				</div>
 			</div>
 		</div>
-
-		<!-- Out of Range Badge -->
-		{#if outsideCollectionRange}
-			<div class="absolute top-2 left-4">
-				<div class="badge badge-xs badge-error shadow">{$t('adventures.out_of_range')}</div>
-			</div>
-		{/if}
 
 		<!-- Category Badge -->
 		{#if lodging.type}

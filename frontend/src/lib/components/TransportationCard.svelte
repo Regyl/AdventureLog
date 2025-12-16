@@ -8,11 +8,7 @@
 	import DeleteWarning from './DeleteWarning.svelte';
 	// import ArrowDownThick from '~icons/mdi/arrow-down-thick';
 	import { TRANSPORTATION_TYPES_ICONS } from '$lib';
-	import {
-		formatAllDayDate,
-		formatDateInTimezone,
-		isEntityOutsideCollectionDateRange
-	} from '$lib/dateUtils';
+	import { formatAllDayDate, formatDateInTimezone } from '$lib/dateUtils';
 	import { isAllDay } from '$lib';
 	import CardCarousel from './CardCarousel.svelte';
 
@@ -50,14 +46,6 @@
 
 	function editTransportation() {
 		dispatch('edit', transportation);
-	}
-
-	let outsideCollectionRange: boolean = false;
-
-	$: {
-		if (collection) {
-			outsideCollectionRange = isEntityOutsideCollectionDateRange(transportation, collection);
-		}
 	}
 
 	async function deleteTransportation() {
@@ -119,13 +107,6 @@
 				</div>
 			</div>
 		</div>
-
-		<!-- Out of Range Badge -->
-		{#if outsideCollectionRange}
-			<div class="absolute top-2 left-4">
-				<div class="badge badge-xs badge-error shadow">{$t('adventures.out_of_range')}</div>
-			</div>
-		{/if}
 
 		<!-- Category Badge -->
 		{#if transportation.type}

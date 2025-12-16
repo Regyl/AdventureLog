@@ -25,7 +25,6 @@
 	import StarOutline from '~icons/mdi/star-outline';
 	import Eye from '~icons/mdi/eye';
 	import EyeOff from '~icons/mdi/eye-off';
-	import { isEntityOutsideCollectionDateRange } from '$lib/dateUtils';
 
 	export let type: string | null = null;
 	export let user: User | null;
@@ -61,18 +60,6 @@
 				displayActivityTypes = adventure.tags.slice(0, 3);
 				remainingCount = adventure.tags.length - 3;
 			}
-		}
-	}
-
-	let outsideCollectionRange: boolean = false;
-
-	$: {
-		if (collection && collection.start_date && collection.end_date) {
-			outsideCollectionRange = adventure.visits.every((visit) =>
-				isEntityOutsideCollectionDateRange(visit, collection)
-			);
-		} else {
-			outsideCollectionRange = false;
 		}
 	}
 
@@ -219,9 +206,6 @@
 					</div>
 				{/if}
 			</div>
-			{#if outsideCollectionRange}
-				<div class="badge badge-xs badge-error shadow">{$t('adventures.out_of_range')}</div>
-			{/if}
 		</div>
 
 		<!-- Privacy Indicator -->

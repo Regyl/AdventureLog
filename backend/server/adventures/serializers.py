@@ -713,34 +713,12 @@ class CollectionItineraryItemSerializer(CustomModelSerializer):
         read_only_fields = ['id', 'created_at', 'start_datetime', 'end_datetime', 'item', 'object_name']
     
     def get_item(self, obj):
-        """Return serialized data for the linked item"""
+        """Return id and type for the linked item"""
         if not obj.item:
             return None
             
-        # Get the appropriate serializer based on the content type
-        from django.contrib.contenttypes.models import ContentType
-        
-        content_type = obj.content_type
-        item = obj.item
-        
-        # Map content types to their serializers
-        serializer_mapping = {
-            'visit': VisitSerializer,
-            'transportation': TransportationSerializer,
-            'lodging': LodgingSerializer,
-            'note': NoteSerializer,
-            'checklist': ChecklistSerializer,
-        }
-        
-        model_name = content_type.model
-        serializer_class = serializer_mapping.get(model_name)
-        
-        if serializer_class:
-            return serializer_class(item, context=self.context).data
-        
-        # Fallback for unknown content types
         return {
-            'id': str(item.id),
-            'type': model_name,
+            'id': str(obj.item.id),
+            'type': obj.content_type.model,
         }
         

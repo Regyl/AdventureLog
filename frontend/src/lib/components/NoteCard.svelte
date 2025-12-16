@@ -11,27 +11,18 @@
 		return marked(markdown);
 	};
 
-	import Launch from '~icons/mdi/launch';
 	import TrashCan from '~icons/mdi/trash-can';
 	import Calendar from '~icons/mdi/calendar';
 	import DeleteWarning from './DeleteWarning.svelte';
 	import DotsHorizontal from '~icons/mdi/dots-horizontal';
 	import FileDocumentEdit from '~icons/mdi/file-document-edit';
 	import LinkVariant from '~icons/mdi/link-variant';
-	import { isEntityOutsideCollectionDateRange } from '$lib/dateUtils';
 
 	export let note: Note;
 	export let user: User | null = null;
 	export let collection: Collection | null = null;
 
 	let isWarningModalOpen: boolean = false;
-	let outsideCollectionRange: boolean = false;
-
-	$: {
-		if (collection) {
-			outsideCollectionRange = isEntityOutsideCollectionDateRange(note, collection);
-		}
-	}
 
 	function editNote() {
 		dispatch('edit', note);
@@ -73,9 +64,6 @@
 				<h2 class="text-lg font-semibold line-clamp-2">{note.name}</h2>
 				<div class="flex flex-wrap items-center gap-2 mt-2">
 					<div class="badge badge-primary badge-sm">{$t('adventures.note')}</div>
-					{#if outsideCollectionRange}
-						<div class="badge badge-error badge-xs">{$t('adventures.out_of_range')}</div>
-					{/if}
 				</div>
 			</div>
 

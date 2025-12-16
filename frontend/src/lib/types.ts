@@ -135,6 +135,7 @@ export type Collection = {
 	is_archived?: boolean;
 	shared_with: string[] | undefined;
 	link?: string | null;
+	itinerary: CollectionItineraryItem[];
 };
 
 export type SlimCollection = {
@@ -490,4 +491,17 @@ export type Pin = {
 	longitude: string;
 	is_visited?: boolean;
 	category: Category | null;
+};
+
+export type CollectionItineraryItem = {
+	id: string;
+	collection: string; // UUID of the collection
+	content_type: string; // Content type model name
+	object_id: string; // UUID of the referenced object
+	item: Visit | Transportation | Lodging | Note | Checklist; // The actual referenced object
+	date: string | null; // ISO 8601 date string
+	order: number; // Manual order within a day
+	created_at: string; // ISO 8601 date string
+	start_datetime: string | null; // Computed property - ISO 8601 date string
+	end_datetime: string | null; // Computed property - ISO 8601 date string
 };

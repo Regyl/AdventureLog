@@ -184,13 +184,18 @@ class CollectionViewSet(viewsets.ModelViewSet):
        
         return Response(serializer.data)
     
-    # get view to get all the itinerary items for the collection
-    @action(detail=True, methods=['get'])
-    def itinerary(self, request, pk=None):
+    def retrieve(self, request, pk=None):
+        """Retrieve a collection and include itinerary items in the response."""
         collection = self.get_object()
+        serializer = self.get_serializer(collection)
+        data = serializer.data
+
+        # Include itinerary items inline with collection details
         itinerary_items = CollectionItineraryItem.objects.filter(collection=collection)
-        serializer = CollectionItineraryItemSerializer(itinerary_items, many=True)
-        return Response(serializer.data)
+        itinerary_serializer = CollectionItineraryItemSerializer(itinerary_items, many=True)
+        data['itinerary'] = itinerary_serializer.data
+
+        return Response(data)
     
     # this make the is_public field of the collection cascade to the locations
     @transaction.atomic

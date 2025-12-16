@@ -14,6 +14,7 @@
 	import Calendar from '~icons/mdi/calendar';
 	import ImageDisplayModal from '$lib/components/ImageDisplayModal.svelte';
 	import CollectionAllItems from '$lib/components/CollectionAllItems.svelte';
+	import CollectionItineraryPlanner from '$lib/components/locations/CollectionItineraryPlanner.svelte';
 	import { getBasemapUrl } from '$lib';
 	import FolderMultiple from '~icons/mdi/folder-multiple';
 	import FormatListBulleted from '~icons/mdi/format-list-bulleted';
@@ -36,10 +37,10 @@
 	let isImageModalOpen: boolean = false;
 
 	// View state from URL params
-	type ViewType = 'all' | 'timeline' | 'map';
-	let currentView: ViewType = 'timeline';
+	type ViewType = 'all' | 'itinerary' | 'map';
+	let currentView: ViewType = 'itinerary';
 
-	// Determine if this is a folder view (no dates) or timeline view (has dates)
+	// Determine if this is a folder view (no dates) or itinerary view (has dates)
 	$: isFolderView = !collection?.start_date && !collection?.end_date;
 
 	// Gather all images from locations for the hero
@@ -48,18 +49,18 @@
 	// Define available views based on collection type
 	$: availableViews = {
 		all: true, // Always available
-		timeline: !isFolderView, // Only for collections with dates
+		itinerary: !isFolderView, // Only for collections with dates
 		map: collection?.locations?.some((l) => l.latitude && l.longitude) || false
 	};
 
 	// Get default view based on available views
 	let defaultView: ViewType;
-	$: defaultView = (availableViews.timeline ? 'timeline' : 'all') as ViewType;
+	$: defaultView = (availableViews.itinerary ? 'itinerary' : 'all') as ViewType;
 
 	// Read view from URL params and validate it's available
 	$: {
 		const view = $page.url.searchParams.get('view') as ViewType;
-		if (view && ['all', 'timeline', 'map'].includes(view) && availableViews[view]) {
+		if (view && ['all', 'itinerary', 'map'].includes(view) && availableViews[view]) {
 			currentView = view;
 		} else {
 			currentView = defaultView;
@@ -277,14 +278,14 @@
 						All Items
 					</button>
 				{/if}
-				{#if availableViews.timeline}
+				{#if availableViews.itinerary}
 					<button
 						class="btn join-item"
-						class:btn-active={currentView === 'timeline'}
-						on:click={() => switchView('timeline')}
+						class:btn-active={currentView === 'itinerary'}
+						on:click={() => switchView('itinerary')}
 					>
 						<Timeline class="w-5 h-5 mr-2" />
-						Timeline
+						Itinerary
 					</button>
 				{/if}
 				{#if availableViews.map}
@@ -320,9 +321,9 @@
 					<CollectionAllItems {collection} user={data.user} {isFolderView} />
 				{/if}
 
-				<!-- Timeline View -->
-				{#if currentView === 'timeline' && collection.locations && collection.locations.length > 0}
-					<p>timeline goes here</p>
+				<!-- Itinerary View -->
+				{#if currentView === 'itinerary'}
+					<CollectionItineraryPlanner {collection} user={data.user} />
 				{/if}
 
 				<!-- Map View -->

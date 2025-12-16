@@ -13,19 +13,12 @@
 	import FileDocumentEdit from '~icons/mdi/file-document-edit';
 	import CheckCircle from '~icons/mdi/check-circle';
 	import CheckboxBlankCircleOutline from '~icons/mdi/checkbox-blank-circle-outline';
-	import { isEntityOutsideCollectionDateRange } from '$lib/dateUtils';
 
 	export let checklist: Checklist;
 	export let user: User | null = null;
 	export let collection: Collection;
 
 	let isWarningModalOpen: boolean = false;
-
-	let outsideCollectionRange: boolean = false;
-
-	$: {
-		outsideCollectionRange = isEntityOutsideCollectionDateRange(checklist, collection);
-	}
 
 	function editChecklist() {
 		dispatch('edit', checklist);
@@ -66,9 +59,6 @@
 				<h2 class="text-lg font-semibold line-clamp-2">{checklist.name}</h2>
 				<div class="flex flex-wrap items-center gap-2 mt-2">
 					<div class="badge badge-primary badge-sm">{$t('adventures.checklist')}</div>
-					{#if outsideCollectionRange}
-						<div class="badge badge-error badge-xs">{$t('adventures.out_of_range')}</div>
-					{/if}
 				</div>
 			</div>
 
