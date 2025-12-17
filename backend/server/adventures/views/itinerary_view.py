@@ -1,0 +1,201 @@
+from adventures.models import Location, Collection, CollectionItineraryItem, Transportation, Note, Lodging, Visit
+import datetime
+from django.utils.dateparse import parse_date, parse_datetime
+from django.contrib.contenttypes.models import ContentType
+from adventures.serializers import CollectionItineraryItemSerializer
+from adventures.utils.itinerary import reorder_itinerary_items
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError, PermissionDenied
+from adventures.permissions import IsOwnerOrSharedWithFullAccess
+from django.db.models import Q
+from django.db import transaction
+
+class ItineraryViewSet(viewsets.ModelViewSet):
+    serializer_class = CollectionItineraryItemSerializer
+    permission_classes = [IsOwnerOrSharedWithFullAccess]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        if not user.is_authenticated:
+            return CollectionItineraryItem.objects.none()
+        
+        # Return itinerary items from collections the user owns or is shared with
+        return CollectionItineraryItem.objects.filter(
+            Q(collection__user=user) | Q(collection__shared_with=user)
+        ).distinct().select_related('collection', 'collection__user').order_by('date', 'order')
+
+    def create(self, request, *args, **kwargs):
+        """
+        Accept 'content_type' as either a ContentType PK or a model name string
+        (e.g. 'location', 'lodging', 'transportation', 'note', 'visit'). If a
+        string is provided we resolve it to the appropriate ContentType PK and
+        validate the referenced object exists and the user has permission to
+        access it.
+        
+        Optional parameter 'update_item_date': if True, update the actual item's
+        date field to match the itinerary date.
+        """
+        if not request.user.is_authenticated:
+            return Response({"error": "User is not authenticated"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        data = request.data.copy()
+        content_type_val = data.get('content_type')
+        object_id = data.get('object_id')
+        update_item_date = data.get('update_item_date', False)
+        target_date = data.get('date')
+
+        # Support legacy field 'location' -> treat as content_type='location'
+        if not content_type_val and data.get('location'):
+            content_type_val = 'location'
+            object_id = object_id or data.get('location')
+            data['content_type'] = content_type_val
+            data['object_id'] = object_id
+
+        # If content_type is provided as a string model name, map to ContentType PK
+        if content_type_val and isinstance(content_type_val, str):
+            # If it's already numeric-like, leave it
+            if not content_type_val.isdigit():
+                content_map = {
+                    'location': Location,
+                    'transportation': Transportation,
+                    'note': Note,
+                    'lodging': Lodging,
+                    'visit': Visit,
+                }
+
+                if content_type_val not in content_map:
+                    return Response({
+                        'error': f"Invalid content_type. Must be one of: {', '.join(content_map.keys())}"
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                model_class = content_map[content_type_val]
+
+                # Validate referenced object exists
+                try:
+                    content_object = model_class.objects.get(id=object_id)
+                except (ValueError, model_class.DoesNotExist):
+                    return Response({'error': f"{content_type_val} not found"}, status=status.HTTP_404_NOT_FOUND)
+
+                # Permission check
+                permission_checker = IsOwnerOrSharedWithFullAccess()
+                if not permission_checker.has_object_permission(request, self, content_object):
+                    return Response({'error': 'User does not have permission to access this content'}, status=status.HTTP_403_FORBIDDEN)
+
+                ct = ContentType.objects.get_for_model(model_class)
+                data['content_type'] = ct.pk
+                
+                # If update_item_date is True and target_date is provided, update the item's date
+                if update_item_date and target_date and content_object:
+                    # Extract just the date part if target_date is datetime
+                    clean_date = str(target_date).split('T')[0] if 'T' in str(target_date) else str(target_date)
+                    
+                    # For locations, create an all-day visit instead of updating a date field
+                    if content_type_val == 'location':
+                        # Determine start/end bounds. Support single date or optional start_date/end_date in payload.
+                        # Prefer explicit start_date/end_date if provided, otherwise use the single target date.
+                        start_input = data.get('start_date') or clean_date
+                        end_input = data.get('end_date') or clean_date
+
+                        def parse_bounds(val):
+                            if not val:
+                                return None
+                            s = str(val)
+                            # If datetime string provided, parse directly
+                            if 'T' in s:
+                                dt = parse_datetime(s)
+                                return dt
+                            # Otherwise parse as date and convert to datetime at start/end of day
+                            d = parse_date(s)
+                            if d:
+                                return d
+                            return None
+
+                        # Normalize to date or datetime values
+                        parsed_start = parse_bounds(start_input)
+                        parsed_end = parse_bounds(end_input)
+
+                        # If both are plain dates, convert to datetimes spanning the day
+                        if isinstance(parsed_start, datetime.date) and not isinstance(parsed_start, datetime.datetime):
+                            new_start = datetime.datetime.combine(parsed_start, datetime.time.min)
+                        elif isinstance(parsed_start, datetime.datetime):
+                            new_start = parsed_start
+                        else:
+                            new_start = None
+
+                        if isinstance(parsed_end, datetime.date) and not isinstance(parsed_end, datetime.datetime):
+                            new_end = datetime.datetime.combine(parsed_end, datetime.time.max)
+                        elif isinstance(parsed_end, datetime.datetime):
+                            new_end = parsed_end
+                        else:
+                            new_end = None
+
+                        # If we couldn't parse bounds, fallback to the all-day target date
+                        if not new_start or not new_end:
+                            try:
+                                d = parse_date(clean_date)
+                                new_start = datetime.datetime.combine(d, datetime.time.min)
+                                new_end = datetime.datetime.combine(d, datetime.time.max)
+                            except Exception:
+                                new_start = None
+                                new_end = None
+
+                        # If we have valid bounds, check for any overlapping Visit for this location.
+                        # Overlap condition: existing.start_date <= new_end AND existing.end_date >= new_start
+                        if new_start and new_end:
+                            overlap_q = Q(start_date__lte=new_end) & Q(end_date__gte=new_start)
+                            existing = Visit.objects.filter(location=content_object).filter(overlap_q)
+                            if not existing.exists():
+                                Visit.objects.create(
+                                    location=content_object,
+                                    start_date=new_start,
+                                    end_date=new_end,
+                                    notes="Created from itinerary planning"
+                                )
+                            # else: an overlapping visit already exists — skip creating a duplicate
+                    else:
+                        # For other item types, update their date field
+                        date_field = None
+                        if hasattr(content_object, 'date'):
+                            date_field = 'date'
+                        elif hasattr(content_object, 'start_date'):
+                            date_field = 'start_date'
+                        elif hasattr(content_object, 'check_in'):
+                            date_field = 'check_in'
+                        
+                        if date_field:
+                            setattr(content_object, date_field, clean_date)
+                            content_object.save(update_fields=[date_field])
+
+        # Proceed with normal serializer flow using modified data
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
+    @action(detail=False, methods=['post'], url_path='reorder')
+    @transaction.atomic
+    def reorder(self, request):
+        """
+        Reorder itinerary items in bulk.
+        
+        Expected payload:
+        {
+            "items": [
+                {"id": "uuid", "date": "2024-01-01", "order": 0},
+                {"id": "uuid", "date": "2024-01-01", "order": 1},
+                ...
+            ]
+        }
+        """
+        items_data = request.data.get('items', [])
+
+        # Delegate to reusable helper which handles validation, permission checks
+        # and the two-phase update to avoid unique constraint races.
+        updated_items = reorder_itinerary_items(request.user, items_data)
+
+        serializer = self.get_serializer(updated_items, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

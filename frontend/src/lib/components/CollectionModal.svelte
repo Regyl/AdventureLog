@@ -19,9 +19,10 @@
 		end_date: collectionToEdit?.end_date || null,
 		user: collectionToEdit?.user || '',
 		is_public: collectionToEdit?.is_public || false,
-		adventures: collectionToEdit?.adventures || [],
+		locations: collectionToEdit?.locations || [],
 		link: collectionToEdit?.link || '',
-		shared_with: undefined
+		shared_with: undefined,
+		itinerary: []
 	};
 
 	console.log(collection);

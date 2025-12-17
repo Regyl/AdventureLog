@@ -20,6 +20,12 @@
 	import LodgingCard from '$lib/components/LodgingCard.svelte';
 	import NoteCard from '$lib/components/NoteCard.svelte';
 	import ChecklistCard from '$lib/components/ChecklistCard.svelte';
+	import NewLocationModal from '$lib/components/NewLocationModal.svelte';
+	import LodgingModal from '$lib/components/LodgingModal.svelte';
+	import TransportationModal from '$lib/components/TransportationModal.svelte';
+	import NoteModal from '$lib/components/NoteModal.svelte';
+	import ChecklistModal from '$lib/components/ChecklistModal.svelte';
+	import ItineraryLinkModal from '$lib/components/ItineraryLinkModal.svelte';
 
 	export let collection: Collection;
 	export let user: any;
@@ -41,6 +47,67 @@
 
 	$: days = groupItemsByDay(collection);
 	$: unscheduledItems = getUnscheduledItems(collection);
+
+	let locationToEdit: Location | null = null;
+	let isLocationModalOpen: boolean = false;
+	function handleEditLocation(event: CustomEvent<Location>) {
+		locationToEdit = event.detail;
+		isLocationModalOpen = true;
+	}
+
+	function handleDeleteLocation(event: CustomEvent<Location>) {
+		// remove locally deleted location from itinerary view and list
+		const deletedLocation = event.detail;
+		collection.locations = collection.locations?.filter((loc) => loc.id !== deletedLocation.id);
+		collection.itinerary = collection.itinerary?.filter(
+			(it) => !(it.item?.type === 'location' && it.object_id === deletedLocation.id)
+		);
+	}
+
+	let locationBeingUpdated: Location | null = null;
+
+	let isLodgingModalOpen = false;
+	let isTransportationModalOpen = false;
+	let isNoteModalOpen = false;
+	let isChecklistModalOpen = false;
+	let isItineraryLinkModalOpen = false;
+
+	// Store the target date and display date for the link modal
+	let linkModalTargetDate: string = '';
+	let linkModalDisplayDate: string = '';
+
+	// When opening a "create new item" modal we store the target date here
+	let pendingAddDate: string | null = null;
+
+	// Sync the locationBeingUpdated with the collection.locations array
+	$: if (locationBeingUpdated && locationBeingUpdated.id && collection) {
+		// Make a shallow copy of locations (ensure array exists)
+		const locs = collection.locations ? [...collection.locations] : [];
+
+		const index = locs.findIndex((loc) => loc.id === locationBeingUpdated.id);
+
+		if (index !== -1) {
+			// Ensure visits are properly synced and replace the item immutably
+			locs[index] = {
+				...locs[index],
+				...locationBeingUpdated,
+				visits: locationBeingUpdated.visits || locs[index].visits || []
+			};
+		} else {
+			// Prepend new/updated location
+			locs.unshift({ ...locationBeingUpdated });
+		}
+
+		// Assign back to collection immutably to trigger reactivity
+		collection = { ...collection, locations: locs };
+	}
+
+	// If a new location was just created and we have a pending add-date,
+	// attach it to that date in the itinerary.
+	$: if (locationBeingUpdated?.id && pendingAddDate) {
+		addItineraryItemForObject('location', locationBeingUpdated.id, pendingAddDate);
+		pendingAddDate = null;
+	}
 
 	/**
 	 * Get lodging items where the guest is staying overnight on a given date
@@ -218,20 +285,274 @@
 		days = [...days];
 	}
 
-	function handleDndFinalize(dayIndex: number, e: CustomEvent) {
-		const { items: newItems } = e.detail;
+	async function handleDndFinalize(dayIndex: number, e: CustomEvent) {
+		const { items: newItems, info } = e.detail;
 
 		// Update local state
 		days[dayIndex].items = newItems;
 		days = [...days];
 
-		// TODO: Add backend save functionality here when ready
-		// Example:
-		// if (info.trigger === TRIGGERS.DROPPED_INTO_ZONE || info.trigger === TRIGGERS.DROPPED_INTO_ANOTHER) {
-		//   await saveReorderedItems(days[dayIndex].date, newItems);
-		// }
+		// Save to backend if item was actually moved (not just considered)
+		if (
+			info.trigger === TRIGGERS.DROPPED_INTO_ZONE ||
+			info.trigger === TRIGGERS.DROPPED_INTO_ANOTHER
+		) {
+			await saveReorderedItems();
+		}
+	}
+
+	async function saveReorderedItems() {
+		try {
+			// Collect all items across all days with their new positions
+			const itemsToUpdate = days.flatMap((day) =>
+				day.items
+					.filter((item) => item.id && !item[SHADOW_ITEM_MARKER_PROPERTY_NAME])
+					.map((item, index) => ({
+						id: item.id,
+						date: day.date,
+						order: index
+					}))
+			);
+
+			if (itemsToUpdate.length === 0) {
+				return;
+			}
+
+			const response = await fetch('/api/itineraries/reorder/', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					items: itemsToUpdate
+				})
+			});
+
+			if (!response.ok) {
+				throw new Error('Failed to save item order');
+			}
+
+			// Optionally show success feedback
+			console.log('Itinerary order saved successfully');
+			// Make sure to sync the collection.itinerary with the new order
+			const updatedItinerary = collection.itinerary?.map((it) => {
+				const updatedItem = itemsToUpdate.find((upd) => upd.id === it.id);
+				if (updatedItem) {
+					return {
+						...it,
+						date: updatedItem.date,
+						order: updatedItem.order
+					};
+				}
+				return it;
+			});
+			collection.itinerary = updatedItinerary;
+		} catch (error) {
+			console.error('Error saving itinerary order:', error);
+			// Optionally show error notification to user
+			alert('Failed to save itinerary order. Please try again.');
+		}
+	}
+
+	// Add an itinerary item locally and attempt to persist to backend
+	async function addItineraryItemForObject(
+		objectType: string,
+		objectId: string,
+		dateISO: string,
+		updateItemDate: boolean = false
+	) {
+		const tempId = `temp-${Date.now()}`;
+		const day = days.find((d) => d.date === dateISO);
+		const order = day ? day.items.length : 0;
+
+		const newIt = {
+			id: tempId,
+			collection: collection.id,
+			content_type: objectType,
+			object_id: objectId,
+			item: { id: objectId, type: objectType },
+			date: dateISO,
+			order,
+			created_at: new Date().toISOString()
+		};
+
+		collection.itinerary = [...(collection.itinerary || []), newIt];
+		days = groupItemsByDay(collection);
+
+		try {
+			const res = await fetch('/api/itineraries/', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					collection: collection.id,
+					content_type: objectType,
+					object_id: objectId,
+					date: dateISO,
+					order,
+					update_item_date: updateItemDate
+				})
+			});
+
+			if (!res.ok) {
+				const j = await res.json().catch(() => ({}));
+				throw new Error(j.detail || 'Failed to add itinerary item');
+			}
+
+			const created = await res.json();
+			collection.itinerary = collection.itinerary.map((it) => (it.id === tempId ? created : it));
+
+			// If we updated the item's date, update local state directly
+			if (updateItemDate) {
+				const isoDate = `${dateISO}T00:00:00`;
+
+				if (objectType === 'location') {
+					// For locations, create a new visit locally
+					if (collection.locations) {
+						collection.locations = collection.locations.map((loc) => {
+							if (loc.id === objectId) {
+								const newVisit = {
+									id: `temp-visit-${Date.now()}`,
+									location: objectId,
+									start_date: `${dateISO}T00:00:00`,
+									end_date: `${dateISO}T23:59:59`,
+									notes: 'Created from itinerary planning',
+									created_at: new Date().toISOString(),
+									updated_at: new Date().toISOString(),
+									images: [],
+									attachments: []
+								};
+								return {
+									...loc,
+									visits: [...(loc.visits || []), newVisit]
+								};
+							}
+							return loc;
+						});
+					}
+				} else if (objectType === 'transportation') {
+					if (collection.transportations) {
+						collection.transportations = collection.transportations.map((t) =>
+							t.id === objectId ? { ...t, date: isoDate } : t
+						);
+					}
+				} else if (objectType === 'lodging') {
+					if (collection.lodging) {
+						collection.lodging = collection.lodging.map((l) =>
+							l.id === objectId ? { ...l, check_in: isoDate } : l
+						);
+					}
+				} else if (objectType === 'note') {
+					if (collection.notes) {
+						collection.notes = collection.notes.map((n) =>
+							n.id === objectId ? { ...n, date: isoDate } : n
+						);
+					}
+				} else if (objectType === 'checklist') {
+					if (collection.checklists) {
+						collection.checklists = collection.checklists.map((c) =>
+							c.id === objectId ? { ...c, date: isoDate } : c
+						);
+					}
+				}
+			}
+
+			days = groupItemsByDay(collection);
+		} catch (err) {
+			console.error('Error creating itinerary item:', err);
+			alert('Failed to add item to itinerary.');
+			collection.itinerary = collection.itinerary.filter((it) => it.id !== tempId);
+			days = groupItemsByDay(collection);
+		}
 	}
 </script>
+
+{#if isLocationModalOpen}
+	<NewLocationModal
+		on:close={() => (isLocationModalOpen = false)}
+		{user}
+		{locationToEdit}
+		bind:location={locationBeingUpdated}
+		{collection}
+	/>
+{/if}
+
+{#if isLodgingModalOpen}
+	<LodgingModal
+		on:close={() => (isLodgingModalOpen = false)}
+		{collection}
+		on:save={(e) => {
+			const lodging = e.detail;
+			collection.lodging = [...(collection.lodging || []), lodging];
+			if (pendingAddDate) {
+				addItineraryItemForObject('lodging', lodging.id, pendingAddDate);
+				pendingAddDate = null;
+			}
+			isLodgingModalOpen = false;
+		}}
+	/>
+{/if}
+
+{#if isTransportationModalOpen}
+	<TransportationModal
+		on:close={() => (isTransportationModalOpen = false)}
+		{collection}
+		on:save={(e) => {
+			const transportation = e.detail;
+			collection.transportations = [...(collection.transportations || []), transportation];
+			if (pendingAddDate) {
+				addItineraryItemForObject('transportation', transportation.id, pendingAddDate);
+				pendingAddDate = null;
+			}
+			isTransportationModalOpen = false;
+		}}
+	/>
+{/if}
+
+{#if isNoteModalOpen}
+	<NoteModal
+		on:close={() => (isNoteModalOpen = false)}
+		{collection}
+		on:save={(e) => {
+			const note = e.detail;
+			collection.notes = [...(collection.notes || []), note];
+			if (pendingAddDate) {
+				addItineraryItemForObject('note', note.id, pendingAddDate);
+				pendingAddDate = null;
+			}
+			isNoteModalOpen = false;
+		}}
+	/>
+{/if}
+
+{#if isChecklistModalOpen}
+	<ChecklistModal
+		on:close={() => (isChecklistModalOpen = false)}
+		{collection}
+		on:save={(e) => {
+			const checklist = e.detail;
+			collection.checklists = [...(collection.checklists || []), checklist];
+			if (pendingAddDate) {
+				addItineraryItemForObject('checklist', checklist.id, pendingAddDate);
+				pendingAddDate = null;
+			}
+			isChecklistModalOpen = false;
+		}}
+	/>
+{/if}
+
+{#if isItineraryLinkModalOpen}
+	<ItineraryLinkModal
+		{collection}
+		{user}
+		targetDate={linkModalTargetDate}
+		displayDate={linkModalDisplayDate}
+		on:close={() => (isItineraryLinkModalOpen = false)}
+		on:addItem={(e) => {
+			const { type, itemId, updateDate } = e.detail;
+			addItineraryItemForObject(type, itemId, linkModalTargetDate, updateDate);
+		}}
+	/>
+{/if}
 
 {#if days.length === 0 && unscheduledItems.length === 0}
 	<div class="card bg-base-200 shadow-xl">
@@ -255,6 +576,66 @@
 							{day.items.length}
 							{day.items.length === 1 ? 'item' : 'items'}
 						</div>
+
+						<!-- Add dropdown: link existing or create new -->
+						<div class="dropdown ml-3 z-[9999]">
+							<label tabindex="0" class="btn btn-sm btn-outline gap-2">Add</label>
+							<ul
+								tabindex="0"
+								class="dropdown-content menu p-2 shadow bg-base-300 rounded-box w-56"
+							>
+								<li>
+									<a
+										on:click={() => {
+											linkModalTargetDate = day.date;
+											linkModalDisplayDate = day.displayDate;
+											isItineraryLinkModalOpen = true;
+										}}>Link existing item</a
+									>
+								</li>
+								<li class="menu-title">Create new</li>
+								<li>
+									<a
+										on:click={() => {
+											pendingAddDate = day.date;
+											isLocationModalOpen = true;
+										}}>Location</a
+									>
+								</li>
+								<li>
+									<a
+										on:click={() => {
+											pendingAddDate = day.date;
+											isLodgingModalOpen = true;
+										}}>Lodging</a
+									>
+								</li>
+								<li>
+									<a
+										on:click={() => {
+											pendingAddDate = day.date;
+											isTransportationModalOpen = true;
+										}}>Transportation</a
+									>
+								</li>
+								<li>
+									<a
+										on:click={() => {
+											pendingAddDate = day.date;
+											isNoteModalOpen = true;
+										}}>Note</a
+									>
+								</li>
+								<li>
+									<a
+										on:click={() => {
+											pendingAddDate = day.date;
+											isChecklistModalOpen = true;
+										}}>Checklist</a
+									>
+								</li>
+							</ul>
+						</div>
 					</div>
 
 					<!-- Day Items -->
@@ -275,7 +656,6 @@
 									flipDurationMs,
 									dropTargetStyle: { outline: 'none', border: 'none' },
 									dragDisabled: false,
-									dragHandle: '.itinerary-drag-handle',
 									dropFromOthersDisabled: true
 								}}
 								on:consider={(e) => handleDndConsider(dayIndex, e)}
@@ -362,6 +742,8 @@
 												{#if objectType === 'location'}
 													<LocationCard
 														adventure={resolvedObj}
+														on:edit={handleEditLocation}
+														on:delete={handleDeleteLocation}
 														{user}
 														{collection}
 														compact={true}

@@ -25,6 +25,7 @@
 		"@types/node": "^22.15.2",
 		"@types/qrcode": "^1.5.5",
 		"autoprefixer": "^10.4.21",
+		"baseline-browser-mapping": "^2.9.9",
 		"daisyui": "^4.12.24",
 		"postcss": "^8.5.3",
 		"prettier": "^3.5.3",
