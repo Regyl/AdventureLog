@@ -622,12 +622,12 @@
 
 {#if canAutoGenerate}
 	<div class="alert alert-info shadow-lg mb-6">
-		<div class="flex-1">
+		<div class="flex-1 flex items-center gap-3 min-w-0">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				fill="none"
 				viewBox="0 0 24 24"
-				class="w-6 h-6 mx-2 stroke-current"
+				class="w-6 h-6 stroke-current flex-shrink-0"
 			>
 				<path
 					stroke-linecap="round"
@@ -636,15 +636,17 @@
 					d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
 				></path>
 			</svg>
-			<div>
-				<h3 class="font-bold">Auto-Generate Itinerary</h3>
-				<div class="text-sm">
+			<div class="min-w-0">
+				<div class="flex items-baseline gap-3">
+					<h3 class="font-bold truncate">Auto-Generate Itinerary</h3>
+				</div>
+				<div class="text-sm opacity-90 truncate">
 					This collection has dated items but no itinerary yet. Would you like to automatically
 					organize them by date?
 				</div>
 			</div>
 		</div>
-		<div class="flex-none">
+		<div class="flex-none ml-3">
 			<button
 				class="btn btn-sm btn-primary"
 				disabled={isAutoGenerating}
@@ -673,83 +675,108 @@
 	<div class="space-y-6">
 		<!-- Scheduled Days -->
 		{#each days as day, dayIndex}
+			{@const dayNumber = dayIndex + 1}
+			{@const totalDays = days.length}
+			{@const weekday = DateTime.fromISO(day.date).toFormat('ccc')}
+			{@const dayOfMonth = DateTime.fromISO(day.date).toFormat('d')}
+			{@const monthAbbrev = DateTime.fromISO(day.date).toFormat('LLL')}
+
 			<div class="card bg-base-200 shadow-xl">
 				<div class="card-body">
-					<!-- Day Header -->
-					<div class="flex items-center gap-3 mb-4 pb-4 border-b border-base-300">
-						<CalendarBlank class="w-6 h-6 text-primary" />
-						<h3 class="text-xl font-bold">{day.displayDate}</h3>
-						{#if savingDay === day.date}
-							<div class="ml-3">
-								<div class="badge badge-neutral-300 gap-2 p-3">
-									<span class="loading loading-spinner loading-sm"></span>
-									Saving...
-								</div>
+					<!-- Day Header (compact, shows date pill + Day X of Y + items + add/save) -->
+
+					<div class="flex items-start gap-4 mb-4 pb-4 border-b border-base-300">
+						<!-- Date pill -->
+						<div class="flex-none">
+							<div class="text-center bg-base-300 rounded-lg px-3 py-2 w-20">
+								<div class="text-xs opacity-70">{weekday}</div>
+								<div class="text-2xl font-bold -mt-1">{dayOfMonth}</div>
+								<div class="text-xs opacity-70">{monthAbbrev}</div>
 							</div>
-						{/if}
-						<div class="badge badge-primary badge-outline ml-auto">
-							{day.items.length}
-							{day.items.length === 1 ? 'item' : 'items'}
 						</div>
 
-						<!-- Add dropdown: link existing or create new -->
-						<div class="dropdown ml-3 z-[9999]">
-							<label tabindex="0" class="btn btn-sm btn-outline gap-2">Add</label>
-							<ul
-								tabindex="0"
-								class="dropdown-content menu p-2 shadow bg-base-300 rounded-box w-56"
-							>
-								<li>
-									<a
-										on:click={() => {
-											linkModalTargetDate = day.date;
-											linkModalDisplayDate = day.displayDate;
-											isItineraryLinkModalOpen = true;
-										}}>Link existing item</a
-									>
-								</li>
-								<li class="menu-title">Create new</li>
-								<li>
-									<a
-										on:click={() => {
-											pendingAddDate = day.date;
-											isLocationModalOpen = true;
-										}}>Location</a
-									>
-								</li>
-								<li>
-									<a
-										on:click={() => {
-											pendingAddDate = day.date;
-											isLodgingModalOpen = true;
-										}}>Lodging</a
-									>
-								</li>
-								<li>
-									<a
-										on:click={() => {
-											pendingAddDate = day.date;
-											isTransportationModalOpen = true;
-										}}>Transportation</a
-									>
-								</li>
-								<li>
-									<a
-										on:click={() => {
-											pendingAddDate = day.date;
-											isNoteModalOpen = true;
-										}}>Note</a
-									>
-								</li>
-								<li>
-									<a
-										on:click={() => {
-											pendingAddDate = day.date;
-											isChecklistModalOpen = true;
-										}}>Checklist</a
-									>
-								</li>
-							</ul>
+						<!-- Title and meta -->
+						<div class="flex-1 min-w-0">
+							<h3 class="text-lg md:text-xl font-bold truncate">{day.displayDate}</h3>
+							<div class="text-sm opacity-70 mt-1 flex items-center gap-3">
+								<span class="font-medium">Day {dayNumber} of {totalDays}</span>
+								<span class="opacity-50">•</span>
+								<span>{day.items.length} {day.items.length === 1 ? 'item' : 'items'}</span>
+								{#if day.overnightLodging.length > 0}
+									<span class="badge badge-info badge-outline">Overnight Lodging</span>
+								{/if}
+							</div>
+						</div>
+
+						<!-- Actions: saving indicator + Add dropdown -->
+						<div class="flex-none ml-3 flex items-start gap-2">
+							{#if savingDay === day.date}
+								<div>
+									<div class="badge badge-neutral-300 gap-2 p-2">
+										<span class="loading loading-spinner loading-sm"></span>
+										Saving...
+									</div>
+								</div>
+							{/if}
+
+							<div class="dropdown z-[9999]">
+								<label tabindex="0" class="btn btn-sm btn-outline gap-2">Add</label>
+								<ul
+									tabindex="0"
+									class="dropdown-content menu p-2 shadow bg-base-300 rounded-box w-56"
+								>
+									<li>
+										<a
+											on:click={() => {
+												linkModalTargetDate = day.date;
+												linkModalDisplayDate = day.displayDate;
+												isItineraryLinkModalOpen = true;
+											}}>Link existing item</a
+										>
+									</li>
+									<li class="menu-title">Create new</li>
+									<li>
+										<a
+											on:click={() => {
+												pendingAddDate = day.date;
+												isLocationModalOpen = true;
+											}}>Location</a
+										>
+									</li>
+									<li>
+										<a
+											on:click={() => {
+												pendingAddDate = day.date;
+												isLodgingModalOpen = true;
+											}}>Lodging</a
+										>
+									</li>
+									<li>
+										<a
+											on:click={() => {
+												pendingAddDate = day.date;
+												isTransportationModalOpen = true;
+											}}>Transportation</a
+										>
+									</li>
+									<li>
+										<a
+											on:click={() => {
+												pendingAddDate = day.date;
+												isNoteModalOpen = true;
+											}}>Note</a
+										>
+									</li>
+									<li>
+										<a
+											on:click={() => {
+												pendingAddDate = day.date;
+												isChecklistModalOpen = true;
+											}}>Checklist</a
+										>
+									</li>
+								</ul>
+							</div>
 						</div>
 					</div>
 
@@ -818,7 +845,7 @@
 												</div>
 											</div>
 
-											<!-- Order Badge -->
+											<!-- Order Badge
 											<div class="absolute right-2 top-2 z-10">
 												<div
 													class="badge badge-primary badge-sm font-bold shadow-md"
@@ -826,7 +853,7 @@
 												>
 													#{index + 1}
 												</div>
-											</div>
+											</div> -->
 
 											<!-- Multi-day indicator for lodging -->
 											{#if multiDay && objectType === 'lodging'}
