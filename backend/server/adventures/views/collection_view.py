@@ -93,7 +93,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
         if self.action == 'destroy':
             return Collection.objects.filter(user=self.request.user.id)
         
-        if self.action in ['update', 'partial_update']:
+        if self.action in ['update', 'partial_update', 'leave']:
             return Collection.objects.filter(
                 Q(user=self.request.user.id) | Q(shared_with=self.request.user)
             ).distinct()
@@ -115,9 +115,9 @@ class CollectionViewSet(viewsets.ModelViewSet):
                 Q(is_public=True) | Q(user=self.request.user.id) | Q(shared_with=self.request.user)
             ).distinct()
         
-        # For list action, include collections owned by the user or shared with the user, that are not archived
+        # For list action and default base queryset, return collections owned by the user (exclude shared)
         return Collection.objects.filter(
-            (Q(user=self.request.user.id) | Q(shared_with=self.request.user)) & Q(is_archived=False)
+            Q(user=self.request.user.id) & Q(is_archived=False)
         ).distinct()
 
     def get_queryset(self):
@@ -131,8 +131,10 @@ class CollectionViewSet(viewsets.ModelViewSet):
         if not request.user.is_authenticated:
             return Response({"error": "User is not authenticated"}, status=400)
         
+        # List should only return collections owned by the requesting user (shared collections are available
+        # via the `shared` action).
         queryset = Collection.objects.filter(
-            (Q(user=request.user.id) | Q(shared_with=request.user)) & Q(is_archived=False)
+            Q(user=request.user.id) & Q(is_archived=False)
         ).distinct().select_related('user').prefetch_related(
             Prefetch(
                 'locations__images',

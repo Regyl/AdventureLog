@@ -210,11 +210,37 @@
 			});
 
 			if (res.ok) {
+				// Try to parse returned collection data
+				let data: any = null;
+				try {
+					data = await res.json();
+				} catch (e) {
+					data = null;
+				}
+
 				// Remove invite from list
 				invites = invites.filter((i) => i.id !== invite.id);
 				addToast('success', `${$t('invites.accepted')} "${invite.name}"`);
-				// Optionally refresh shared collections
-				await goto(window.location.pathname, { invalidateAll: true });
+
+				// If API returned the accepted collection, add it to sharedCollections immediately
+				if (data && (data.collection || data.result || data.id)) {
+					// Normalize expected shapes: {collection: {...}} or collection object directly
+					const newCollection = data.collection ? data.collection : data;
+					// Prepend so it's visible at top
+					sharedCollections = [newCollection as SlimCollection, ...sharedCollections];
+				} else {
+					// Fallback: refresh shared collections from API
+					try {
+						const sharedRes = await fetch(`/api/collections/shared/?nested=true`);
+						if (sharedRes.ok) {
+							const sharedData = await sharedRes.json();
+							// Prefer results if paginated
+							sharedCollections = sharedData.results ? sharedData.results : sharedData;
+						}
+					} catch (e) {
+						// ignore fallback errors; user already got success toast
+					}
+				}
 			} else {
 				const error = await res.json();
 				addToast('error', error.error || $t('invites.accept_failed'));
