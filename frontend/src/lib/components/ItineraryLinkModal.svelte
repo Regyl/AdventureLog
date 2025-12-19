@@ -209,15 +209,26 @@
 								<div class="card-body p-4">
 									<div class="mb-3">
 										{#if type === 'location'}
-											<LocationCard adventure={item} {user} {collection} compact={true} />
+											<LocationCard
+												adventure={item}
+												{user}
+												{collection}
+												compact={true}
+												readOnly={true}
+											/>
 										{:else if type === 'transportation'}
-											<TransportationCard transportation={item} {user} {collection} />
+											<TransportationCard
+												transportation={item}
+												{user}
+												{collection}
+												readOnly={true}
+											/>
 										{:else if type === 'lodging'}
-											<LodgingCard lodging={item} {user} {collection} />
+											<LodgingCard lodging={item} {user} {collection} readOnly={true} />
 										{:else if type === 'note'}
-											<NoteCard note={item} {user} {collection} />
+											<NoteCard note={item} {user} {collection} readOnly={true} />
 										{:else if type === 'checklist'}
-											<ChecklistCard checklist={item} {user} {collection} />
+											<ChecklistCard checklist={item} {user} {collection} readOnly={true} />
 										{/if}
 									</div>
 									<button
@@ -245,15 +256,26 @@
 								<div class="card-body p-4">
 									<div class="mb-3">
 										{#if type === 'location'}
-											<LocationCard adventure={item} {user} {collection} compact={true} />
+											<LocationCard
+												adventure={item}
+												{user}
+												{collection}
+												compact={true}
+												readOnly={true}
+											/>
 										{:else if type === 'transportation'}
-											<TransportationCard transportation={item} {user} {collection} />
+											<TransportationCard
+												transportation={item}
+												{user}
+												{collection}
+												readOnly={true}
+											/>
 										{:else if type === 'lodging'}
-											<LodgingCard lodging={item} {user} {collection} />
+											<LodgingCard lodging={item} {user} {collection} readOnly={true} />
 										{:else if type === 'note'}
-											<NoteCard note={item} {user} {collection} />
+											<NoteCard note={item} {user} {collection} readOnly={true} />
 										{:else if type === 'checklist'}
-											<ChecklistCard checklist={item} {user} {collection} />
+											<ChecklistCard checklist={item} {user} {collection} readOnly={true} />
 										{/if}
 									</div>
 									<div class="text-sm opacity-70 mb-2">Already on: {(dates || []).join(', ')}</div>
@@ -284,15 +306,26 @@
 								<div class="card-body p-4">
 									<div class="mb-3">
 										{#if type === 'location'}
-											<LocationCard adventure={item} {user} {collection} compact={true} />
+											<LocationCard
+												adventure={item}
+												{user}
+												{collection}
+												compact={true}
+												readOnly={true}
+											/>
 										{:else if type === 'transportation'}
-											<TransportationCard transportation={item} {user} {collection} />
+											<TransportationCard
+												transportation={item}
+												{user}
+												{collection}
+												readOnly={true}
+											/>
 										{:else if type === 'lodging'}
-											<LodgingCard lodging={item} {user} {collection} />
+											<LodgingCard lodging={item} {user} {collection} readOnly={true} />
 										{:else if type === 'note'}
-											<NoteCard note={item} {user} {collection} />
+											<NoteCard note={item} {user} {collection} readOnly={true} />
 										{:else if type === 'checklist'}
-											<ChecklistCard checklist={item} {user} {collection} />
+											<ChecklistCard checklist={item} {user} {collection} readOnly={true} />
 										{/if}
 									</div>
 									<div class="text-sm opacity-70 mb-2">On: {(dates || []).join(', ')}</div>
@@ -327,15 +360,26 @@
 								<div class="card-body p-4">
 									<div class="mb-3">
 										{#if type === 'location'}
-											<LocationCard adventure={item} {user} {collection} compact={true} />
+											<LocationCard
+												adventure={item}
+												{user}
+												{collection}
+												compact={true}
+												readOnly={true}
+											/>
 										{:else if type === 'transportation'}
-											<TransportationCard transportation={item} {user} {collection} />
+											<TransportationCard
+												transportation={item}
+												{user}
+												{collection}
+												readOnly={true}
+											/>
 										{:else if type === 'lodging'}
-											<LodgingCard lodging={item} {user} {collection} />
+											<LodgingCard lodging={item} {user} {collection} readOnly={true} />
 										{:else if type === 'note'}
-											<NoteCard note={item} {user} {collection} />
+											<NoteCard note={item} {user} {collection} readOnly={true} />
 										{:else if type === 'checklist'}
-											<ChecklistCard checklist={item} {user} {collection} />
+											<ChecklistCard checklist={item} {user} {collection} readOnly={true} />
 										{/if}
 									</div>
 									<div class="flex gap-2">

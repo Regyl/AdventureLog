@@ -17,6 +17,7 @@
 	export let checklist: Checklist;
 	export let user: User | null = null;
 	export let collection: Collection;
+	export let readOnly: boolean = false;
 
 	let isWarningModalOpen: boolean = false;
 
@@ -62,7 +63,7 @@
 				</div>
 			</div>
 
-			{#if checklist.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid))}
+			{#if !readOnly && (checklist.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid)))}
 				<div class="dropdown dropdown-end">
 					<div tabindex="0" role="button" class="btn btn-square btn-sm p-1 text-base-content">
 						<DotsHorizontal class="w-5 h-5" />

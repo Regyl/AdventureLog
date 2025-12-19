@@ -297,74 +297,75 @@
 				>
 					<Launch class="w-4 h-4" />
 				</button>
+				{#if !readOnly}
+					{#if (adventure.user && adventure.user.uuid == user?.uuid) || (collection && user && collection.shared_with?.includes(user.uuid)) || (collection && user && collection.user == user.uuid)}
+						<details class="dropdown dropdown-end relative z-50">
+							<summary class="btn btn-square btn-sm p-1 text-base-content">
+								<DotsHorizontal class="w-5 h-5" />
+							</summary>
+							<ul
+								class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow-lg border border-base-300"
+							>
+								<li>
+									<button on:click={editAdventure} class="flex items-center gap-2">
+										<FileDocumentEdit class="w-4 h-4" />
+										{$t('adventures.edit_location')}
+									</button>
+								</li>
+								{#if user?.uuid == adventure.user?.uuid}
+									<li>
+										<button
+											on:click={() => (isCollectionModalOpen = true)}
+											class="flex items-center gap-2"
+										>
+											<Plus class="w-4 h-4" />
+											{$t('collection.manage_collections')}
+										</button>
+									</li>
+								{:else if collection && user && collection.user == user.uuid}
+									<li>
+										<button
+											on:click={() =>
+												removeFromCollection(new CustomEvent('unlink', { detail: collection.id }))}
+											class="flex items-center gap-2"
+										>
+											<LinkVariantRemove class="w-4 h-4" />
+											{$t('adventures.remove_from_collection')}
+										</button>
+									</li>
+								{/if}
 
-				{#if (adventure.user && adventure.user.uuid == user?.uuid) || (collection && user && collection.shared_with?.includes(user.uuid)) || (collection && user && collection.user == user.uuid)}
-					<details class="dropdown dropdown-end relative z-50">
-						<summary class="btn btn-square btn-sm p-1 text-base-content">
-							<DotsHorizontal class="w-5 h-5" />
-						</summary>
-						<ul
-							class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow-lg border border-base-300"
-						>
-							<li>
-								<button on:click={editAdventure} class="flex items-center gap-2">
-									<FileDocumentEdit class="w-4 h-4" />
-									{$t('adventures.edit_location')}
-								</button>
-							</li>
-							{#if user?.uuid == adventure.user?.uuid}
-								<li>
-									<button
-										on:click={() => (isCollectionModalOpen = true)}
-										class="flex items-center gap-2"
-									>
-										<Plus class="w-4 h-4" />
-										{$t('collection.manage_collections')}
-									</button>
-								</li>
-							{:else if collection && user && collection.user == user.uuid}
-								<li>
-									<button
-										on:click={() =>
-											removeFromCollection(new CustomEvent('unlink', { detail: collection.id }))}
-										class="flex items-center gap-2"
-									>
-										<LinkVariantRemove class="w-4 h-4" />
-										{$t('adventures.remove_from_collection')}
-									</button>
-								</li>
-							{/if}
+								{#if adventure.is_public}
+									<li>
+										<button on:click={copyLink} class="flex items-center gap-2">
+											{#if copied}
+												<Check class="w-4 h-4 text-success" />
+												<span>{$t('adventures.link_copied')}</span>
+											{:else}
+												<LinkIcon class="w-4 h-4" />
+												{$t('adventures.copy_link')}
+											{/if}
+										</button>
+									</li>
+								{/if}
 
-							{#if adventure.is_public}
-								<li>
-									<button on:click={copyLink} class="flex items-center gap-2">
-										{#if copied}
-											<Check class="w-4 h-4 text-success" />
-											<span>{$t('adventures.link_copied')}</span>
-										{:else}
-											<LinkIcon class="w-4 h-4" />
-											{$t('adventures.copy_link')}
-										{/if}
-									</button>
-								</li>
-							{/if}
-
-							{#if user.uuid == adventure.user?.uuid}
-								<div class="divider my-1"></div>
-								<li>
-									<button
-										id="delete_adventure"
-										data-umami-event="Delete Adventure"
-										class="text-error flex items-center gap-2"
-										on:click={() => (isWarningModalOpen = true)}
-									>
-										<TrashCan class="w-4 h-4" />
-										{$t('adventures.delete')}
-									</button>
-								</li>
-							{/if}
-						</ul>
-					</details>
+								{#if user.uuid == adventure.user?.uuid}
+									<div class="divider my-1"></div>
+									<li>
+										<button
+											id="delete_adventure"
+											data-umami-event="Delete Adventure"
+											class="text-error flex items-center gap-2"
+											on:click={() => (isWarningModalOpen = true)}
+										>
+											<TrashCan class="w-4 h-4" />
+											{$t('adventures.delete')}
+										</button>
+									</li>
+								{/if}
+							</ul>
+						</details>
+					{/if}
 				{/if}
 			</div>
 		</div>

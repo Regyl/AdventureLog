@@ -39,6 +39,7 @@
 	export let lodging: Lodging;
 	export let user: User | null = null;
 	export let collection: Collection | null = null;
+	export let readOnly: boolean = false;
 
 	let isWarningModalOpen: boolean = false;
 
@@ -117,7 +118,7 @@
 		<div class="flex items-start justify-between gap-3">
 			<h2 class="text-lg font-semibold line-clamp-2">{lodging.name}</h2>
 
-			{#if lodging.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid))}
+			{#if !readOnly && (lodging.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid)))}
 				<div class="dropdown dropdown-end">
 					<div tabindex="0" role="button" class="btn btn-square btn-sm p-1 text-base-content">
 						<DotsHorizontal class="w-5 h-5" />

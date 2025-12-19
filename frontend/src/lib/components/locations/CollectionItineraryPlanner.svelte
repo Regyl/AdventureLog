@@ -48,6 +48,61 @@
 	$: days = groupItemsByDay(collection);
 	$: unscheduledItems = getUnscheduledItems(collection);
 
+	// Auto-generate state
+	let isAutoGenerating = false;
+
+	// Saving state for itinerary reorders. When true, disable drag interactions.
+	let isSavingOrder = false;
+	// Which day (ISO date string) is currently being saved. Used to show per-day spinner.
+	let savingDay: string | null = null;
+
+	// Check if auto-generate is available
+	$: canAutoGenerate = collection.itinerary?.length === 0 && hasDatedRecords(collection);
+
+	function hasDatedRecords(collection: Collection): boolean {
+		// Check if collection has any dated records
+		const hasVisits =
+			collection.locations?.some((loc) => loc.visits?.some((v) => v.start_date)) || false;
+		const hasLodging = collection.lodging?.some((l) => l.check_in) || false;
+		const hasTransportation = collection.transportations?.some((t) => t.date) || false;
+		const hasNotes = collection.notes?.some((n) => n.date) || false;
+		const hasChecklists = collection.checklists?.some((c) => c.date) || false;
+
+		return hasVisits || hasLodging || hasTransportation || hasNotes || hasChecklists;
+	}
+
+	async function handleAutoGenerate() {
+		if (!canAutoGenerate || isAutoGenerating) return;
+
+		isAutoGenerating = true;
+
+		try {
+			const response = await fetch('/api/itineraries/auto-generate/', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					collection_id: collection.id
+				})
+			});
+
+			if (!response.ok) {
+				const error = await response.json();
+				throw new Error(error.detail || error.error || 'Failed to auto-generate itinerary');
+			}
+
+			const data = await response.json();
+
+			// Refresh the page to load the updated itinerary
+			window.location.reload();
+		} catch (error) {
+			console.error('Auto-generate error:', error);
+			alert(error.message || 'Failed to auto-generate itinerary');
+			isAutoGenerating = false;
+		}
+	}
+
 	let locationToEdit: Location | null = null;
 	let isLocationModalOpen: boolean = false;
 	function handleEditLocation(event: CustomEvent<Location>) {
@@ -297,7 +352,18 @@
 			info.trigger === TRIGGERS.DROPPED_INTO_ZONE ||
 			info.trigger === TRIGGERS.DROPPED_INTO_ANOTHER
 		) {
-			await saveReorderedItems();
+			// Prevent further dragging while we persist the new order
+			if (!isSavingOrder) {
+				isSavingOrder = true;
+				// mark this day as saving so we can show a spinner on that day's header
+				savingDay = days[dayIndex]?.date || null;
+				try {
+					await saveReorderedItems();
+				} finally {
+					isSavingOrder = false;
+					savingDay = null;
+				}
+			}
 		}
 	}
 
@@ -554,6 +620,47 @@
 	/>
 {/if}
 
+{#if canAutoGenerate}
+	<div class="alert alert-info shadow-lg mb-6">
+		<div class="flex-1">
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				fill="none"
+				viewBox="0 0 24 24"
+				class="w-6 h-6 mx-2 stroke-current"
+			>
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+				></path>
+			</svg>
+			<div>
+				<h3 class="font-bold">Auto-Generate Itinerary</h3>
+				<div class="text-sm">
+					This collection has dated items but no itinerary yet. Would you like to automatically
+					organize them by date?
+				</div>
+			</div>
+		</div>
+		<div class="flex-none">
+			<button
+				class="btn btn-sm btn-primary"
+				disabled={isAutoGenerating}
+				on:click={handleAutoGenerate}
+			>
+				{#if isAutoGenerating}
+					<span class="loading loading-spinner loading-sm"></span>
+					Generating...
+				{:else}
+					Auto-Generate
+				{/if}
+			</button>
+		</div>
+	</div>
+{/if}
+
 {#if days.length === 0 && unscheduledItems.length === 0}
 	<div class="card bg-base-200 shadow-xl">
 		<div class="card-body text-center py-12">
@@ -572,6 +679,14 @@
 					<div class="flex items-center gap-3 mb-4 pb-4 border-b border-base-300">
 						<CalendarBlank class="w-6 h-6 text-primary" />
 						<h3 class="text-xl font-bold">{day.displayDate}</h3>
+						{#if savingDay === day.date}
+							<div class="ml-3">
+								<div class="badge badge-neutral-300 gap-2 p-3">
+									<span class="loading loading-spinner loading-sm"></span>
+									Saving...
+								</div>
+							</div>
+						{/if}
 						<div class="badge badge-primary badge-outline ml-auto">
 							{day.items.length}
 							{day.items.length === 1 ? 'item' : 'items'}
@@ -655,7 +770,7 @@
 									items: day.items,
 									flipDurationMs,
 									dropTargetStyle: { outline: 'none', border: 'none' },
-									dragDisabled: false,
+									dragDisabled: isSavingOrder,
 									dropFromOthersDisabled: true
 								}}
 								on:consider={(e) => handleDndConsider(dayIndex, e)}

@@ -4,6 +4,7 @@ from django.utils.dateparse import parse_date, parse_datetime
 from django.contrib.contenttypes.models import ContentType
 from adventures.serializers import CollectionItineraryItemSerializer
 from adventures.utils.itinerary import reorder_itinerary_items
+from adventures.utils.autogenerate_itinerary import auto_generate_itinerary
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -199,3 +200,54 @@ class ItineraryViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(updated_items, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['post'], url_path='auto-generate')
+    @transaction.atomic
+    def auto_generate(self, request):
+        """
+        Auto-generate itinerary items for a collection based on dated records.
+        
+        Only works when:
+        - Collection has zero itinerary items
+        - Collection has dated records (visits, lodging, transportation, notes, checklists)
+        
+        Expected payload:
+        {
+            "collection_id": "uuid"
+        }
+        
+        Returns: List of created itinerary items
+        """
+        collection_id = request.data.get('collection_id')
+        
+        if not collection_id:
+            return Response(
+                {"error": "collection_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get collection and check permissions
+        try:
+            collection = Collection.objects.get(id=collection_id)
+        except Collection.DoesNotExist:
+            return Response(
+                {"error": "Collection not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Permission check: user must be collection owner or in shared_with
+        if not (collection.user == request.user or collection.shared_with.filter(id=request.user.id).exists()):
+            return Response(
+                {"error": "You do not have permission to modify this collection"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            created_items = auto_generate_itinerary(collection)
+            serializer = self.get_serializer(created_items, many=True)
+            return Response({
+                "message": f"Successfully generated {len(created_items)} itinerary items",
+                "items": serializer.data
+            }, status=status.HTTP_201_CREATED)
+        except ValidationError as e:
+            return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
