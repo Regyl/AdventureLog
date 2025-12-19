@@ -479,7 +479,9 @@
     "activity_breakdown_by_category": "Activity Breakdown by Category",
     "dates_not_saved": "Visit Not Added Yet",
     "dates_not_saved_description": "Click add visit to save",
-    "link_copied": "Link Copied"
+    "link_copied": "Link Copied",
+    "wiki_results_found": "Wikipedia Results",
+    "select": "Select"
   },
   "worldtravel": {
     "country_list": "Country List",

@@ -75,6 +75,15 @@
 
 	let wandererFetchedTrails: WandererTrail[] = [];
 
+	// Wikipedia image selection
+	let wikiImageResults: Array<{
+		source: string;
+		width: number;
+		height: number;
+		title: string;
+		type: string;
+	}> = [];
+
 	// Allowed file types for attachments
 	const allowedFileTypes = [
 		'.gpx',
@@ -221,14 +230,29 @@
 			const res = await fetch(`/api/generate/img/?name=${encodeURIComponent(imageSearch)}`);
 			const data = await res.json();
 
-			if (!res.ok || !data.source) {
+			if (!res.ok || !data.images || data.images.length === 0) {
 				wikiImageError = $t('adventures.image_fetch_failed');
 				return;
 			}
 
-			const blob = await fetchImageFromUrl(data.source);
+			// Store results to display inline
+			wikiImageResults = data.images;
+		} catch (error) {
+			wikiImageError = $t('adventures.wiki_image_error');
+			addToast('error', $t('adventures.image_upload_error'));
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	async function selectWikiImage(imageUrl: string) {
+		isLoading = true;
+
+		try {
+			const blob = await fetchImageFromUrl(imageUrl);
 			if (!blob) {
 				wikiImageError = $t('adventures.image_fetch_failed');
+				isLoading = false;
 				return;
 			}
 
@@ -238,7 +262,7 @@
 			if (newImage) {
 				updateImagesList(newImage);
 				addToast('success', $t('adventures.image_upload_success'));
-				imageSearch = '';
+				// Keep results open to allow adding multiple images
 			} else {
 				throw new Error('Upload failed');
 			}
@@ -750,35 +774,6 @@
 						{/if}
 					</div>
 
-					<!-- Wikipedia Search -->
-					<div class="bg-base-50 p-4 rounded-lg border border-base-200">
-						<h4 class="font-medium mb-3 text-base-content/80">
-							{$t('adventures.wikipedia')}
-						</h4>
-						<div class="flex gap-2">
-							<input
-								type="text"
-								bind:value={imageSearch}
-								class="input input-bordered flex-1"
-								placeholder="Search Wikipedia for images"
-								disabled={isLoading}
-							/>
-							<button
-								class="btn btn-primary btn-sm"
-								class:loading={isLoading}
-								disabled={isLoading || !imageSearch.trim()}
-								on:click={handleWikiImageSearch}
-							>
-								{$t('adventures.fetch_image')}
-							</button>
-						</div>
-						{#if wikiImageError}
-							<div class="alert alert-error mt-2 py-2">
-								<span class="text-sm">{wikiImageError}</span>
-							</div>
-						{/if}
-					</div>
-
 					<!-- Immich Integration -->
 					{#if immichIntegration}
 						<div class="bg-base-50 p-4 rounded-lg border border-base-200">
@@ -793,6 +788,96 @@
 								}}
 								on:remoteImmichSaved={handleImmichImageSaved}
 							/>
+						</div>
+					{/if}
+				</div>
+
+				<!-- Wikipedia Search (Full Width) -->
+				<div class="bg-base-50 p-4 rounded-lg border border-base-200 mb-6">
+					<h4 class="font-medium mb-3 text-base-content/80">
+						{$t('adventures.wikipedia')}
+					</h4>
+					<div class="flex gap-2">
+						<input
+							type="text"
+							bind:value={imageSearch}
+							class="input input-bordered flex-1"
+							placeholder="Search Wikipedia for images"
+							disabled={isLoading}
+						/>
+						<button
+							class="btn btn-primary btn-sm"
+							class:loading={isLoading}
+							disabled={isLoading || !imageSearch.trim()}
+							on:click={handleWikiImageSearch}
+						>
+							{$t('navbar.search')}
+						</button>
+					</div>
+					{#if wikiImageError}
+						<div class="alert alert-error mt-2 py-2">
+							<span class="text-sm">{wikiImageError}</span>
+						</div>
+					{/if}
+
+					<!-- Wikipedia Image Results -->
+					{#if wikiImageResults.length > 0}
+						<div class="mt-4">
+							<div class="flex items-center justify-between mb-3">
+								<span class="text-sm text-base-content/70">
+									{$t('adventures.wiki_results_found', {
+										values: { count: wikiImageResults.length, query: imageSearch }
+									})}
+								</span>
+								<button
+									class="btn btn-ghost btn-xs"
+									on:click={() => {
+										wikiImageResults = [];
+										imageSearch = '';
+									}}
+								>
+									<CloseIcon class="h-4 w-4" />
+								</button>
+							</div>
+							<div
+								class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3"
+							>
+								{#each wikiImageResults as result (result.source)}
+									<button
+										type="button"
+										class="card bg-base-100 border border-base-300 hover:border-primary hover:shadow-lg transition-all duration-200 cursor-pointer group"
+										on:click={() => selectWikiImage(result.source)}
+										disabled={isLoading}
+									>
+										<figure class="aspect-square bg-base-200 overflow-hidden">
+											<img
+												src={result.source}
+												alt={result.title}
+												class="w-full h-full object-cover transition-transform group-hover:scale-105"
+												loading="lazy"
+											/>
+										</figure>
+										<div class="card-body p-2">
+											<h4 class="text-xs font-medium line-clamp-1 text-left" title={result.title}>
+												{result.title}
+											</h4>
+											<div
+												class="text-xs text-base-content/60 flex items-center justify-between gap-1"
+											>
+												<span class="truncate">{result.width} × {result.height}</span>
+											</div>
+										</div>
+										<div
+											class="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center rounded-2xl"
+										>
+											<div class="btn btn-primary btn-sm gap-2">
+												<CheckIcon class="h-4 w-4" />
+												{$t('adventures.select')}
+											</div>
+										</div>
+									</button>
+								{/each}
+							</div>
 						</div>
 					{/if}
 				</div>
