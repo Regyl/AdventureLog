@@ -12,6 +12,9 @@
 	export let user: any;
 	export let isFolderView: boolean = false;
 
+	// Whether the current user can modify this collection (owner or shared user)
+	export let canModify: boolean = false;
+
 	// Exported so a parent can bind to them if desired
 	export let locationSearch: string = '';
 	export let locationSort:

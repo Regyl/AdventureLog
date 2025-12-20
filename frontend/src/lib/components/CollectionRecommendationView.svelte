@@ -21,6 +21,8 @@
 
 	export let collection: Collection;
 	export let user: User | null;
+	// Whether the current user can modify this collection (owner or shared user)
+	export let canModify: boolean = false;
 
 	type RecommendationResult = {
 		name: string;
@@ -614,7 +616,7 @@
 						<!-- Action Buttons -->
 						<div class="card-actions justify-end mt-4">
 							{#if result.phone_number}
-								<a href={`tel:${result.phone_number}`} class="btn btn-sm btn-ghost">
+								<a href={`tel:${result.phone_number}`} class="btn btn-sm btn-neutral-100">
 									<Phone class="w-4 h-4" />
 								</a>
 							{/if}
@@ -623,7 +625,7 @@
 									href={result.website}
 									target="_blank"
 									rel="noopener noreferrer"
-									class="btn btn-sm btn-ghost"
+									class="btn btn-sm btn-neutral-100"
 								>
 									<Web class="w-4 h-4" />
 								</a>

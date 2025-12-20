@@ -29,6 +29,8 @@
 
 	export let collection: Collection;
 	export let user: any;
+	// Whether the current user can modify this collection (owner or shared user)
+	export let canModify: boolean = false;
 
 	const flipDurationMs = 200;
 
@@ -56,8 +58,9 @@
 	// Which day (ISO date string) is currently being saved. Used to show per-day spinner.
 	let savingDay: string | null = null;
 
-	// Check if auto-generate is available
-	$: canAutoGenerate = collection.itinerary?.length === 0 && hasDatedRecords(collection);
+	// Check if auto-generate is available (only for users with modify permission)
+	$: canAutoGenerate =
+		canModify && collection.itinerary?.length === 0 && hasDatedRecords(collection);
 
 	function hasDatedRecords(collection: Collection): boolean {
 		// Check if collection has any dated records
@@ -725,64 +728,66 @@
 								</div>
 							{/if}
 
-							<div class="dropdown z-[9999]">
-								<label tabindex="0" class="btn btn-sm btn-outline gap-2">Add</label>
-								<ul
-									tabindex="0"
-									class="dropdown-content menu p-2 shadow bg-base-300 rounded-box w-56"
-								>
-									<li>
-										<a
-											on:click={() => {
-												linkModalTargetDate = day.date;
-												linkModalDisplayDate = day.displayDate;
-												isItineraryLinkModalOpen = true;
-											}}>Link existing item</a
-										>
-									</li>
-									<li class="menu-title">Create new</li>
-									<li>
-										<a
-											on:click={() => {
-												pendingAddDate = day.date;
-												isLocationModalOpen = true;
-											}}>Location</a
-										>
-									</li>
-									<li>
-										<a
-											on:click={() => {
-												pendingAddDate = day.date;
-												isLodgingModalOpen = true;
-											}}>Lodging</a
-										>
-									</li>
-									<li>
-										<a
-											on:click={() => {
-												pendingAddDate = day.date;
-												isTransportationModalOpen = true;
-											}}>Transportation</a
-										>
-									</li>
-									<li>
-										<a
-											on:click={() => {
-												pendingAddDate = day.date;
-												isNoteModalOpen = true;
-											}}>Note</a
-										>
-									</li>
-									<li>
-										<a
-											on:click={() => {
-												pendingAddDate = day.date;
-												isChecklistModalOpen = true;
-											}}>Checklist</a
-										>
-									</li>
-								</ul>
-							</div>
+							{#if canModify}
+								<div class="dropdown z-[9999]">
+									<label tabindex="0" class="btn btn-sm btn-outline gap-2">Add</label>
+									<ul
+										tabindex="0"
+										class="dropdown-content menu p-2 shadow bg-base-300 rounded-box w-56"
+									>
+										<li>
+											<a
+												on:click={() => {
+													linkModalTargetDate = day.date;
+													linkModalDisplayDate = day.displayDate;
+													isItineraryLinkModalOpen = true;
+												}}>Link existing item</a
+											>
+										</li>
+										<li class="menu-title">Create new</li>
+										<li>
+											<a
+												on:click={() => {
+													pendingAddDate = day.date;
+													isLocationModalOpen = true;
+												}}>Location</a
+											>
+										</li>
+										<li>
+											<a
+												on:click={() => {
+													pendingAddDate = day.date;
+													isLodgingModalOpen = true;
+												}}>Lodging</a
+											>
+										</li>
+										<li>
+											<a
+												on:click={() => {
+													pendingAddDate = day.date;
+													isTransportationModalOpen = true;
+												}}>Transportation</a
+											>
+										</li>
+										<li>
+											<a
+												on:click={() => {
+													pendingAddDate = day.date;
+													isNoteModalOpen = true;
+												}}>Note</a
+											>
+										</li>
+										<li>
+											<a
+												on:click={() => {
+													pendingAddDate = day.date;
+													isChecklistModalOpen = true;
+												}}>Checklist</a
+											>
+										</li>
+									</ul>
+								</div>
+							{/if}
 						</div>
 					</div>
 
@@ -803,7 +808,7 @@
 									items: day.items,
 									flipDurationMs,
 									dropTargetStyle: { outline: 'none', border: 'none' },
-									dragDisabled: isSavingOrder,
+									dragDisabled: isSavingOrder || !canModify,
 									dropFromOthersDisabled: true
 								}}
 								on:consider={(e) => handleDndConsider(dayIndex, e)}
@@ -824,32 +829,34 @@
 									>
 										{#if resolvedObj}
 											<!-- Drag Handle Container -->
-											<div
-												class="absolute left-2 top-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-												title="Drag to reorder"
-											>
+											{#if canModify}
 												<div
-													class="itinerary-drag-handle btn btn-circle btn-xs btn-ghost bg-base-100/80 backdrop-blur-sm shadow-sm hover:bg-base-200 cursor-grab active:cursor-grabbing"
-													aria-label="Drag to reorder"
-													role="button"
-													tabindex="0"
+													class="absolute left-2 top-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+													title="Drag to reorder"
 												>
-													<svg
-														xmlns="http://www.w3.org/2000/svg"
-														class="h-3 w-3"
-														fill="none"
-														viewBox="0 0 24 24"
-														stroke="currentColor"
+													<div
+														class="itinerary-drag-handle btn btn-circle btn-xs btn-ghost bg-base-100/80 backdrop-blur-sm shadow-sm hover:bg-base-200 cursor-grab active:cursor-grabbing"
+														aria-label="Drag to reorder"
+														role="button"
+														tabindex="0"
 													>
-														<path
-															stroke-linecap="round"
-															stroke-linejoin="round"
-															stroke-width="2"
-															d="M4 8h16M4 16h16"
-														/>
-													</svg>
+														<svg
+															xmlns="http://www.w3.org/2000/svg"
+															class="h-3 w-3"
+															fill="none"
+															viewBox="0 0 24 24"
+															stroke="currentColor"
+														>
+															<path
+																stroke-linecap="round"
+																stroke-linejoin="round"
+																stroke-width="2"
+																d="M4 8h16M4 16h16"
+															/>
+														</svg>
+													</div>
 												</div>
-											</div>
+											{/if}
 
 											<!-- Order Badge
 											<div class="absolute right-2 top-2 z-10">
@@ -985,24 +992,26 @@
 						{#each unscheduledItems as { type, item }}
 							<div class="relative opacity-60 hover:opacity-100 transition-opacity h-full">
 								<!-- "Add to itinerary" indicator -->
-								<div class="absolute -right-2 top-2 z-10">
-									<button class="btn btn-circle btn-sm btn-primary" title="Add to itinerary">
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											class="h-4 w-4"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M12 4v16m8-8H4"
-											/>
-										</svg>
-									</button>
-								</div>
+								{#if canModify}
+									<div class="absolute -right-2 top-2 z-10">
+										<button class="btn btn-circle btn-sm btn-primary" title="Add to itinerary">
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												class="h-4 w-4"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M12 4v16m8-8H4"
+												/>
+											</svg>
+										</button>
+									</div>
+								{/if}
 
 								<!-- Display the appropriate card -->
 								{#if type === 'location'}

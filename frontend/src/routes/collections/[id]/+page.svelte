@@ -53,7 +53,7 @@
 		all: true, // Always available
 		itinerary: !isFolderView, // Only for collections with dates
 		map: collection?.locations?.some((l) => l.latitude && l.longitude) || false,
-		recommendations: true // Always available
+		recommendations: true // may be overridden by permission check below
 	};
 
 	// Get default view based on available views
@@ -73,6 +73,34 @@
 			currentView = defaultView;
 		}
 	}
+
+	// Determine whether current user can modify the collection (owner or shared user)
+	$: canModifyCollection = (() => {
+		const u = data.user as any;
+		if (!u || !collection) return false;
+
+		const userUuid = u.uuid || null;
+		const username = u.username || null;
+		const pk = u.pk !== undefined && u.pk !== null ? String(u.pk) : null;
+		const owner = collection.user;
+
+		// Direct matches: UUID (primary), username, or numeric pk (stringified)
+		if (userUuid && owner === userUuid) return true;
+		if (username && owner === username) return true;
+		if (pk && owner === pk) return true;
+
+		// Shared with may contain UUIDs or other identifiers
+		if (collection.shared_with && Array.isArray(collection.shared_with)) {
+			if (userUuid && collection.shared_with.includes(userUuid)) return true;
+			if (username && collection.shared_with.includes(username)) return true;
+			if (pk && collection.shared_with.includes(pk)) return true;
+		}
+
+		return false;
+	})();
+
+	// Enforce recommendations visibility only for owner/shared users
+	$: availableViews.recommendations = !!canModifyCollection;
 
 	onMount(async () => {
 		if (!collection) {
@@ -336,12 +364,21 @@
 
 				<!-- All Items View -->
 				{#if currentView === 'all' && collection.locations && collection.locations.length > 0}
-					<CollectionAllItems {collection} user={data.user} {isFolderView} />
+					<CollectionAllItems
+						{collection}
+						user={data.user}
+						{isFolderView}
+						canModify={canModifyCollection}
+					/>
 				{/if}
 
 				<!-- Itinerary View -->
 				{#if currentView === 'itinerary'}
-					<CollectionItineraryPlanner {collection} user={data.user} />
+					<CollectionItineraryPlanner
+						{collection}
+						user={data.user}
+						canModify={canModifyCollection}
+					/>
 				{/if}
 
 				<!-- Map View -->
@@ -390,7 +427,11 @@
 
 				<!-- Recommendations View -->
 				{#if currentView === 'recommendations'}
-					<CollectionRecommendationView {collection} user={data.user} />
+					<CollectionRecommendationView
+						{collection}
+						user={data.user}
+						canModify={canModifyCollection}
+					/>
 				{/if}
 			</div>
 
