@@ -15,11 +15,13 @@
 	import ImageDisplayModal from '$lib/components/ImageDisplayModal.svelte';
 	import CollectionAllItems from '$lib/components/CollectionAllItems.svelte';
 	import CollectionItineraryPlanner from '$lib/components/locations/CollectionItineraryPlanner.svelte';
+	import CollectionRecommendationView from '$lib/components/CollectionRecommendationView.svelte';
 	import { getBasemapUrl } from '$lib';
 	import FolderMultiple from '~icons/mdi/folder-multiple';
 	import FormatListBulleted from '~icons/mdi/format-list-bulleted';
 	import Timeline from '~icons/mdi/timeline';
 	import Map from '~icons/mdi/map';
+	import Lightbulb from '~icons/mdi/lightbulb';
 
 	const renderMarkdown = (markdown: string) => {
 		return marked(markdown) as string;
@@ -37,7 +39,7 @@
 	let isImageModalOpen: boolean = false;
 
 	// View state from URL params
-	type ViewType = 'all' | 'itinerary' | 'map';
+	type ViewType = 'all' | 'itinerary' | 'map' | 'recommendations';
 	let currentView: ViewType = 'itinerary';
 
 	// Determine if this is a folder view (no dates) or itinerary view (has dates)
@@ -50,7 +52,8 @@
 	$: availableViews = {
 		all: true, // Always available
 		itinerary: !isFolderView, // Only for collections with dates
-		map: collection?.locations?.some((l) => l.latitude && l.longitude) || false
+		map: collection?.locations?.some((l) => l.latitude && l.longitude) || false,
+		recommendations: true // Always available
 	};
 
 	// Get default view based on available views
@@ -60,7 +63,11 @@
 	// Read view from URL params and validate it's available
 	$: {
 		const view = $page.url.searchParams.get('view') as ViewType;
-		if (view && ['all', 'itinerary', 'map'].includes(view) && availableViews[view]) {
+		if (
+			view &&
+			['all', 'itinerary', 'map', 'recommendations'].includes(view) &&
+			availableViews[view]
+		) {
 			currentView = view;
 		} else {
 			currentView = defaultView;
@@ -299,6 +306,16 @@
 						Map
 					</button>
 				{/if}
+				{#if availableViews.recommendations}
+					<button
+						class="btn join-item"
+						class:btn-active={currentView === 'recommendations'}
+						on:click={() => switchView('recommendations')}
+					>
+						<Lightbulb class="w-5 h-5 mr-2" />
+						Recommendations
+					</button>
+				{/if}
 			</div>
 		</div>
 
@@ -369,6 +386,11 @@
 							</div>
 						</div>
 					</div>
+				{/if}
+
+				<!-- Recommendations View -->
+				{#if currentView === 'recommendations'}
+					<CollectionRecommendationView {collection} user={data.user} />
 				{/if}
 			</div>
 
