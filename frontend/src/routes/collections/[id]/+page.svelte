@@ -282,8 +282,8 @@
 						class:btn-active={currentView === 'all'}
 						on:click={() => switchView('all')}
 					>
-						<FormatListBulleted class="w-5 h-5 mr-2" />
-						All Items
+						<FormatListBulleted class="w-5 h-5 sm:mr-2" aria-hidden="true" />
+						<span class="hidden sm:inline">All Items</span>
 					</button>
 				{/if}
 				{#if availableViews.itinerary}
@@ -292,8 +292,8 @@
 						class:btn-active={currentView === 'itinerary'}
 						on:click={() => switchView('itinerary')}
 					>
-						<Timeline class="w-5 h-5 mr-2" />
-						Itinerary
+						<Timeline class="w-5 h-5 sm:mr-2" aria-hidden="true" />
+						<span class="hidden sm:inline">Itinerary</span>
 					</button>
 				{/if}
 				{#if availableViews.map}
@@ -302,8 +302,8 @@
 						class:btn-active={currentView === 'map'}
 						on:click={() => switchView('map')}
 					>
-						<Map class="w-5 h-5 mr-2" />
-						Map
+						<Map class="w-5 h-5 sm:mr-2" aria-hidden="true" />
+						<span class="hidden sm:inline">Map</span>
 					</button>
 				{/if}
 				{#if availableViews.recommendations}
@@ -312,8 +312,8 @@
 						class:btn-active={currentView === 'recommendations'}
 						on:click={() => switchView('recommendations')}
 					>
-						<Lightbulb class="w-5 h-5 mr-2" />
-						Recommendations
+						<Lightbulb class="w-5 h-5 sm:mr-2" aria-hidden="true" />
+						<span class="hidden sm:inline">Recommendations</span>
 					</button>
 				{/if}
 			</div>
