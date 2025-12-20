@@ -103,6 +103,12 @@
 		}
 	}
 
+	function handleRemoveItineraryItem(event: CustomEvent<CollectionItineraryItem>) {
+		const itemToRemove = event.detail;
+		collection.itinerary = collection.itinerary?.filter((it) => it.id !== itemToRemove.id);
+		days = groupItemsByDay(collection);
+	}
+
 	let locationToEdit: Location | null = null;
 	let isLocationModalOpen: boolean = false;
 	function handleEditLocation(event: CustomEvent<Location>) {
@@ -886,6 +892,8 @@
 														adventure={resolvedObj}
 														on:edit={handleEditLocation}
 														on:delete={handleDeleteLocation}
+														itineraryItem={item}
+														on:removeFromItinerary={handleRemoveItineraryItem}
 														{user}
 														{collection}
 														compact={true}

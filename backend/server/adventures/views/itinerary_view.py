@@ -12,6 +12,7 @@ from rest_framework.exceptions import ValidationError, PermissionDenied
 from adventures.permissions import IsOwnerOrSharedWithFullAccess
 from django.db.models import Q
 from django.db import transaction
+from django.utils import timezone
 
 class ItineraryViewSet(viewsets.ModelViewSet):
     serializer_class = CollectionItineraryItemSerializer
@@ -176,6 +177,49 @@ class ItineraryViewSet(viewsets.ModelViewSet):
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        """
+        Override destroy to remove associated visits when deleting a location itinerary item.
+        
+        When removing a location from the itinerary, any PLANNED visits (future visits) at 
+        that location on the same date as the itinerary item should also be removed.
+        """
+        instance = self.get_object()
+        
+        # Check if this is a location type itinerary item
+        location_ct = ContentType.objects.get_for_model(Location)
+        if instance.content_type == location_ct and instance.object_id:
+            try:
+                location = Location.objects.get(id=instance.object_id)
+                itinerary_date = instance.date
+                
+                if itinerary_date:
+                    # Convert itinerary date to datetime for comparison
+                    if isinstance(itinerary_date, str):
+                        itinerary_date = parse_date(itinerary_date)
+                    
+                    # Find visits at this location on this date that are in the future (planned visits)
+                    # A visit is considered "planned" if its start_date is in the future
+                    now = timezone.now()
+                    
+                    visits_to_delete = Visit.objects.filter(
+                        location=location,
+                        start_date__date=itinerary_date,
+                        start_date__gt=now  # Only delete future/planned visits
+                    )
+                    
+                    deleted_count = visits_to_delete.count()
+                    if deleted_count > 0:
+                        visits_to_delete.delete()
+                        
+            except Location.DoesNotExist:
+                # Location doesn't exist, just proceed with deleting the itinerary item
+                pass
+        
+        # Call parent destroy to delete the itinerary item
+        return super().destroy(request, *args, **kwargs)
     
     @action(detail=False, methods=['post'], url_path='reorder')
     @transaction.atomic

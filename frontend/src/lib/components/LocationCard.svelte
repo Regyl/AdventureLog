@@ -25,12 +25,14 @@
 	import StarOutline from '~icons/mdi/star-outline';
 	import Eye from '~icons/mdi/eye';
 	import EyeOff from '~icons/mdi/eye-off';
+	import CollectionItineraryPlanner from './locations/CollectionItineraryPlanner.svelte';
 
 	export let type: string | null = null;
 	export let user: User | null;
 	export let collection: Collection | null = null;
 	export let readOnly: boolean = false;
 	export let compact: boolean = false; // For compact grid display in itinerary
+	export let itineraryItem: CollectionItineraryPlanner | null = null;
 
 	let isCollectionModalOpen: boolean = false;
 	let isWarningModalOpen: boolean = false;
@@ -93,6 +95,19 @@
 			dispatch('delete', adventure.id);
 		} else {
 			console.log('Error deleting adventure');
+		}
+	}
+
+	async function removeFromItinerary() {
+		let itineraryItemId = itineraryItem?.id;
+		let res = await fetch(`/api/itineraries/${itineraryItemId}`, {
+			method: 'DELETE'
+		});
+		if (res.ok) {
+			addToast('info', $t('itinerary.item_remove_success'));
+			dispatch('removeFromItinerary', itineraryItem);
+		} else {
+			addToast('error', $t('itinerary.item_remove_error'));
 		}
 	}
 
@@ -345,6 +360,19 @@
 												<LinkIcon class="w-4 h-4" />
 												{$t('adventures.copy_link')}
 											{/if}
+										</button>
+									</li>
+								{/if}
+
+								{#if itineraryItem && itineraryItem.id}
+									<div class="divider my-1"></div>
+									<li>
+										<button
+											on:click={() => removeFromItinerary()}
+											class="text-error flex items-center gap-2"
+										>
+											<TrashCan class="w-4 h-4 text-error" />
+											{$t('itinerary.remove_from_itinerary')}
 										</button>
 									</li>
 								{/if}
