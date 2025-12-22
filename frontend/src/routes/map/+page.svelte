@@ -1,18 +1,10 @@
 <script lang="ts">
-	import {
-		DefaultMarker,
-		MapEvents,
-		MapLibre,
-		Popup,
-		Marker,
-		GeoJSON,
-		LineLayer
-	} from 'svelte-maplibre';
+	import { DefaultMarker, Popup, Marker, GeoJSON, LineLayer } from 'svelte-maplibre';
 	import { t } from 'svelte-i18n';
 	import type { Activity, Location, VisitedCity, VisitedRegion, Pin } from '$lib/types.js';
-	import CardCarousel from '$lib/components/CardCarousel.svelte';
+	import type { ClusterOptions } from 'svelte-maplibre';
 	import { goto } from '$app/navigation';
-	import { basemapOptions, getActivityColor, getBasemapLabel, getBasemapUrl } from '$lib';
+	import { getActivityColor } from '$lib';
 
 	// Icons
 	import MapIcon from '~icons/mdi/map';
@@ -25,7 +17,7 @@
 	import LocationIcon from '~icons/mdi/crosshairs-gps';
 	import NewLocationModal from '$lib/components/NewLocationModal.svelte';
 	import ActivityIcon from '~icons/mdi/run-fast';
-	import MapStyleSelector from '$lib/components/MapStyleSelector.svelte';
+	import FullMap from '$lib/components/FullMap.svelte';
 
 	export let data;
 
@@ -56,8 +48,99 @@
 	// Cache for full location data
 	let locationCache: Map<string, Location> = new Map();
 	let loadingLocations: Set<string> = new Set();
+	let locationRequests: Map<string, Promise<Location | null>> = new Map();
+
+	// Hover/focus popup state
+	let hoveredPinId: string | null = null;
+	let hoveredLocation: Location | null = null;
+	let hoveredLocationLoading: boolean = false;
+	let hoveredLocationError: string | null = null;
+	let hoverRequestSeq = 0;
 
 	let locationBeingUpdated: Location | undefined = undefined;
+
+	// Clustering configuration
+	const PIN_SOURCE_ID = 'map-pins';
+	const pinClusterOptions: ClusterOptions = { radius: 300, maxZoom: 8, minPoints: 2 };
+
+	type VisitStatus = 'visited' | 'planned';
+
+	type PinFeatureProperties = {
+		id: string;
+		name: string;
+		visitStatus: VisitStatus;
+		categoryIcon?: string;
+	};
+
+	type PinFeature = {
+		type: 'Feature';
+		geometry: {
+			type: 'Point';
+			coordinates: [number, number];
+		};
+		properties: PinFeatureProperties;
+	};
+
+	type PinFeatureCollection = {
+		type: 'FeatureCollection';
+		features: PinFeature[];
+	};
+
+	function parseCoordinate(value: number | string | null | undefined): number | null {
+		if (value === null || value === undefined) return null;
+		const numeric = typeof value === 'number' ? value : Number(value);
+		return Number.isFinite(numeric) ? numeric : null;
+	}
+
+	function pinToFeature(pin: Pin): PinFeature | null {
+		const lat = parseCoordinate(pin.latitude);
+		const lon = parseCoordinate(pin.longitude);
+		if (lat === null || lon === null) return null;
+
+		return {
+			type: 'Feature',
+			geometry: { type: 'Point', coordinates: [lon, lat] },
+			properties: {
+				id: pin.id,
+				name: pin.name,
+				visitStatus: pin.is_visited ? 'visited' : 'planned',
+				categoryIcon: pin.category?.icon || '📍'
+			}
+		};
+	}
+
+	function pinToFeatureUnknown(item: unknown) {
+		return pinToFeature(item as Pin);
+	}
+
+	function getMarkerProps(feature: any): PinFeatureProperties | null {
+		return feature && feature.properties ? feature.properties : null;
+	}
+
+	function getVisitStatusClass(status: VisitStatus): string {
+		switch (status) {
+			case 'visited':
+				return 'bg-gradient-to-br from-emerald-400 to-emerald-600';
+			case 'planned':
+				return 'bg-gradient-to-br from-blue-400 to-blue-600';
+			default:
+				return 'bg-gray-200';
+		}
+	}
+
+	function markerClassResolver(props: { visitStatus?: string } | null): string {
+		if (!props?.visitStatus) return '';
+		return getVisitStatusClass(props.visitStatus as VisitStatus);
+	}
+
+	function markerLabelResolver(props: { categoryIcon?: string } | null): string {
+		if (!props) return '📍';
+		return props.categoryIcon || '📍';
+	}
+
+	async function handleViewDetails(pinId: string) {
+		goto(`/locations/${pinId}`);
+	}
 
 	// Statistics
 	$: totalAdventures = pins.length;
@@ -140,37 +223,92 @@
 		visitedCities = await response.json();
 	}
 
+	function formatDateForPopup(value: string | null | undefined): string {
+		if (!value) return '';
+		// Most API date strings here are ISO-ish; for a popup, a short date is enough.
+		return value.split('T')[0] ?? value;
+	}
+
+	function truncateForPopup(value: string | null | undefined, max = 140): string {
+		if (!value) return '';
+		const normalized = value.replace(/\s+/g, ' ').trim();
+		if (normalized.length <= max) return normalized;
+		return `${normalized.slice(0, max).trim()}…`;
+	}
+
 	async function fetchLocationDetails(locationId: string): Promise<Location | null> {
 		// Check cache first
 		if (locationCache.has(locationId)) {
 			return locationCache.get(locationId)!;
 		}
 
-		// Prevent duplicate requests
-		if (loadingLocations.has(locationId)) {
-			return null;
-		}
+		// Reuse in-flight requests so hover doesn't trigger duplicate fetches
+		const existing = locationRequests.get(locationId);
+		if (existing) return existing;
 
-		try {
-			loadingLocations.add(locationId);
-			const response = await fetch(`/api/locations/${locationId}`);
+		const request = (async () => {
+			try {
+				loadingLocations.add(locationId);
+				const response = await fetch(`/api/locations/${locationId}`);
 
-			if (!response.ok) {
-				throw new Error(`Failed to fetch location: ${response.statusText}`);
+				if (!response.ok) {
+					throw new Error(`Failed to fetch location: ${response.statusText}`);
+				}
+
+				const location: Location = await response.json();
+				locationCache.set(locationId, location);
+				return location;
+			} catch (error) {
+				console.error('Error fetching location details:', error);
+				return null;
+			} finally {
+				loadingLocations.delete(locationId);
+				locationRequests.delete(locationId);
 			}
+		})();
 
-			const location: Location = await response.json();
-			locationCache.set(locationId, location);
-			return location;
-		} catch (error) {
-			console.error('Error fetching location details:', error);
-			return null;
-		} finally {
-			loadingLocations.delete(locationId);
-		}
+		locationRequests.set(locationId, request);
+		return request;
 	}
 
-	function addMarker(e: { detail: { lngLat: { lng: any; lat: any } } }) {
+	async function prefetchLocationDetailsForPopup(locationId: string) {
+		hoveredPinId = locationId;
+		hoveredLocationError = null;
+
+		const cached = locationCache.get(locationId) ?? null;
+		hoveredLocation = cached;
+
+		// If we already have full data, no need to show a loading state.
+		if (cached) {
+			hoveredLocationLoading = false;
+			return;
+		}
+
+		const seq = ++hoverRequestSeq;
+		hoveredLocationLoading = true;
+
+		const location = await fetchLocationDetails(locationId);
+		if (seq !== hoverRequestSeq || hoveredPinId !== locationId) return;
+
+		hoveredLocationLoading = false;
+		if (!location) {
+			hoveredLocationError = $t('errors.generic_error') ?? 'Failed to load details';
+			hoveredLocation = cached;
+			return;
+		}
+
+		hoveredLocation = location;
+	}
+
+	function clearHoverPopupIfActive(locationId: string) {
+		if (hoveredPinId !== locationId) return;
+		hoveredPinId = null;
+		hoveredLocation = null;
+		hoveredLocationLoading = false;
+		hoveredLocationError = null;
+	}
+
+	function addMarker(e: CustomEvent<{ lngLat: { lng: any; lat: any } }>) {
 		newMarker = null;
 		newMarker = { lngLat: e.detail.lngLat };
 		newLongitude = e.detail.lngLat.lng;
@@ -208,18 +346,7 @@
 		newMarker = null;
 	}
 
-	// Function to handle popup opening - only fetch when actually needed
-	let openPopups = new Set<string>();
-
-	function handlePopupOpen(pinId: string) {
-		openPopups.add(pinId);
-		openPopups = openPopups; // Trigger reactivity
-	}
-
-	function handlePopupClose(pinId: string) {
-		openPopups.delete(pinId);
-		openPopups = openPopups; // Trigger reactivity
-	}
+	// FullMap handles cluster theme styling + cluster expansion on click.
 </script>
 
 <svelte:head>
@@ -307,220 +434,242 @@
 			<!-- Map Section -->
 			<div class="container mx-auto px-6 py-4 flex-1">
 				<div class="card bg-base-100 shadow-xl h-full relative">
-					<!-- Integrated Map Type Selector -->
-					<div
-						class="absolute top-4 right-4 z-10 bg-base-200 backdrop-blur-sm rounded-lg shadow-lg"
-					>
-						<div class="p-2">
-							<MapStyleSelector bind:basemapType />
-						</div>
-					</div>
-
 					<div class="card-body p-0 h-full">
-						<MapLibre
-							style={getBasemapUrl(basemapType)}
-							class="w-full h-full min-h-[70vh] rounded-lg"
+						<FullMap
+							bind:basemapType
+							sourceId={PIN_SOURCE_ID}
+							items={filteredPins}
+							toFeature={pinToFeatureUnknown}
+							clusterEnabled={true}
+							clusterOptions={pinClusterOptions}
+							{getMarkerProps}
+							mapClass="w-full h-full min-h-[70vh] rounded-lg"
 							standardControls
+							on:mapClick={addMarker}
 						>
-							{#each filteredPins as pin}
-								{#if pin.latitude && pin.longitude}
-									<Marker
-										lngLat={[parseFloat(pin.longitude), parseFloat(pin.latitude)]}
-										class="grid h-8 w-8 place-items-center rounded-full border-2 border-white shadow-lg cursor-pointer hover:scale-110 transition-all duration-200 {pin.is_visited
-											? 'bg-gradient-to-br from-emerald-400 to-emerald-600 hover:from-emerald-500 hover:to-emerald-700'
-											: 'bg-gradient-to-br from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700'} text-white focus:outline-4 focus:outline-primary/50"
-									>
-										<span class="text-xl">
-											{pin.category?.icon || '📍'}
-										</span>
-
-										<Popup
-											openOn="click"
-											offset={[0, -10]}
-											on:open={() => handlePopupOpen(pin.id)}
-											on:close={() => handlePopupClose(pin.id)}
+							<svelte:fragment
+								slot="marker"
+								let:markerProps
+								let:markerLngLat
+								let:isActive
+								let:setActive
+							>
+								{#if markerProps && markerLngLat}
+									<Marker lngLat={markerLngLat} class={isActive ? 'map-pin-active' : 'map-pin'}>
+										<div
+											class="relative group z-[1000] group-hover:z-[10000] focus-within:z-[10000]"
 										>
-											<div class="min-w-64 max-w-sm">
-												{#if openPopups.has(pin.id)}
-													{#await fetchLocationDetails(pin.id)}
-														<div class="flex items-center justify-center p-4">
-															<span class="loading loading-spinner loading-sm"></span>
-															<span class="ml-2 text-sm">Loading details...</span>
-														</div>
-													{:then location}
-														{#if location}
-															{#if location.images && location.images.length > 0}
-																<div class="mb-3">
-																	<CardCarousel
-																		images={location.images}
-																		name={location.name}
-																		icon={location?.category?.icon}
-																	/>
-																</div>
-															{/if}
-															<div class="space-y-2">
-																<div class="text-lg text-black font-bold">{location.name}</div>
-																<div class="flex items-center gap-2">
-																	<span
-																		class="badge {location.is_visited
+											<!-- Marker Pin -->
+											<div
+												class="grid place-items-center w-10 h-10 rounded-full border-2 border-white shadow-lg text-xl cursor-pointer group-hover:scale-110 transition-all duration-200 {markerClassResolver(
+													markerProps
+												)}"
+												role="button"
+												tabindex="0"
+												on:mouseenter={() => {
+													setActive(true);
+													prefetchLocationDetailsForPopup(markerProps.id);
+												}}
+												on:mouseleave={() => {
+													setActive(false);
+													clearHoverPopupIfActive(markerProps.id);
+												}}
+												on:focus={() => {
+													setActive(true);
+													prefetchLocationDetailsForPopup(markerProps.id);
+												}}
+												on:blur={() => {
+													setActive(false);
+													clearHoverPopupIfActive(markerProps.id);
+												}}
+												on:click={() => handleViewDetails(markerProps.id)}
+												on:keydown={(e) => e.key === 'Enter' && handleViewDetails(markerProps.id)}
+											>
+												{markerLabelResolver(markerProps)}
+											</div>
+
+											<!-- Custom DaisyUI Popup -->
+											<div
+												class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 z-[9999]"
+											>
+												<div
+													class="card card-compact bg-base-100 shadow-xl border border-base-300 min-w-56 max-w-80"
+												>
+													<div class="card-body gap-3">
+														<!-- Always-visible (fast) content -->
+														<div class="space-y-2">
+															<div class="min-w-0">
+																<h3 class="card-title text-sm leading-tight truncate">
+																	{markerProps.name}
+																</h3>
+																<div class="mt-1 flex items-center gap-2">
+																	<div
+																		class="badge badge-sm {markerProps.visitStatus === 'visited'
 																			? 'badge-success'
-																			: 'badge-info'} badge-sm"
+																			: 'badge-info'}"
 																	>
-																		{location.is_visited
+																		{markerProps.visitStatus === 'visited'
 																			? $t('adventures.visited')
 																			: $t('adventures.planned')}
-																	</span>
-																	{#if location.category}
-																		<span class="badge badge-outline badge-sm">
-																			{location.category.display_name}
-																			{location.category.icon}
-																		</span>
+																	</div>
+																	{#if markerProps.categoryIcon}
+																		<div class="badge badge-ghost badge-sm">
+																			{markerProps.categoryIcon}
+																		</div>
 																	{/if}
 																</div>
-																{#if location.visits && location.visits.length > 0}
-																	<div class="text-black text-sm space-y-1">
-																		{#each location.visits as visit}
-																			<div class="flex items-center gap-1">
-																				<Calendar class="w-3 h-3" />
-																				<span>
-																					{visit.start_date
-																						? new Date(visit.start_date).toLocaleDateString(
-																								undefined,
-																								{
-																									timeZone: 'UTC'
-																								}
-																							)
-																						: ''}
-																					{visit.end_date &&
-																					visit.end_date !== '' &&
-																					visit.end_date !== visit.start_date
-																						? ' - ' +
-																							new Date(visit.end_date).toLocaleDateString(
-																								undefined,
-																								{
-																									timeZone: 'UTC'
-																								}
-																							)
-																						: ''}
-																				</span>
-																			</div>
-																		{/each}
+															</div>
+														</div>
+
+														{#if hoveredPinId === markerProps.id}
+															<!-- Progressive (fetched) content -->
+															{#if hoveredLocationError}
+																<div role="alert" class="alert alert-error alert-soft">
+																	<span class="text-sm">{hoveredLocationError}</span>
+																</div>
+															{:else if hoveredLocationLoading && !hoveredLocation}
+																<div class="space-y-2">
+																	<div class="flex items-center gap-2">
+																		<span class="loading loading-spinner loading-xs"></span>
+																		<span class="text-xs text-base-content/60">Loading more…</span>
+																	</div>
+																	<div class="skeleton h-3 w-3/4"></div>
+																	<div class="skeleton h-3 w-full"></div>
+																	<div class="skeleton h-3 w-2/3"></div>
+																	<div class="grid grid-cols-2 gap-2">
+																		<div class="skeleton h-6 w-full"></div>
+																		<div class="skeleton h-6 w-full"></div>
+																	</div>
+																</div>
+															{:else if hoveredLocation}
+																{#if hoveredLocation.category?.display_name}
+																	<div class="badge badge-outline badge-sm">
+																		{hoveredLocation.category.display_name}
 																	</div>
 																{/if}
-																<div class="flex flex-col gap-2 pt-2">
-																	{#if location.longitude && location.latitude}
-																		<a
-																			class="btn btn-outline btn-sm gap-2"
-																			href={`https://maps.apple.com/?q=${location.latitude},${location.longitude}`}
-																			target="_blank"
-																			rel="noopener noreferrer"
-																		>
-																			<LocationIcon class="w-4 h-4" />
-																			{$t('adventures.open_in_maps')}
-																		</a>
+
+																{#if hoveredLocation.location}
+																	<div class="text-xs text-base-content/70">
+																		{truncateForPopup(hoveredLocation.location, 90)}
+																	</div>
+																{/if}
+
+																<div class="flex flex-wrap items-center gap-2">
+																	{#if hoveredLocation.rating !== null && hoveredLocation.rating !== undefined}
+																		<div class="badge badge-neutral badge-sm">
+																			★ {hoveredLocation.rating}
+																		</div>
 																	{/if}
-																	<button
-																		class="btn btn-primary btn-sm gap-2"
-																		on:click={() => goto(`/locations/${location.id}`)}
-																	>
-																		<Eye class="w-4 h-4" />
-																		{$t('map.view_details')}
-																	</button>
+																	<div class="badge badge-ghost badge-sm">
+																		Visits: {hoveredLocation.visits?.length ?? 0}
+																	</div>
+																	<div class="badge badge-ghost badge-sm">
+																		Media: {hoveredLocation.images?.length ?? 0}
+																	</div>
+																	<div class="badge badge-ghost badge-sm">
+																		Files: {hoveredLocation.attachments?.length ?? 0}
+																	</div>
+																	<div class="badge badge-ghost badge-sm">
+																		Trails: {hoveredLocation.trails?.length ?? 0}
+																	</div>
 																</div>
-															</div>
-														{:else}
-															<div class="p-4 text-center">
-																<div class="text-lg text-black font-bold">{pin.name}</div>
-																<div class="text-sm text-gray-600">Failed to load details</div>
-																<button
-																	class="btn btn-primary btn-sm gap-2 mt-2"
-																	on:click={() => goto(`/locations/${pin.id}`)}
-																>
-																	<Eye class="w-4 h-4" />
-																	{$t('map.view_details')}
-																</button>
-															</div>
+
+																{#if hoveredLocation.visits && hoveredLocation.visits.length > 0}
+																	<div class="text-xs text-base-content/70">
+																		Last visit: {formatDateForPopup(
+																			hoveredLocation.visits[0]?.start_date
+																		)}
+																	</div>
+																{/if}
+
+																{#if hoveredLocation.description}
+																	<p class="text-xs leading-snug text-base-content/80">
+																		{truncateForPopup(hoveredLocation.description, 160)}
+																	</p>
+																{/if}
+
+																{#if hoveredLocation.tags && hoveredLocation.tags.length > 0}
+																	<div class="flex flex-wrap gap-1">
+																		{#each hoveredLocation.tags.slice(0, 6) as tag}
+																			<span class="badge badge-ghost badge-sm">{tag}</span>
+																		{/each}
+																		{#if hoveredLocation.tags.length > 6}
+																			<span class="badge badge-ghost badge-sm"
+																				>+{hoveredLocation.tags.length - 6}</span
+																			>
+																		{/if}
+																	</div>
+																{/if}
+															{/if}
 														{/if}
-													{:catch error}
-														<div class="p-4 text-center">
-															<div class="text-lg text-black font-bold">{pin.name}</div>
-															<div class="text-sm text-red-600">Error loading details</div>
-															<button
-																class="btn btn-primary btn-sm gap-2 mt-2"
-																on:click={() => goto(`/locations/${pin.id}`)}
-															>
-																<Eye class="w-4 h-4" />
-																{$t('map.view_details')}
-															</button>
-														</div>
-													{/await}
-												{:else}
-													<div class="p-4 text-center">
-														<div class="text-lg text-black font-bold">{pin.name}</div>
-														<div class="text-sm text-gray-600">Click to load details...</div>
 													</div>
-												{/if}
+												</div>
+												<!-- Arrow pointer -->
+												<div
+													class="absolute top-full left-1/2 -translate-x-1/2 -mt-px w-3 h-3 rotate-45 bg-base-100 border-r border-b border-base-300"
+												></div>
 											</div>
-										</Popup>
+										</div>
 									</Marker>
 								{/if}
-							{/each}
+							</svelte:fragment>
 
-							<MapEvents on:click={addMarker} />
-							{#if newMarker}
-								<DefaultMarker lngLat={newMarker.lngLat} />
-							{/if}
-
-							{#each visitedRegions as region}
-								{#if showRegions}
-									<Marker
-										lngLat={[region.longitude, region.latitude]}
-										class="grid h-8 w-8 place-items-center rounded-full border border-gray-200 bg-green-300 hover:bg-green-400 text-black shadow-lg cursor-pointer transition-transform hover:scale-110"
-									>
-										<LocationIcon class="w-5 h-5 text-green-700" />
-										<Popup openOn="click" offset={[0, -10]}>
-											<div class="space-y-2">
-												<div class="text-lg text-black font-bold">{region.name}</div>
-												<div class="badge badge-success badge-sm">{region.region}</div>
-											</div>
-										</Popup>
-									</Marker>
+							<svelte:fragment slot="overlays">
+								{#if newMarker}
+									<DefaultMarker lngLat={newMarker.lngLat} />
 								{/if}
-							{/each}
 
-							{#if showCities}
-								{#each visitedCities as city}
-									<Marker
-										lngLat={[city.longitude, city.latitude]}
-										class="grid h-8 w-8 place-items-center rounded-full border border-gray-200 bg-blue-300 hover:bg-blue-400 text-black shadow-lg cursor-pointer transition-transform hover:scale-110"
-									>
-										<LocationIcon class="w-5 h-5 text-blue-700" />
-										<Popup openOn="click" offset={[0, -10]}>
-											<div class="space-y-2">
-												<div class="text-lg text-black font-bold">{city.name}</div>
-												<div class="badge badge-success badge-sm">{city.id}</div>
-											</div>
-										</Popup>
-									</Marker>
-								{/each}
-							{/if}
-
-							{#if showActivities}
-								{#each activities as activity}
-									{#if activity.geojson}
-										<GeoJSON data={activity.geojson}>
-											<LineLayer
-												paint={{
-													'line-color': getActivityColor(activity.sport_type),
-													'line-width': 3,
-													'line-opacity': 0.8
-												}}
-											/>
-										</GeoJSON>
+								{#each visitedRegions as region}
+									{#if showRegions}
+										<Marker
+											lngLat={[region.longitude, region.latitude]}
+											class="grid h-8 w-8 place-items-center rounded-full border border-gray-200 bg-green-300 hover:bg-green-400 text-black shadow-lg cursor-pointer transition-transform hover:scale-110"
+										>
+											<LocationIcon class="w-5 h-5 text-green-700" />
+											<Popup openOn="click" offset={[0, -10]}>
+												<div class="space-y-2">
+													<div class="text-lg text-black font-bold">{region.name}</div>
+													<div class="badge badge-success badge-sm">{region.region}</div>
+												</div>
+											</Popup>
+										</Marker>
 									{/if}
 								{/each}
-							{/if}
-						</MapLibre>
+
+								{#if showCities}
+									{#each visitedCities as city}
+										<Marker
+											lngLat={[city.longitude, city.latitude]}
+											class="grid h-8 w-8 place-items-center rounded-full border border-gray-200 bg-blue-300 hover:bg-blue-400 text-black shadow-lg cursor-pointer transition-transform hover:scale-110"
+										>
+											<LocationIcon class="w-5 h-5 text-blue-700" />
+											<Popup openOn="click" offset={[0, -10]}>
+												<div class="space-y-2">
+													<div class="text-lg text-black font-bold">{city.name}</div>
+													<div class="badge badge-success badge-sm">{city.id}</div>
+												</div>
+											</Popup>
+										</Marker>
+									{/each}
+								{/if}
+
+								{#if showActivities}
+									{#each activities as activity}
+										{#if activity.geojson}
+											<GeoJSON data={activity.geojson}>
+												<LineLayer
+													paint={{
+														'line-color': getActivityColor(activity.sport_type),
+														'line-width': 3,
+														'line-opacity': 0.8
+													}}
+												/>
+											</GeoJSON>
+										{/if}
+									{/each}
+								{/if}
+							</svelte:fragment>
+						</FullMap>
 					</div>
 				</div>
 			</div>
@@ -709,9 +858,3 @@
 		bind:location={locationBeingUpdated}
 	/>
 {/if}
-
-<style>
-	:global(.map) {
-		height: 500px;
-	}
-</style>

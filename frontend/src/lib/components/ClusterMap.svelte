@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
-	import { CircleLayer, GeoJSON, MapLibre, MarkerLayer, SymbolLayer } from 'svelte-maplibre';
+	import { createEventDispatcher, onMount } from 'svelte';
+	import { CircleLayer, GeoJSON, MapLibre, MarkerLayer } from 'svelte-maplibre';
 	import type { ClusterOptions, LayerClickInfo } from 'svelte-maplibre';
 	import { getBasemapUrl } from '$lib';
+	import { resolveThemeColor, withAlpha } from '$lib/utils/resolveThemeColor';
 
 	type PointGeometry = {
 		type: 'Point';
@@ -74,19 +75,92 @@
 
 	export let markerLabel: (props: MarkerProps) => string = markerTitle;
 
-	export let clusterCirclePaint = {
+	const DEFAULT_CLUSTER_CIRCLE_PAINT: Record<string, any> = {
 		'circle-color': ['step', ['get', 'point_count'], '#60a5fa', 20, '#facc15', 60, '#f472b6'],
 		'circle-radius': ['step', ['get', 'point_count'], 24, 20, 34, 60, 46],
 		'circle-opacity': 0.85
 	};
 
-	export let clusterSymbolLayout = {
+	export let clusterCirclePaint: Record<string, any> = DEFAULT_CLUSTER_CIRCLE_PAINT;
+
+	const DEFAULT_CLUSTER_SYMBOL_LAYOUT: Record<string, any> = {
 		'text-field': '{point_count_abbreviated}',
-		'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+		// Use a font stack that works across more basemap styles.
+		// Many raster-only styles rely on an external `glyphs` endpoint and won't have Open Sans.
+		'text-font': ['Noto Sans Regular', 'Arial Unicode MS Regular'],
 		'text-size': 12
 	};
 
-	export let clusterSymbolPaint = { 'text-color': '#1f2937' };
+	export let clusterSymbolLayout: Record<string, any> = DEFAULT_CLUSTER_SYMBOL_LAYOUT;
+
+	const DEFAULT_CLUSTER_SYMBOL_PAINT: Record<string, any> = { 'text-color': '#1f2937' };
+	export let clusterSymbolPaint: Record<string, any> = DEFAULT_CLUSTER_SYMBOL_PAINT;
+
+	onMount(() => {
+		// Only apply theme-based defaults when the consumer hasn't overridden them.
+		const shouldThemeCircle = clusterCirclePaint === DEFAULT_CLUSTER_CIRCLE_PAINT;
+		const shouldThemeLayout = clusterSymbolLayout === DEFAULT_CLUSTER_SYMBOL_LAYOUT;
+		const shouldThemeSymbol = clusterSymbolPaint === DEFAULT_CLUSTER_SYMBOL_PAINT;
+		if (!shouldThemeCircle && !shouldThemeLayout && !shouldThemeSymbol) return;
+
+		const baseContent = resolveThemeColor('--color-base-content', '#111827');
+
+		// Softer/pastel-ish cluster palette using daisyUI semantic tokens.
+		const info = resolveThemeColor('--color-info', '#38bdf8');
+		const warning = resolveThemeColor('--color-warning', '#f59e0b');
+		const error = resolveThemeColor('--color-error', '#f87171');
+
+		const infoContent = resolveThemeColor('--color-info-content', '#082f49');
+		const warningContent = resolveThemeColor('--color-warning-content', '#111827');
+		const errorContent = resolveThemeColor('--color-error-content', '#450a0a');
+
+		if (shouldThemeCircle) {
+			clusterCirclePaint = {
+				// Use daisyUI semantic colors so clusters pop against any basemap.
+				'circle-color': [
+					'step',
+					['get', 'point_count'],
+					withAlpha(info, 0.7),
+					25,
+					withAlpha(warning, 0.7),
+					80,
+					withAlpha(error, 0.65)
+				],
+				'circle-radius': ['step', ['get', 'point_count'], 22, 20, 32, 60, 44],
+				'circle-opacity': 1,
+				'circle-stroke-color': withAlpha(baseContent, 0.25),
+				'circle-stroke-width': 2,
+				// Keep clusters crisp; blur can look fuzzy on some displays.
+				'circle-blur': 0
+			};
+		}
+
+		if (shouldThemeLayout) {
+			clusterSymbolLayout = {
+				...clusterSymbolLayout,
+				'text-size': 13
+			};
+		}
+
+		if (shouldThemeSymbol) {
+			clusterSymbolPaint = {
+				// Keep numbers highly readable: use each fill's matching *-content color.
+				'text-color': [
+					'step',
+					['get', 'point_count'],
+					infoContent,
+					25,
+					warningContent,
+					80,
+					errorContent
+				],
+				// Tiny crisp halo just to help glyph edges.
+				'text-halo-color': withAlpha(baseContent, 0.12),
+				'text-halo-width': 0.75,
+				'text-halo-blur': 0
+			};
+		}
+	});
 
 	const dispatch = createEventDispatcher<{
 		markerSelect: { feature: unknown; markerProps: MarkerProps; countryCode?: string };
@@ -225,12 +299,19 @@
 			paint={resolvedClusterCirclePaint}
 			on:click={handleClusterClick}
 		/>
-		<SymbolLayer
-			id={`${sourceId}-cluster-count`}
-			applyToClusters
-			layout={clusterSymbolLayout}
-			paint={clusterSymbolPaint}
-		/>
+		<!-- Render cluster counts as HTML so they don't depend on map glyph/font availability -->
+		<MarkerLayer applyToClusters let:feature={clusterFeature}>
+			{@const clusterProps = getMarkerProps(clusterFeature)}
+			{@const abbreviated = clusterProps && clusterProps['point_count_abbreviated']}
+			{@const count = abbreviated ?? (clusterProps && clusterProps['point_count'])}
+			{#if typeof count !== 'undefined' && count !== null}
+				<div
+					class="pointer-events-none select-none font-sans text-xs font-bold text-base-content drop-shadow-sm"
+				>
+					{count}
+				</div>
+			{/if}
+		</MarkerLayer>
 		<MarkerLayer applyToClusters={false} on:click={handleMarkerClick} let:feature={featureData}>
 			{@const markerProps = getMarkerProps(featureData)}
 			<slot name="marker" {featureData} {markerProps}>
