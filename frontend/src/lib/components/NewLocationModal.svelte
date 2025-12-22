@@ -11,8 +11,12 @@
 	export let user: User | null = null;
 	export let collection: Collection | null = null;
 	export let initialLatLng: { lat: number; lng: number } | null = null; // Used to pass the location from the map selection to the modal
+	export let initialVisitDate: string | null = null; // Used to pre-fill visit date when adding from itinerary planner
 
 	const dispatch = createEventDispatcher();
+
+	// Store the initial visit date internally so it persists even if parent clears it
+	let storedInitialVisitDate: string | null = initialVisitDate;
 
 	let modal: HTMLDialogElement;
 
@@ -185,7 +189,7 @@
 								>
 									<path
 										fill-rule="evenodd"
-										d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5-5z"
+										d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-0.089l4-5-5z"
 										clip-rule="evenodd"
 									/>
 								</svg>
@@ -321,6 +325,7 @@
 				on:close={() => close()}
 				measurementSystem={user?.measurement_system || 'metric'}
 				{collection}
+				initialVisitDate={storedInitialVisitDate}
 			/>
 		{/if}
 	</div>

@@ -119,13 +119,69 @@
 		isLocationModalOpen = true;
 	}
 
-	function handleDeleteLocation(event: CustomEvent<Location>) {
-		// remove locally deleted location from itinerary view and list
-		const deletedLocation = event.detail;
-		collection.locations = collection.locations?.filter((loc) => loc.id !== deletedLocation.id);
-		collection.itinerary = collection.itinerary?.filter(
-			(it) => !(it.item?.type === 'location' && it.object_id === deletedLocation.id)
-		);
+	function handleItemDelete(event: CustomEvent<CollectionItineraryItem | string | number>) {
+		const payload = event.detail;
+
+		// Support both cases:
+		// 1) Card components dispatch a primitive id (string/number) when deleting the underlying object
+		// 2) Some callers may dispatch a full itinerary item object
+		if (typeof payload === 'string' || typeof payload === 'number') {
+			const objectId = payload;
+
+			// Remove any itinerary entries that reference this object
+			collection.itinerary = collection.itinerary?.filter(
+				(it) => String(it.object_id) !== String(objectId)
+			);
+
+			// Remove the object from all possible collections (location/transportation/lodging/note/checklist)
+			if (collection.locations) {
+				collection.locations = collection.locations.filter(
+					(loc) => String(loc.id) !== String(objectId)
+				);
+			}
+			if (collection.transportations) {
+				collection.transportations = collection.transportations.filter(
+					(t) => String(t.id) !== String(objectId)
+				);
+			}
+			if (collection.lodging) {
+				collection.lodging = collection.lodging.filter((l) => String(l.id) !== String(objectId));
+			}
+			if (collection.notes) {
+				collection.notes = collection.notes.filter((n) => String(n.id) !== String(objectId));
+			}
+			if (collection.checklists) {
+				collection.checklists = collection.checklists.filter(
+					(c) => String(c.id) !== String(objectId)
+				);
+			}
+
+			// Re-group days and return
+			days = groupItemsByDay(collection);
+			return;
+		}
+
+		// Otherwise expect a full itinerary-like object
+		const itemToDelete = payload as CollectionItineraryItem;
+		collection.itinerary = collection.itinerary?.filter((it) => it.id !== itemToDelete.id);
+		// Also remove the associated object from the collection
+		const objectType = itemToDelete.item?.type || '';
+		if (objectType === 'location') {
+			collection.locations = collection.locations?.filter(
+				(loc) => loc.id !== itemToDelete.object_id
+			);
+		} else if (objectType === 'transportation') {
+			collection.transportations = collection.transportations?.filter(
+				(t) => t.id !== itemToDelete.object_id
+			);
+		} else if (objectType === 'lodging') {
+			collection.lodging = collection.lodging?.filter((l) => l.id !== itemToDelete.object_id);
+		} else if (objectType === 'note') {
+			collection.notes = collection.notes?.filter((n) => n.id !== itemToDelete.object_id);
+		} else if (objectType === 'checklist') {
+			collection.checklists = collection.checklists?.filter((c) => c.id !== itemToDelete.object_id);
+		}
+		days = groupItemsByDay(collection);
 	}
 
 	let locationBeingUpdated: Location | null = null;
@@ -142,6 +198,8 @@
 
 	// When opening a "create new item" modal we store the target date here
 	let pendingAddDate: string | null = null;
+	// Track if we've already added this location to the itinerary
+	let addedToItinerary: Set<string> = new Set();
 
 	// Sync the locationBeingUpdated with the collection.locations array
 	$: if (locationBeingUpdated && locationBeingUpdated.id && collection) {
@@ -168,9 +226,15 @@
 
 	// If a new location was just created and we have a pending add-date,
 	// attach it to that date in the itinerary.
-	$: if (locationBeingUpdated?.id && pendingAddDate) {
+	$: if (
+		locationBeingUpdated?.id &&
+		pendingAddDate &&
+		!addedToItinerary.has(locationBeingUpdated.id)
+	) {
 		addItineraryItemForObject('location', locationBeingUpdated.id, pendingAddDate);
-		pendingAddDate = null;
+		// Mark this location as added to prevent duplicates
+		addedToItinerary.add(locationBeingUpdated.id);
+		addedToItinerary = addedToItinerary; // trigger reactivity
 	}
 
 	/**
@@ -543,11 +607,17 @@
 
 {#if isLocationModalOpen}
 	<NewLocationModal
-		on:close={() => (isLocationModalOpen = false)}
+		on:close={() => {
+			isLocationModalOpen = false;
+			pendingAddDate = null;
+			addedToItinerary.clear();
+			addedToItinerary = addedToItinerary;
+		}}
 		{user}
 		{locationToEdit}
 		bind:location={locationBeingUpdated}
 		{collection}
+		initialVisitDate={pendingAddDate}
 	/>
 {/if}
 
@@ -898,7 +968,7 @@
 													<LocationCard
 														adventure={resolvedObj}
 														on:edit={handleEditLocation}
-														on:delete={handleDeleteLocation}
+														on:delete={handleItemDelete}
 														itineraryItem={item}
 														on:removeFromItinerary={handleRemoveItineraryItem}
 														{user}
@@ -910,6 +980,7 @@
 														transportation={resolvedObj}
 														{user}
 														{collection}
+														on:delete={handleItemDelete}
 														itineraryItem={item}
 														on:removeFromItinerary={handleRemoveItineraryItem}
 													/>
@@ -919,6 +990,7 @@
 														{user}
 														{collection}
 														itineraryItem={item}
+														on:delete={handleItemDelete}
 														on:removeFromItinerary={handleRemoveItineraryItem}
 													/>
 												{:else if objectType === 'note'}
@@ -927,6 +999,7 @@
 														note={resolvedObj}
 														{user}
 														{collection}
+														on:delete={handleItemDelete}
 														itineraryItem={item}
 														on:removeFromItinerary={handleRemoveItineraryItem}
 													/>
@@ -936,6 +1009,7 @@
 														checklist={resolvedObj}
 														{user}
 														{collection}
+														on:delete={handleItemDelete}
 														itineraryItem={item}
 														on:removeFromItinerary={handleRemoveItineraryItem}
 													/>

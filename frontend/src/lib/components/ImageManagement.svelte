@@ -170,8 +170,16 @@
 				return;
 			}
 
-			// Store results to display inline
-			wikiImageResults = data.images;
+			// Store results to display inline (deduplicated by source)
+			{
+				const seen = new Set();
+				wikiImageResults = (data.images || []).filter((img: { source: unknown }) => {
+					if (!img || !img.source) return false;
+					if (seen.has(img.source)) return false;
+					seen.add(img.source);
+					return true;
+				});
+			}
 		} catch (error) {
 			wikiImageError = $t('adventures.wiki_image_error');
 			addToast('error', $t('adventures.image_upload_error'));
@@ -366,7 +374,7 @@
 							</button>
 						</div>
 						<div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-96 overflow-y-auto">
-							{#each wikiImageResults as result (result.source)}
+							{#each wikiImageResults as result, i (result.source + '-' + i)}
 								<button
 									type="button"
 									class="card bg-base-100 border border-base-300 hover:border-primary hover:shadow-lg transition-all duration-200 cursor-pointer group"
