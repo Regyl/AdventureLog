@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { DefaultMarker, Popup, Marker, GeoJSON, LineLayer } from 'svelte-maplibre';
+	import { onMount } from 'svelte';
 	import { t } from 'svelte-i18n';
 	import type { Activity, Location, VisitedCity, VisitedRegion, Pin } from '$lib/types.js';
 	import type { ClusterOptions } from 'svelte-maplibre';
@@ -56,6 +57,9 @@
 	let hoveredLocationLoading: boolean = false;
 	let hoveredLocationError: string | null = null;
 	let hoverRequestSeq = 0;
+
+	// Touch/coarse-pointer devices: tap should open preview instead of navigating.
+	let isTouchLike: boolean = false;
 
 	let locationBeingUpdated: Location | undefined = undefined;
 
@@ -346,6 +350,22 @@
 		newMarker = null;
 	}
 
+	onMount(() => {
+		if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+		const mql = window.matchMedia('(hover: none), (pointer: coarse)');
+		const update = () => {
+			isTouchLike = mql.matches;
+		};
+		update();
+		if (typeof mql.addEventListener === 'function') {
+			mql.addEventListener('change', update);
+			return () => mql.removeEventListener('change', update);
+		}
+		// Safari < 14
+		(mql as any).addListener?.(update);
+		return () => (mql as any).removeListener?.(update);
+	});
+
 	// FullMap handles cluster theme styling + cluster expansion on click.
 </script>
 
@@ -461,16 +481,20 @@
 										>
 											<!-- Marker Pin -->
 											<div
-												class="grid place-items-center w-10 h-10 rounded-full border-2 border-white shadow-lg text-xl cursor-pointer group-hover:scale-110 transition-all duration-200 {markerClassResolver(
+												class="map-pin-hit grid place-items-center w-8 h-8 rounded-full border-2 border-white shadow-lg text-base cursor-pointer group-hover:scale-110 transition-all duration-200 {markerClassResolver(
 													markerProps
 												)}"
+												class:scale-110={isActive}
 												role="button"
 												tabindex="0"
+												aria-label={markerProps.name}
+												title=""
 												on:mouseenter={() => {
 													setActive(true);
 													prefetchLocationDetailsForPopup(markerProps.id);
 												}}
 												on:mouseleave={() => {
+													if (isTouchLike) return;
 													setActive(false);
 													clearHoverPopupIfActive(markerProps.id);
 												}}
@@ -479,18 +503,42 @@
 													prefetchLocationDetailsForPopup(markerProps.id);
 												}}
 												on:blur={() => {
+													if (isTouchLike) return;
 													setActive(false);
 													clearHoverPopupIfActive(markerProps.id);
 												}}
-												on:click={() => handleViewDetails(markerProps.id)}
-												on:keydown={(e) => e.key === 'Enter' && handleViewDetails(markerProps.id)}
+												on:click={(e) => {
+													e.stopPropagation();
+													if (isTouchLike) {
+														// On touch devices: first tap shows popup, second tap navigates
+														if (isActive && hoveredPinId === markerProps.id && hoveredLocation) {
+															// Already active with details loaded - navigate
+															handleViewDetails(markerProps.id);
+															return;
+														}
+														// First tap or details not loaded - show popup
+														setActive(true);
+														prefetchLocationDetailsForPopup(markerProps.id);
+														return;
+													}
+													// Desktop: click navigates directly
+													handleViewDetails(markerProps.id);
+												}}
+												on:keydown={(e) => {
+													if (e.key !== 'Enter') return;
+													e.stopPropagation();
+													handleViewDetails(markerProps.id);
+												}}
 											>
 												{markerLabelResolver(markerProps)}
 											</div>
 
+											<!-- View Details button moved here -->
 											<!-- Custom DaisyUI Popup -->
 											<div
-												class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 z-[9999]"
+												class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto transition-all duration-200 z-[9999]"
+												class:opacity-100={isActive}
+												class:pointer-events-auto={isActive}
 											>
 												<div
 													class="card card-compact bg-base-100 shadow-xl border border-base-300 min-w-56 max-w-80"
@@ -521,9 +569,23 @@
 															</div>
 														</div>
 
-														{#if hoveredPinId === markerProps.id}
+														{#if isActive}
 															<!-- Progressive (fetched) content -->
-															{#if hoveredLocationError}
+															{#if hoveredPinId !== markerProps.id}
+																<div class="space-y-2">
+																	<div class="flex items-center gap-2">
+																		<span class="loading loading-spinner loading-xs"></span>
+																		<span class="text-xs text-base-content/60">Loading more…</span>
+																	</div>
+																	<div class="skeleton h-3 w-3/4"></div>
+																	<div class="skeleton h-3 w-full"></div>
+																	<div class="skeleton h-3 w-2/3"></div>
+																	<div class="grid grid-cols-2 gap-2">
+																		<div class="skeleton h-6 w-full"></div>
+																		<div class="skeleton h-6 w-full"></div>
+																	</div>
+																</div>
+															{:else if hoveredLocationError}
 																<div role="alert" class="alert alert-error alert-soft">
 																	<span class="text-sm">{hoveredLocationError}</span>
 																</div>
@@ -602,6 +664,19 @@
 																{/if}
 															{/if}
 														{/if}
+
+														<div class="card-actions justify-end">
+															<button
+																type="button"
+																class="btn btn-primary btn-sm"
+																on:click={(e) => {
+																	e.stopPropagation();
+																	handleViewDetails(markerProps.id);
+																}}
+															>
+																{$t('map.view_details')}
+															</button>
+														</div>
 													</div>
 												</div>
 												<!-- Arrow pointer -->
@@ -858,3 +933,22 @@
 		bind:location={locationBeingUpdated}
 	/>
 {/if}
+
+<style>
+	/* Ensure only the explicit hit area handles pointer events to avoid unintended edge hover/tap popups */
+	:global(.maplibregl-marker.map-pin),
+	:global(.mapboxgl-marker.map-pin) {
+		pointer-events: none;
+	}
+
+	:global(.maplibregl-marker.map-pin .map-pin-hit),
+	:global(.mapboxgl-marker.map-pin .map-pin-hit) {
+		pointer-events: auto;
+	}
+
+	/* Suppress any default map popups so only the custom rich popup shows */
+	:global(.maplibregl-popup),
+	:global(.mapboxgl-popup) {
+		display: none !important;
+	}
+</style>
