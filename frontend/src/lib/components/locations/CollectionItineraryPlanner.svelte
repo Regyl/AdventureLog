@@ -824,7 +824,7 @@
 									<div
 										class="group relative transition-all duration-200 pointer-events-auto h-full {isDraggingShadow
 											? 'opacity-40 scale-95'
-											: 'hover:shadow-lg'}"
+											: ''}"
 										animate:flip={{ duration: flipDurationMs }}
 									>
 										{#if resolvedObj}
@@ -906,15 +906,39 @@
 														compact={true}
 													/>
 												{:else if objectType === 'transportation'}
-													<TransportationCard transportation={resolvedObj} {user} {collection} />
+													<TransportationCard
+														transportation={resolvedObj}
+														{user}
+														{collection}
+														itineraryItem={item}
+														on:removeFromItinerary={handleRemoveItineraryItem}
+													/>
 												{:else if objectType === 'lodging'}
-													<LodgingCard lodging={resolvedObj} {user} {collection} />
+													<LodgingCard
+														lodging={resolvedObj}
+														{user}
+														{collection}
+														itineraryItem={item}
+														on:removeFromItinerary={handleRemoveItineraryItem}
+													/>
 												{:else if objectType === 'note'}
 													<!-- @ts-ignore - TypeScript can't narrow union type properly -->
-													<NoteCard note={resolvedObj} {user} {collection} />
+													<NoteCard
+														note={resolvedObj}
+														{user}
+														{collection}
+														itineraryItem={item}
+														on:removeFromItinerary={handleRemoveItineraryItem}
+													/>
 												{:else if objectType === 'checklist'}
 													<!-- @ts-ignore - TypeScript can't narrow union type properly -->
-													<ChecklistCard checklist={resolvedObj} {user} {collection} />
+													<ChecklistCard
+														checklist={resolvedObj}
+														{user}
+														{collection}
+														itineraryItem={item}
+														on:removeFromItinerary={handleRemoveItineraryItem}
+													/>
 												{/if}
 											</div>
 										{:else}

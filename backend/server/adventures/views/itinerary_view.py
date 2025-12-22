@@ -1,7 +1,8 @@
-from adventures.models import Location, Collection, CollectionItineraryItem, Transportation, Note, Lodging, Visit
+from adventures.models import Location, Collection, CollectionItineraryItem, Transportation, Note, Lodging, Visit, Checklist, Note
 import datetime
 from django.utils.dateparse import parse_date, parse_datetime
 from django.contrib.contenttypes.models import ContentType
+from django.db import models
 from adventures.serializers import CollectionItineraryItemSerializer
 from adventures.utils.itinerary import reorder_itinerary_items
 from adventures.utils.autogenerate_itinerary import auto_generate_itinerary
@@ -66,6 +67,8 @@ class ItineraryViewSet(viewsets.ModelViewSet):
                     'note': Note,
                     'lodging': Lodging,
                     'visit': Visit,
+                    'checklist': Checklist,
+                    'note': Note,
                 }
 
                 if content_type_val not in content_map:
@@ -171,6 +174,23 @@ class ItineraryViewSet(viewsets.ModelViewSet):
                             setattr(content_object, date_field, clean_date)
                             content_object.save(update_fields=[date_field])
 
+        # Ensure order is unique for this collection+date combination
+        collection_id = data.get('collection')
+        item_date = data.get('date')
+        item_order = data.get('order', 0)
+        
+        if collection_id and item_date:
+            # Find the maximum order for this collection+date
+            existing_max = CollectionItineraryItem.objects.filter(
+                collection_id=collection_id,
+                date=item_date
+            ).aggregate(max_order=models.Max('order'))['max_order']
+            
+            # Check if the requested order conflicts with existing items
+            if existing_max is not None and item_order <= existing_max:
+                # Assign next available order
+                data['order'] = existing_max + 1
+        
         # Proceed with normal serializer flow using modified data
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)

@@ -17,11 +17,14 @@
 	import DotsHorizontal from '~icons/mdi/dots-horizontal';
 	import FileDocumentEdit from '~icons/mdi/file-document-edit';
 	import LinkVariant from '~icons/mdi/link-variant';
+	import CalendarRemove from '~icons/mdi/calendar-remove';
+	import type { CollectionItineraryItem } from '$lib/types';
 
 	export let note: Note;
 	export let user: User | null = null;
 	export let collection: Collection | null = null;
 	export let readOnly: boolean = false;
+	export let itineraryItem: CollectionItineraryItem | null = null;
 
 	let isWarningModalOpen: boolean = false;
 
@@ -39,6 +42,19 @@
 			dispatch('delete', note.id);
 		} else {
 			addToast($t('notes.note_delete_error'), 'error');
+		}
+	}
+
+	async function removeFromItinerary() {
+		let itineraryItemId = itineraryItem?.id;
+		let res = await fetch(`/api/itineraries/${itineraryItemId}`, {
+			method: 'DELETE'
+		});
+		if (res.ok) {
+			addToast('info', $t('itinerary.item_remove_success'));
+			dispatch('removeFromItinerary', itineraryItem);
+		} else {
+			addToast('error', $t('itinerary.item_remove_error'));
 		}
 	}
 </script>
@@ -69,14 +85,12 @@
 			</div>
 
 			{#if !readOnly && (note.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid)))}
-				<div class="dropdown dropdown-end">
-					<div tabindex="0" role="button" class="btn btn-square btn-sm p-1 text-base-content">
+				<details class="dropdown dropdown-end relative z-50">
+					<summary class="btn btn-square btn-sm p-1 text-base-content">
 						<DotsHorizontal class="w-5 h-5" />
-					</div>
-					<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+					</summary>
 					<ul
-						tabindex="0"
-						class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg border border-base-300"
+						class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow-lg border border-base-300"
 					>
 						<li>
 							<button on:click={editNote} class="flex items-center gap-2">
@@ -84,6 +98,18 @@
 								{$t('notes.open')}
 							</button>
 						</li>
+						{#if itineraryItem && itineraryItem.id}
+							<div class="divider my-1"></div>
+							<li>
+								<button
+									on:click={() => removeFromItinerary()}
+									class="text-error flex items-center gap-2"
+								>
+									<CalendarRemove class="w-4 h-4 text-error" />
+									{$t('itinerary.remove_from_itinerary')}
+								</button>
+							</li>
+						{/if}
 						<div class="divider my-1"></div>
 						<li>
 							<button
@@ -95,7 +121,7 @@
 							</button>
 						</li>
 					</ul>
-				</div>
+				</details>
 			{/if}
 		</div>
 

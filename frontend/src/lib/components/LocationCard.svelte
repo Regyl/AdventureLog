@@ -26,6 +26,7 @@
 	import Eye from '~icons/mdi/eye';
 	import EyeOff from '~icons/mdi/eye-off';
 	import CollectionItineraryPlanner from './locations/CollectionItineraryPlanner.svelte';
+	import CalendarRemove from '~icons/mdi/calendar-remove';
 
 	export let type: string | null = null;
 	export let user: User | null;
@@ -371,7 +372,7 @@
 											on:click={() => removeFromItinerary()}
 											class="text-error flex items-center gap-2"
 										>
-											<TrashCan class="w-4 h-4 text-error" />
+											<CalendarRemove class="w-4 h-4 text-error" />
 											{$t('itinerary.remove_from_itinerary')}
 										</button>
 									</li>

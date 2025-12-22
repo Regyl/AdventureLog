@@ -114,7 +114,9 @@
 					scheduledOnThisDay.push({ type: 'note', item: note, dates });
 				else scheduledOtherDays.push({ type: 'note', item: note, dates });
 			} else {
-				otherDays.push({ type: 'note', item: note });
+				const itemDate = note.date ? note.date.split('T')[0] : null;
+				if (itemDate === targetDate) onThisDay.push({ type: 'note', item: note });
+				else otherDays.push({ type: 'note', item: note });
 			}
 		});
 
@@ -126,7 +128,9 @@
 					scheduledOnThisDay.push({ type: 'checklist', item: checklist, dates });
 				else scheduledOtherDays.push({ type: 'checklist', item: checklist, dates });
 			} else {
-				otherDays.push({ type: 'checklist', item: checklist });
+				const itemDate = checklist.date ? checklist.date.split('T')[0] : null;
+				if (itemDate === targetDate) onThisDay.push({ type: 'checklist', item: checklist });
+				else otherDays.push({ type: 'checklist', item: checklist });
 			}
 		});
 
@@ -171,14 +175,14 @@
 		>
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-3">
-					<div class="p-2 bg-primary/10 rounded-xl">
-						<CalendarBlank class="w-8 h-8 text-primary" />
+					<div class="p-1 bg-primary/10 rounded-xl">
+						<CalendarBlank class="w-6 h-6 text-primary" />
 					</div>
 					<div>
-						<h1 class="text-3xl font-bold text-primary bg-clip-text">
+						<h1 class="text-2xl font-bold text-primary bg-clip-text">
 							Link Items to {displayDate}
 						</h1>
-						<p class="text-sm text-base-content/60">
+						<p class="text-xs text-base-content/60">
 							{groupedItems.scheduledOnThisDay.length +
 								groupedItems.onThisDay.length +
 								groupedItems.scheduledOtherDays.length +
@@ -195,18 +199,18 @@
 			</div>
 		</div>
 
-		<div class="px-6">
+		<div class="px-4">
 			<!-- Items on this day -->
 			{#if groupedItems.onThisDay.length > 0}
-				<div class="mb-6">
+				<div class="mb-4">
 					<h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
 						<CalendarBlank class="w-5 h-5 text-primary" />
 						Items on this day
 					</h4>
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-2">
 						{#each groupedItems.onThisDay as { type, item }}
 							<div class="card bg-base-100 border border-base-300 shadow-sm">
-								<div class="card-body p-4">
+								<div class="card-body p-2 text-sm">
 									<div class="mb-3">
 										{#if type === 'location'}
 											<LocationCard
@@ -232,7 +236,7 @@
 										{/if}
 									</div>
 									<button
-										class="btn btn-primary btn-sm w-full"
+										class="btn btn-primary btn-xs w-full"
 										on:click={() => handleAddItem(type, item.id, false)}
 									>
 										Add to Itinerary
@@ -245,15 +249,15 @@
 			{/if}
 
 			{#if groupedItems.scheduledOnThisDay.length > 0}
-				<div class="mb-6">
+				<div class="mb-4">
 					<h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
 						<CalendarBlank class="w-5 h-5 text-primary" />
 						Already added on this day
 					</h4>
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-2">
 						{#each groupedItems.scheduledOnThisDay as { type, item, dates }}
 							<div class="card bg-base-100 border border-base-300 shadow-sm">
-								<div class="card-body p-4">
+								<div class="card-body p-2 text-sm">
 									<div class="mb-3">
 										{#if type === 'location'}
 											<LocationCard
@@ -278,8 +282,8 @@
 											<ChecklistCard checklist={item} {user} {collection} readOnly={true} />
 										{/if}
 									</div>
-									<div class="text-sm opacity-70 mb-2">Already on: {(dates || []).join(', ')}</div>
-									<div class="text-xs opacity-50">
+									<div class="text-xs opacity-70 mb-2">Already on: {(dates || []).join(', ')}</div>
+									<div class="text-2xs opacity-50">
 										Use "Items on other days" or "Add as is" to duplicate onto this date.
 									</div>
 								</div>
@@ -294,16 +298,16 @@
 			{/if}
 
 			{#if groupedItems.scheduledOtherDays.length > 0}
-				<div class="mb-6">
+				<div class="mb-4">
 					<h4 class="text-lg font-semibold mb-3 opacity-70">Already added on other days</h4>
 					<p class="text-sm opacity-60 mb-4">
 						These items are already in your itinerary on a different date — you can add them again
 						to this day or update their date.
 					</p>
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-2">
 						{#each groupedItems.scheduledOtherDays as { type, item, dates }}
 							<div class="card bg-base-100 border border-base-300 shadow-sm">
-								<div class="card-body p-4">
+								<div class="card-body p-2 text-sm">
 									<div class="mb-3">
 										{#if type === 'location'}
 											<LocationCard
@@ -328,14 +332,14 @@
 											<ChecklistCard checklist={item} {user} {collection} readOnly={true} />
 										{/if}
 									</div>
-									<div class="text-sm opacity-70 mb-2">On: {(dates || []).join(', ')}</div>
+									<div class="text-xs opacity-70 mb-2">On: {(dates || []).join(', ')}</div>
 									<div class="flex gap-2">
 										<button
-											class="btn btn-outline btn-sm flex-1"
+											class="btn btn-outline btn-xs flex-1"
 											on:click={() => handleAddItem(type, item.id, false)}>Add to This Day</button
 										>
 										<button
-											class="btn btn-primary btn-sm flex-1"
+											class="btn btn-primary btn-xs flex-1"
 											on:click={() => handleAddItem(type, item.id, true)}>Add & Update Date</button
 										>
 									</div>
@@ -348,16 +352,16 @@
 
 			<!-- Items on other days -->
 			{#if groupedItems.otherDays.length > 0}
-				<div class="mb-6">
+				<div class="mb-4">
 					<h4 class="text-lg font-semibold mb-3 opacity-70">Items on other days</h4>
 					<p class="text-sm opacity-60 mb-4">
 						These items have different dates. You can add them and optionally update their date to
 						match.
 					</p>
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-2">
 						{#each groupedItems.otherDays as { type, item }}
 							<div class="card bg-base-100 border border-base-300 shadow-sm">
-								<div class="card-body p-4">
+								<div class="card-body p-2 text-sm">
 									<div class="mb-3">
 										{#if type === 'location'}
 											<LocationCard
@@ -384,13 +388,13 @@
 									</div>
 									<div class="flex gap-2">
 										<button
-											class="btn btn-outline btn-sm flex-1"
+											class="btn btn-outline btn-xs flex-1"
 											on:click={() => handleAddItem(type, item.id, false)}
 										>
 											Add as is
 										</button>
 										<button
-											class="btn btn-primary btn-sm flex-1"
+											class="btn btn-primary btn-xs flex-1"
 											on:click={() => handleAddItem(type, item.id, true)}
 										>
 											Add & Update Date
@@ -405,10 +409,10 @@
 
 			{#if groupedItems.scheduledOnThisDay.length + groupedItems.onThisDay.length + groupedItems.scheduledOtherDays.length + groupedItems.otherDays.length === 0}
 				<div class="card bg-base-200">
-					<div class="card-body text-center py-12">
-						<CalendarBlank class="w-16 h-16 mx-auto mb-4 opacity-30" />
-						<p class="text-lg font-semibold opacity-70">No unscheduled items available</p>
-						<p class="text-sm opacity-60 mt-2">
+					<div class="card-body text-center py-8">
+						<CalendarBlank class="w-12 h-12 mx-auto mb-3 opacity-30" />
+						<p class="text-md font-semibold opacity-70">No unscheduled items available</p>
+						<p class="text-xs opacity-60 mt-1">
 							All items have been added to the itinerary or there are no items to add.
 						</p>
 					</div>
@@ -418,10 +422,10 @@
 
 		<!-- Footer Actions -->
 		<div
-			class="sticky bottom-0 bg-base-100/90 backdrop-blur-lg border-t border-base-300 -mx-6 -mb-6 px-6 py-4 mt-6"
+			class="sticky bottom-0 bg-base-100/90 backdrop-blur-lg border-t border-base-300 -mx-6 -mb-6 px-4 py-3 mt-4"
 		>
 			<div class="flex items-center justify-between">
-				<div class="text-sm text-base-content/60">
+				<div class="text-xs text-base-content/60">
 					{groupedItems.scheduledOnThisDay.length +
 						groupedItems.onThisDay.length +
 						groupedItems.scheduledOtherDays.length +

@@ -5,17 +5,15 @@
 	import { deserialize } from '$app/forms';
 
 	// Icons
-	import Star from '~icons/mdi/star';
-	import Crown from '~icons/mdi/crown';
 	import SaveIcon from '~icons/mdi/content-save';
 	import ArrowLeftIcon from '~icons/mdi/arrow-left';
 	import TrashIcon from '~icons/mdi/delete';
 	import EditIcon from '~icons/mdi/pencil';
 	import FileIcon from '~icons/mdi/file-document';
+	import AttachmentIcon from '~icons/mdi/attachment';
 	import CheckIcon from '~icons/mdi/check';
 	import CloseIcon from '~icons/mdi/close';
-	import ImageIcon from '~icons/mdi/image';
-	import AttachmentIcon from '~icons/mdi/attachment';
+	import Star from '~icons/mdi/star';
 	import SwapHorizontalVariantIcon from '~icons/mdi/swap-horizontal-variant';
 	import LinkIcon from '~icons/mdi/link';
 	import PlusIcon from '~icons/mdi/plus';
@@ -27,7 +25,7 @@
 	import Camera from '~icons/mdi/camera';
 
 	import { addToast } from '$lib/toasts';
-	import ImmichSelect from '../ImmichSelect.svelte';
+	import ImageManagement from '../ImageManagement.svelte';
 	import WandererCard from '../WandererCard.svelte';
 
 	// Props
@@ -39,16 +37,10 @@
 	export let measurementSystem: 'metric' | 'imperial' = 'metric';
 	export let userIsOwner: boolean = false;
 	// Component state
-	let fileInput: HTMLInputElement;
 	let attachmentFileInput: HTMLInputElement;
-	let url: string = '';
-	let imageSearch: string = '';
-	let imageError: string = '';
-	let wikiImageError: string = '';
 	let attachmentError: string = '';
 	let immichIntegration: boolean = false;
 	let copyImmichLocally: boolean = false;
-	let isLoading: boolean = false;
 	let isAttachmentLoading: boolean = false;
 
 	// Attachment state
@@ -75,15 +67,6 @@
 
 	let wandererFetchedTrails: WandererTrail[] = [];
 
-	// Wikipedia image selection
-	let wikiImageResults: Array<{
-		source: string;
-		width: number;
-		height: number;
-		title: string;
-		type: string;
-	}> = [];
-
 	// Allowed file types for attachments
 	const allowedFileTypes = [
 		'.gpx',
@@ -103,214 +86,12 @@
 	const dispatch = createEventDispatcher();
 
 	// Helper functions
-	function createImageFromData(data: {
-		id: string;
-		image: string;
-		immich_id?: string | null;
-	}): ContentImage {
-		return {
-			id: data.id,
-			image: data.image,
-			is_primary: false,
-			immich_id: data.immich_id || null
-		};
-	}
-
-	function updateImagesList(newImage: ContentImage) {
-		images = [...images, newImage];
-	}
-
 	function updateAttachmentsList(newAttachment: Attachment) {
 		attachments = [...attachments, newAttachment];
 	}
 
 	function updateTrailsList(newTrail: Trail) {
 		trails = [...trails, newTrail];
-	}
-
-	// API calls
-	async function uploadImageToServer(file: File) {
-		const formData = new FormData();
-		formData.append('image', file);
-		formData.append('object_id', itemId);
-		formData.append('content_type', 'location');
-
-		try {
-			const res = await fetch(`/locations?/image`, {
-				method: 'POST',
-				body: formData
-			});
-
-			if (res.ok) {
-				const newData = deserialize(await res.text()) as { data: { id: string; image: string } };
-				return createImageFromData(newData.data);
-			} else {
-				throw new Error('Upload failed');
-			}
-		} catch (error) {
-			console.error('Upload error:', error);
-			return null;
-		}
-	}
-
-	async function fetchImageFromUrl(imageUrl: string): Promise<Blob | null> {
-		try {
-			const res = await fetch(imageUrl);
-			if (!res.ok) throw new Error('Failed to fetch image');
-			return await res.blob();
-		} catch (error) {
-			console.error('Fetch error:', error);
-			return null;
-		}
-	}
-
-	// Image event handlers
-	async function handleMultipleFiles(event: Event) {
-		const files = (event.target as HTMLInputElement).files;
-		if (!files) return;
-
-		isLoading = true;
-		imageError = '';
-
-		try {
-			for (const file of files) {
-				const newImage = await uploadImageToServer(file);
-				if (newImage) {
-					updateImagesList(newImage);
-				}
-			}
-			addToast('success', $t('adventures.image_upload_success'));
-		} catch (error) {
-			addToast('error', $t('adventures.image_upload_error'));
-			imageError = $t('adventures.image_upload_error');
-		} finally {
-			isLoading = false;
-			if (fileInput) fileInput.value = '';
-		}
-	}
-
-	async function handleUrlUpload() {
-		if (!url.trim()) return;
-
-		isLoading = true;
-		imageError = '';
-
-		try {
-			const blob = await fetchImageFromUrl(url);
-			if (!blob) {
-				imageError = $t('adventures.no_image_url');
-				return;
-			}
-
-			const file = new File([blob], 'image.jpg', { type: 'image/jpeg' });
-			const newImage = await uploadImageToServer(file);
-
-			if (newImage) {
-				updateImagesList(newImage);
-				addToast('success', $t('adventures.image_upload_success'));
-				url = '';
-			} else {
-				throw new Error('Upload failed');
-			}
-		} catch (error) {
-			imageError = $t('adventures.image_fetch_failed');
-			addToast('error', $t('adventures.image_upload_error'));
-		} finally {
-			isLoading = false;
-		}
-	}
-
-	async function handleWikiImageSearch() {
-		if (!imageSearch.trim()) return;
-
-		isLoading = true;
-		wikiImageError = '';
-
-		try {
-			const res = await fetch(`/api/generate/img/?name=${encodeURIComponent(imageSearch)}`);
-			const data = await res.json();
-
-			if (!res.ok || !data.images || data.images.length === 0) {
-				wikiImageError = $t('adventures.image_fetch_failed');
-				return;
-			}
-
-			// Store results to display inline
-			wikiImageResults = data.images;
-		} catch (error) {
-			wikiImageError = $t('adventures.wiki_image_error');
-			addToast('error', $t('adventures.image_upload_error'));
-		} finally {
-			isLoading = false;
-		}
-	}
-
-	async function selectWikiImage(imageUrl: string) {
-		isLoading = true;
-
-		try {
-			const blob = await fetchImageFromUrl(imageUrl);
-			if (!blob) {
-				wikiImageError = $t('adventures.image_fetch_failed');
-				isLoading = false;
-				return;
-			}
-
-			const file = new File([blob], `${imageSearch}.jpg`, { type: 'image/jpeg' });
-			const newImage = await uploadImageToServer(file);
-
-			if (newImage) {
-				updateImagesList(newImage);
-				addToast('success', $t('adventures.image_upload_success'));
-				// Keep results open to allow adding multiple images
-			} else {
-				throw new Error('Upload failed');
-			}
-		} catch (error) {
-			wikiImageError = $t('adventures.wiki_image_error');
-			addToast('error', $t('adventures.image_upload_error'));
-		} finally {
-			isLoading = false;
-		}
-	}
-
-	async function makePrimaryImage(imageId: string) {
-		try {
-			const res = await fetch(`/api/images/${imageId}/toggle_primary`, {
-				method: 'POST'
-			});
-
-			if (res.ok) {
-				images = images.map((image) => ({
-					...image,
-					is_primary: image.id === imageId
-				}));
-				addToast('success', 'Primary image updated');
-			} else {
-				throw new Error('Failed to update primary image');
-			}
-		} catch (error) {
-			console.error('Error in makePrimaryImage:', error);
-			addToast('error', 'Failed to update primary image');
-		}
-	}
-
-	async function removeImage(imageId: string) {
-		try {
-			const res = await fetch(`/api/images/${imageId}/image_delete`, {
-				method: 'POST'
-			});
-
-			if (res.status === 204) {
-				images = images.filter((image) => image.id !== imageId);
-				addToast('success', 'Image removed');
-			} else {
-				throw new Error('Failed to remove image');
-			}
-		} catch (error) {
-			console.error('Error removing image:', error);
-			addToast('error', 'Failed to remove image');
-		}
 	}
 
 	// Attachment event handlers
@@ -677,10 +458,8 @@
 		dispatch('next');
 	}
 
-	function handleImmichImageSaved(event: CustomEvent) {
-		const newImage = createImageFromData(event.detail);
-		updateImagesList(newImage);
-		addToast('success', $t('adventures.image_upload_success'));
+	function handleImagesUpdated(event: CustomEvent<ContentImage[]>) {
+		images = event.detail;
 	}
 
 	// Lifecycle
@@ -709,242 +488,21 @@
 		} catch (error) {
 			console.error('Error checking integrations:', error);
 		}
-		if (itemName) {
-			imageSearch = itemName;
-		}
 	});
 </script>
 
 <div class="min-h-screen bg-gradient-to-br from-base-200/30 via-base-100 to-primary/5 p-6">
 	<div class="max-w-full mx-auto space-y-6">
 		<!-- Image Management Section -->
-		<div class="card bg-base-100 border border-base-300 shadow-lg">
-			<div class="card-body p-6">
-				<div class="flex items-center gap-3 mb-6">
-					<div class="p-2 bg-primary/10 rounded-lg">
-						<ImageIcon class="w-5 h-5 text-primary" />
-					</div>
-					<h2 class="text-xl font-bold">{$t('adventures.image_management')}</h2>
-				</div>
-
-				<!-- Upload Options Grid -->
-				<div class="grid gap-4 lg:grid-cols-2 mb-6">
-					<!-- File Upload -->
-					<div class="bg-base-50 p-4 rounded-lg border border-base-200">
-						<h4 class="font-medium mb-3 text-base-content/80">
-							{$t('adventures.upload_from_device')}
-						</h4>
-						<input
-							type="file"
-							bind:this={fileInput}
-							class="file-input file-input-bordered w-full"
-							accept="image/*"
-							multiple
-							disabled={isLoading}
-							on:change={handleMultipleFiles}
-						/>
-					</div>
-
-					<!-- URL Upload -->
-					<div class="bg-base-50 p-4 rounded-lg border border-base-200">
-						<h4 class="font-medium mb-3 text-base-content/80">
-							{$t('adventures.upload_from_url')}
-						</h4>
-						<div class="flex gap-2">
-							<input
-								type="url"
-								bind:value={url}
-								class="input input-bordered flex-1"
-								placeholder="https://example.com/image.jpg"
-								disabled={isLoading}
-							/>
-							<button
-								class="btn btn-primary btn-sm"
-								class:loading={isLoading}
-								disabled={isLoading || !url.trim()}
-								on:click={handleUrlUpload}
-							>
-								{$t('adventures.fetch_image')}
-							</button>
-						</div>
-						{#if imageError}
-							<div class="alert alert-error mt-2 py-2">
-								<span class="text-sm">{imageError}</span>
-							</div>
-						{/if}
-					</div>
-
-					<!-- Immich Integration -->
-					{#if immichIntegration}
-						<div class="bg-base-50 p-4 rounded-lg border border-base-200">
-							<h4 class="font-medium mb-3 text-base-content/80">Immich Integration</h4>
-							<ImmichSelect
-								objectId={itemId}
-								contentType="location"
-								{copyImmichLocally}
-								on:fetchImage={(e) => {
-									url = e.detail;
-									handleUrlUpload();
-								}}
-								on:remoteImmichSaved={handleImmichImageSaved}
-							/>
-						</div>
-					{/if}
-				</div>
-
-				<!-- Wikipedia Search (Full Width) -->
-				<div class="bg-base-50 p-4 rounded-lg border border-base-200 mb-6">
-					<h4 class="font-medium mb-3 text-base-content/80">
-						{$t('adventures.wikipedia')}
-					</h4>
-					<div class="flex gap-2">
-						<input
-							type="text"
-							bind:value={imageSearch}
-							class="input input-bordered flex-1"
-							placeholder="Search Wikipedia for images"
-							disabled={isLoading}
-						/>
-						<button
-							class="btn btn-primary btn-sm"
-							class:loading={isLoading}
-							disabled={isLoading || !imageSearch.trim()}
-							on:click={handleWikiImageSearch}
-						>
-							{$t('navbar.search')}
-						</button>
-					</div>
-					{#if wikiImageError}
-						<div class="alert alert-error mt-2 py-2">
-							<span class="text-sm">{wikiImageError}</span>
-						</div>
-					{/if}
-
-					<!-- Wikipedia Image Results -->
-					{#if wikiImageResults.length > 0}
-						<div class="mt-4">
-							<div class="flex items-center justify-between mb-3">
-								<span class="text-sm text-base-content/70">
-									{$t('adventures.wiki_results_found', {
-										values: { count: wikiImageResults.length, query: imageSearch }
-									})}
-								</span>
-								<button
-									class="btn btn-ghost btn-xs"
-									on:click={() => {
-										wikiImageResults = [];
-										imageSearch = '';
-									}}
-								>
-									<CloseIcon class="h-4 w-4" />
-								</button>
-							</div>
-							<div
-								class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3"
-							>
-								{#each wikiImageResults as result (result.source)}
-									<button
-										type="button"
-										class="card bg-base-100 border border-base-300 hover:border-primary hover:shadow-lg transition-all duration-200 cursor-pointer group"
-										on:click={() => selectWikiImage(result.source)}
-										disabled={isLoading}
-									>
-										<figure class="aspect-square bg-base-200 overflow-hidden">
-											<img
-												src={result.source}
-												alt={result.title}
-												class="w-full h-full object-cover transition-transform group-hover:scale-105"
-												loading="lazy"
-											/>
-										</figure>
-										<div class="card-body p-2">
-											<h4 class="text-xs font-medium line-clamp-1 text-left" title={result.title}>
-												{result.title}
-											</h4>
-											<div
-												class="text-xs text-base-content/60 flex items-center justify-between gap-1"
-											>
-												<span class="truncate">{result.width} × {result.height}</span>
-											</div>
-										</div>
-										<div
-											class="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center rounded-2xl"
-										>
-											<div class="btn btn-primary btn-sm gap-2">
-												<CheckIcon class="h-4 w-4" />
-												{$t('adventures.select')}
-											</div>
-										</div>
-									</button>
-								{/each}
-							</div>
-						</div>
-					{/if}
-				</div>
-
-				<!-- Image Gallery -->
-				{#if images.length > 0}
-					<div class="divider">Current Images</div>
-					<div class="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-						{#each images as image (image.id)}
-							<div class="relative group">
-								<div
-									class="aspect-square overflow-hidden rounded-lg bg-base-200 border border-base-300"
-								>
-									<img
-										src={image.image}
-										alt="Uploaded content"
-										class="w-full h-full object-cover transition-transform group-hover:scale-105"
-										loading="lazy"
-									/>
-								</div>
-
-								<!-- Image Controls Overlay -->
-								<div
-									class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-200 rounded-lg flex items-center justify-center gap-2"
-								>
-									{#if !image.is_primary}
-										<button
-											type="button"
-											class="btn btn-success btn-sm tooltip tooltip-top"
-											data-tip="Make Primary"
-											on:click={() => makePrimaryImage(image.id)}
-										>
-											<Star class="h-4 w-4" />
-										</button>
-									{/if}
-
-									<button
-										type="button"
-										class="btn btn-error btn-sm tooltip tooltip-top"
-										data-tip="Remove Image"
-										on:click={() => removeImage(image.id)}
-									>
-										<TrashIcon class="h-4 w-4" />
-									</button>
-								</div>
-
-								<!-- Primary Badge -->
-								{#if image.is_primary}
-									<div
-										class="absolute top-2 left-2 bg-warning text-warning-content rounded-full p-1 shadow-lg"
-									>
-										<Crown class="h-4 w-4" />
-									</div>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				{:else}
-					<div class="bg-base-200/50 rounded-lg p-8 text-center">
-						<div class="text-base-content/60 mb-2">{$t('adventures.no_images_uploaded_yet')}</div>
-						<div class="text-sm text-base-content/40">
-							{$t('adventures.upload_first_image')}
-						</div>
-					</div>
-				{/if}
-			</div>
-		</div>
+		<ImageManagement
+			bind:images
+			objectId={itemId}
+			contentType="location"
+			defaultSearchTerm={itemName}
+			{immichIntegration}
+			{copyImmichLocally}
+			on:imagesUpdated={handleImagesUpdated}
+		/>
 
 		<!-- Attachment Management Section -->
 		<div class="card bg-base-100 border border-base-300 shadow-lg">

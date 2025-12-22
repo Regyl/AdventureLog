@@ -204,6 +204,10 @@ export default defineConfig({
                 link: "https://www.authelia.com/integration/openid-connect/adventure-log/",
               },
               {
+                text: "Pocket ID",
+                link: "/docs/configuration/social_auth/pocket_id",
+              },
+              {
                 text: "Open ID Connect",
                 link: "/docs/configuration/social_auth/oidc",
               },
