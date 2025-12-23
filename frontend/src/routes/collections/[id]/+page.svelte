@@ -437,6 +437,52 @@
 
 			<!-- Right Column - Sidebar -->
 			<div class="lg:col-span-1 space-y-4 sm:space-y-6">
+				<!-- Progress Tracker (only for folder views) -->
+				{#if isFolderView && collection.locations && collection.locations.length > 0}
+					{@const visitedCount = collection.locations.filter((l) => l.is_visited).length}
+					{@const totalCount = collection.locations.length}
+					{@const progressPercent = totalCount > 0 ? (visitedCount / totalCount) * 100 : 0}
+					<div class="card bg-base-200 shadow-xl">
+						<div class="card-body">
+							<h3 class="card-title text-lg mb-4">✅ Progress</h3>
+							<div class="space-y-4">
+								<div class="flex justify-between text-sm">
+									<span class="opacity-70">Visited</span>
+									<span class="font-bold">{visitedCount} / {totalCount}</span>
+								</div>
+								<div class="w-full bg-base-300 rounded-full h-4 overflow-hidden">
+									<div
+										class="bg-success h-full transition-all duration-500 rounded-full flex items-center justify-center text-xs font-bold text-success-content"
+										style="width: {progressPercent}%"
+									>
+										{#if progressPercent > 20}
+											{Math.round(progressPercent)}%
+										{/if}
+									</div>
+								</div>
+								{#if progressPercent < 20 && progressPercent > 0}
+									<div class="text-center text-xs opacity-70">{Math.round(progressPercent)}%</div>
+								{/if}
+								<div class="grid grid-cols-2 gap-2 pt-2">
+									<div class="stat bg-base-300 rounded-lg p-3">
+										<div class="stat-title text-xs">Visited</div>
+										<div class="stat-value text-lg text-success">{visitedCount}</div>
+									</div>
+									<div class="stat bg-base-300 rounded-lg p-3">
+										<div class="stat-title text-xs">Planned</div>
+										<div class="stat-value text-lg text-warning">{totalCount - visitedCount}</div>
+									</div>
+								</div>
+								{#if visitedCount === totalCount && totalCount > 0}
+									<div class="alert alert-success text-sm py-2">
+										<span>🎉 All locations visited!</span>
+									</div>
+								{/if}
+							</div>
+						</div>
+					</div>
+				{/if}
+
 				<!-- Quick Info Card -->
 				<div class="card bg-base-200 shadow-xl">
 					<div class="card-body">
