@@ -19,9 +19,10 @@ export const load = (async (event) => {
 		return redirect(302, '/login');
 	}
 
-	// Get sorting parameters from URL
+	// Get sorting and filtering parameters from URL
 	const order_by = event.url.searchParams.get('order_by') || 'updated_at';
 	const order_direction = event.url.searchParams.get('order_direction') || 'desc';
+	const status = event.url.searchParams.get('status') || '';
 	const page = event.url.searchParams.get('page') || '1';
 	const currentPage = parseInt(page);
 
@@ -31,7 +32,8 @@ export const load = (async (event) => {
 	};
 
 	// Build API URL with nested=true for lighter payload
-	const apiUrl = `${serverEndpoint}/api/collections/?order_by=${order_by}&order_direction=${order_direction}&page=${page}&nested=true`;
+	const statusParam = status ? `&status=${status}` : '';
+	const apiUrl = `${serverEndpoint}/api/collections/?order_by=${order_by}&order_direction=${order_direction}&page=${page}&nested=true${statusParam}`;
 
 	try {
 		// Execute all API calls in parallel
@@ -66,6 +68,7 @@ export const load = (async (event) => {
 				currentPage,
 				order_by,
 				order_direction,
+				status,
 				archivedCollections: archivedData as SlimCollection[],
 				invites: invitesData
 			}

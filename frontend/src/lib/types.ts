@@ -136,6 +136,8 @@ export type Collection = {
 	shared_with: string[] | undefined;
 	link?: string | null;
 	itinerary: CollectionItineraryItem[];
+	status: 'folder' | 'upcoming' | 'in_progress' | 'completed';
+	days_until_start: number | null;
 };
 
 export type SlimCollection = {
@@ -153,6 +155,8 @@ export type SlimCollection = {
 	location_images: ContentImage[];
 	location_count: number;
 	shared_with: string[];
+	status: 'folder' | 'upcoming' | 'in_progress' | 'completed';
+	days_until_start: number | null;
 };
 
 export type GeocodeSearchResult = {

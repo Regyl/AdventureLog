@@ -54,6 +54,31 @@ class CollectionViewSet(viewsets.ModelViewSet):
 
         return queryset.order_by(ordering)
     
+    def apply_status_filter(self, queryset):
+        """Apply status filtering based on query parameter"""
+        from datetime import date
+        status_filter = self.request.query_params.get('status', None)
+        
+        if not status_filter:
+            return queryset
+        
+        today = date.today()
+        
+        if status_filter == 'folder':
+            # Collections without dates
+            return queryset.filter(Q(start_date__isnull=True) | Q(end_date__isnull=True))
+        elif status_filter == 'upcoming':
+            # Start date in the future
+            return queryset.filter(start_date__gt=today)
+        elif status_filter == 'in_progress':
+            # Currently ongoing
+            return queryset.filter(start_date__lte=today, end_date__gte=today)
+        elif status_filter == 'completed':
+            # End date in the past
+            return queryset.filter(end_date__lt=today)
+        
+        return queryset
+    
     def get_serializer_context(self):
         """Override to add nested and exclusion contexts based on query parameters"""
         context = super().get_serializer_context()
@@ -143,6 +168,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
             )
         )
         
+        queryset = self.apply_status_filter(queryset)
         queryset = self.apply_sorting(queryset)
         return self.paginate_and_respond(queryset, request)
     

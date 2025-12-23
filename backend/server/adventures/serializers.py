@@ -588,11 +588,13 @@ class CollectionSerializer(CustomModelSerializer):
     notes = serializers.SerializerMethodField()
     checklists = serializers.SerializerMethodField()
     lodging = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    days_until_start = serializers.SerializerMethodField()
 
     class Meta:
         model = Collection
-        fields = ['id', 'description', 'user', 'name', 'is_public', 'locations', 'created_at', 'start_date', 'end_date', 'transportations', 'notes', 'updated_at', 'checklists', 'is_archived', 'shared_with', 'link', 'lodging']
-        read_only_fields = ['id', 'created_at', 'updated_at', 'user', 'shared_with']
+        fields = ['id', 'description', 'user', 'name', 'is_public', 'locations', 'created_at', 'start_date', 'end_date', 'transportations', 'notes', 'updated_at', 'checklists', 'is_archived', 'shared_with', 'link', 'lodging', 'status', 'days_until_start']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'user', 'shared_with', 'status', 'days_until_start']
 
     def get_locations(self, obj):
         if self.context.get('nested', False):
@@ -629,6 +631,41 @@ class CollectionSerializer(CustomModelSerializer):
             return []
         return LodgingSerializer(obj.lodging_set.all(), many=True, context=self.context).data
 
+    def get_status(self, obj):
+        """Calculate the status of the collection based on dates"""
+        from datetime import date
+        
+        # If no dates, it's a folder
+        if not obj.start_date or not obj.end_date:
+            return 'folder'
+        
+        today = date.today()
+        
+        # Future trip
+        if obj.start_date > today:
+            return 'upcoming'
+        
+        # Past trip
+        if obj.end_date < today:
+            return 'completed'
+        
+        # Current trip
+        return 'in_progress'
+    
+    def get_days_until_start(self, obj):
+        """Calculate days until start for upcoming collections"""
+        from datetime import date
+        
+        if not obj.start_date:
+            return None
+        
+        today = date.today()
+        
+        if obj.start_date > today:
+            return (obj.start_date - today).days
+        
+        return None
+
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         
@@ -660,13 +697,15 @@ class CollectionInviteSerializer(serializers.ModelSerializer):
 class UltraSlimCollectionSerializer(serializers.ModelSerializer):
     location_images = serializers.SerializerMethodField()
     location_count = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    days_until_start = serializers.SerializerMethodField()
     
     class Meta:
         model = Collection
         fields = [
             'id', 'user', 'name', 'description', 'is_public', 'start_date', 'end_date', 
             'is_archived', 'link', 'created_at', 'updated_at', 'location_images', 
-            'location_count', 'shared_with'
+            'location_count', 'shared_with', 'status', 'days_until_start'
         ]
         read_only_fields = fields  # All fields are read-only for listing
 
@@ -687,6 +726,41 @@ class UltraSlimCollectionSerializer(serializers.ModelSerializer):
         """Get count of locations in this collection"""
         # This uses the cached count if available, or does a simple count query
         return obj.locations.count()
+
+    def get_status(self, obj):
+        """Calculate the status of the collection based on dates"""
+        from datetime import date
+        
+        # If no dates, it's a folder
+        if not obj.start_date or not obj.end_date:
+            return 'folder'
+        
+        today = date.today()
+        
+        # Future trip
+        if obj.start_date > today:
+            return 'upcoming'
+        
+        # Past trip
+        if obj.end_date < today:
+            return 'completed'
+        
+        # Current trip
+        return 'in_progress'
+    
+    def get_days_until_start(self, obj):
+        """Calculate days until start for upcoming collections"""
+        from datetime import date
+        
+        if not obj.start_date:
+            return None
+        
+        today = date.today()
+        
+        if obj.start_date > today:
+            return (obj.start_date - today).days
+        
+        return None
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)

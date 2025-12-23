@@ -39,6 +39,7 @@
 	let currentPage: number = data.props.currentPage || 1;
 	let orderBy = data.props.order_by || 'updated_at';
 	let orderDirection = data.props.order_direction || 'asc';
+	let statusFilter = data.props.status || '';
 
 	let invites: CollectionInvite[] = data.props.invites || [];
 
@@ -99,6 +100,22 @@
 		}
 		if (data.props.archivedCollections) {
 			archivedCollections = data.props.archivedCollections;
+		}
+	}
+
+	async function updateStatusFilter(status: string) {
+		const url = new URL($page.url);
+		if (status) {
+			url.searchParams.set('status', status);
+		} else {
+			url.searchParams.delete('status');
+		}
+		url.searchParams.set('page', '1'); // Reset to first page when filter changes
+		currentPage = 1;
+		statusFilter = status;
+		await goto(url.toString(), { invalidateAll: true, replaceState: true });
+		if (data.props.adventures) {
+			collections = data.props.adventures;
 		}
 	}
 
@@ -569,6 +586,67 @@
 
 					<!-- Only show sort options for collection views, not invites -->
 					{#if activeView !== 'invites'}
+						<!-- Status Filter -->
+						<div class="card bg-base-200/50 p-4 mb-4">
+							<h3 class="font-semibold text-lg mb-4 flex items-center gap-2">
+								<Filter class="w-5 h-5" />
+								{$t('adventures.status_filter')}
+							</h3>
+
+							<div class="space-y-2">
+								<label class="label cursor-pointer justify-start gap-3">
+									<input
+										type="radio"
+										name="status_filter"
+										class="radio radio-primary radio-sm"
+										checked={statusFilter === ''}
+										on:change={() => updateStatusFilter('')}
+									/>
+									<span class="label-text">{$t('adventures.all')}</span>
+								</label>
+								<label class="label cursor-pointer justify-start gap-3">
+									<input
+										type="radio"
+										name="status_filter"
+										class="radio radio-primary radio-sm"
+										checked={statusFilter === 'folder'}
+										on:change={() => updateStatusFilter('folder')}
+									/>
+									<span class="label-text">📁 {$t('adventures.folder')}</span>
+								</label>
+								<label class="label cursor-pointer justify-start gap-3">
+									<input
+										type="radio"
+										name="status_filter"
+										class="radio radio-primary radio-sm"
+										checked={statusFilter === 'upcoming'}
+										on:change={() => updateStatusFilter('upcoming')}
+									/>
+									<span class="label-text">🚀 {$t('adventures.upcoming')}</span>
+								</label>
+								<label class="label cursor-pointer justify-start gap-3">
+									<input
+										type="radio"
+										name="status_filter"
+										class="radio radio-primary radio-sm"
+										checked={statusFilter === 'in_progress'}
+										on:change={() => updateStatusFilter('in_progress')}
+									/>
+									<span class="label-text">🎯 {$t('adventures.in_progress')}</span>
+								</label>
+								<label class="label cursor-pointer justify-start gap-3">
+									<input
+										type="radio"
+										name="status_filter"
+										class="radio radio-primary radio-sm"
+										checked={statusFilter === 'completed'}
+										on:change={() => updateStatusFilter('completed')}
+									/>
+									<span class="label-text">✓ {$t('adventures.completed')}</span>
+								</label>
+							</div>
+						</div>
+
 						<!-- Sort Form - Updated to use URL navigation -->
 						<div class="card bg-base-200/50 p-4">
 							<h3 class="font-semibold text-lg mb-4 flex items-center gap-2">

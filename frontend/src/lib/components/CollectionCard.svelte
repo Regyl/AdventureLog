@@ -21,6 +21,10 @@
 	import ShareModal from './ShareModal.svelte';
 	import CardCarousel from './CardCarousel.svelte';
 	import ExitRun from '~icons/mdi/exit-run';
+	import Eye from '~icons/mdi/eye';
+	import EyeOff from '~icons/mdi/eye-off';
+	import Check from '~icons/mdi/check';
+	import MapMarker from '~icons/mdi/map-marker-multiple';
 
 	const dispatch = createEventDispatcher();
 
@@ -102,57 +106,128 @@
 {/if}
 
 <div
-	class="card w-full max-w-md bg-base-300 shadow-2xl hover:shadow-3xl transition-all duration-300 border border-base-300 hover:border-primary/20 group"
+	class="card w-full max-w-md bg-base-300 shadow hover:shadow-md transition-all duration-200 border border-base-300 group"
 >
 	<!-- Image Carousel -->
 	<div class="relative overflow-hidden rounded-t-2xl">
 		<CardCarousel images={location_images} name={collection.name} icon="📚" />
 
-		<!-- Badge Overlay -->
-		<div class="absolute top-4 left-4 flex flex-col gap-2">
-			<div class="badge badge-sm badge-secondary shadow-lg">
-				{collection.is_public ? $t('adventures.public') : $t('adventures.private')}
-			</div>
+		<!-- Status Badge Overlay -->
+		<div class="absolute top-2 left-4 flex items-center gap-2">
+			{#if collection.status === 'folder'}
+				<div class="badge badge-sm badge-neutral shadow-sm">
+					📁 {$t('adventures.folder')}
+				</div>
+			{:else if collection.status === 'upcoming'}
+				<div class="badge badge-sm badge-info shadow-sm">
+					🚀 {$t('adventures.upcoming')}
+				</div>
+				{#if collection.days_until_start !== null}
+					<div class="badge badge-sm badge-accent shadow-sm">
+						⏳ {collection.days_until_start}
+						{collection.days_until_start === 1 ? $t('adventures.day') : $t('adventures.days')}
+					</div>
+				{/if}
+			{:else if collection.status === 'in_progress'}
+				<div class="badge badge-sm badge-success shadow-sm">
+					🎯 {$t('adventures.in_progress')}
+				</div>
+			{:else if collection.status === 'completed'}
+				<div class="badge badge-sm badge-primary shadow-sm">
+					<Check class="w-4 h-4" />
+					{$t('adventures.completed')}
+				</div>
+			{/if}
 			{#if collection.is_archived}
-				<div class="badge badge-sm badge-warning shadow-lg">
+				<div class="badge badge-sm badge-warning shadow-sm">
 					{$t('adventures.archived')}
 				</div>
 			{/if}
 		</div>
+
+		<!-- Privacy Indicator -->
+		<div class="absolute top-2 right-4">
+			<div
+				class="tooltip tooltip-left"
+				data-tip={collection.is_public ? $t('adventures.public') : $t('adventures.private')}
+			>
+				<div
+					class="badge badge-sm {collection.is_public
+						? 'badge-secondary'
+						: 'badge-ghost'} shadow-lg"
+					aria-label={collection.is_public ? $t('adventures.public') : $t('adventures.private')}
+				>
+					{#if collection.is_public}
+						<Eye class="w-4 h-4" />
+					{:else}
+						<EyeOff class="w-4 h-4" />
+					{/if}
+				</div>
+			</div>
+		</div>
 	</div>
 
 	<!-- Content -->
-	<div class="card-body p-6 space-y-4">
+	<div class="card-body p-4 space-y-3">
 		<!-- Title -->
-		<div class="space-y-3">
-			<button
-				on:click={() => goto(`/collections/${collection.id}`)}
-				class="text-xl font-bold text-left hover:text-primary transition-colors duration-200 line-clamp-2 group-hover:underline"
-			>
-				{collection.name}
-			</button>
+		<button
+			on:click={() => goto(`/collections/${collection.id}`)}
+			class="text-lg font-semibold text-left hover:text-primary transition-colors duration-200 line-clamp-2 group-hover:underline"
+		>
+			{collection.name}
+		</button>
 
-			<!-- Adventure Count -->
-			<p class="text-sm text-base-content/70">
-				{locationLength}
-				{$t('locations.locations')}
-			</p>
+		<!-- Stats -->
+		<div class="flex flex-wrap items-center gap-2 text-sm text-base-content/70">
+			<!-- Location Count -->
+			<div class="flex items-center gap-1">
+				<MapMarker class="w-4 h-4 text-primary" />
+				<span>
+					{locationLength}
+					{locationLength === 1 ? $t('locations.location') : $t('locations.locations')}
+				</span>
+			</div>
 
-			<!-- Date Range -->
+			<!-- Date Range & Duration -->
 			{#if collection.start_date && collection.end_date}
-				<p class="text-sm font-medium">
-					{$t('adventures.dates')}:
-					{new Date(collection.start_date).toLocaleDateString(undefined, { timeZone: 'UTC' })} –
-					{new Date(collection.end_date).toLocaleDateString(undefined, { timeZone: 'UTC' })}
-				</p>
-				<p class="text-sm text-base-content/60">
-					{$t('adventures.duration')}: {Math.floor(
-						(new Date(collection.end_date).getTime() - new Date(collection.start_date).getTime()) /
-							(1000 * 60 * 60 * 24)
-					) + 1} days
-				</p>
+				<span class="text-base-content/60 px-1">•</span>
+				<div class="flex items-center gap-1">
+					<span>
+						{Math.floor(
+							(new Date(collection.end_date).getTime() -
+								new Date(collection.start_date).getTime()) /
+								(1000 * 60 * 60 * 24)
+						) + 1}
+						{Math.floor(
+							(new Date(collection.end_date).getTime() -
+								new Date(collection.start_date).getTime()) /
+								(1000 * 60 * 60 * 24)
+						) +
+							1 ===
+						1
+							? $t('adventures.day')
+							: $t('adventures.days')}
+					</span>
+				</div>
 			{/if}
 		</div>
+
+		<!-- Date Range (if exists) -->
+		{#if collection.start_date && collection.end_date}
+			<div class="text-xs text-base-content/60">
+				{new Date(collection.start_date).toLocaleDateString(undefined, {
+					timeZone: 'UTC',
+					month: 'short',
+					day: 'numeric',
+					year: 'numeric'
+				})} – {new Date(collection.end_date).toLocaleDateString(undefined, {
+					timeZone: 'UTC',
+					month: 'short',
+					day: 'numeric',
+					year: 'numeric'
+				})}
+			</div>
+		{/if}
 
 		<!-- Actions -->
 		<div class="pt-4 border-t border-base-300">
