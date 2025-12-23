@@ -6,6 +6,7 @@
 	import type { ClusterOptions } from 'svelte-maplibre';
 	import { goto } from '$app/navigation';
 	import { getActivityColor } from '$lib';
+	import { page } from '$app/stores';
 
 	// Icons
 	import MapIcon from '~icons/mdi/map';
@@ -29,6 +30,11 @@
 	let sidebarOpen: boolean = false;
 
 	let basemapType: string = 'default';
+
+	// Map state from URL params
+	let mapZoom: number = 2;
+	let mapCenter: [number, number] = [0, 0];
+	let updateUrlTimeout: NodeJS.Timeout | null = null;
 
 	export let initialLatLng: { lat: number; lng: number } | null = null;
 
@@ -350,7 +356,40 @@
 		newMarker = null;
 	}
 
+	function updateUrlParams(lat: number, lng: number, zoom: number) {
+		if (updateUrlTimeout) clearTimeout(updateUrlTimeout);
+		updateUrlTimeout = setTimeout(() => {
+			const params = new URLSearchParams($page.url.searchParams);
+			params.set('lat', lat.toFixed(6));
+			params.set('lng', lng.toFixed(6));
+			params.set('zoom', zoom.toFixed(2));
+			goto(`?${params.toString()}`, { replaceState: true, noScroll: true, keepFocus: true });
+		}, 500);
+	}
+
+	function handleMapMove(e: CustomEvent<{ center: { lng: number; lat: number }; zoom: number }>) {
+		const { center, zoom } = e.detail;
+		updateUrlParams(center.lat, center.lng, zoom);
+	}
+
 	onMount(() => {
+		// Initialize from URL params
+		const params = $page.url.searchParams;
+		const lat = params.get('lat');
+		const lng = params.get('lng');
+		const zoom = params.get('zoom');
+
+		if (lat && lng && zoom) {
+			const parsedLat = parseFloat(lat);
+			const parsedLng = parseFloat(lng);
+			const parsedZoom = parseFloat(zoom);
+
+			if (Number.isFinite(parsedLat) && Number.isFinite(parsedLng) && Number.isFinite(parsedZoom)) {
+				mapCenter = [parsedLng, parsedLat];
+				mapZoom = parsedZoom;
+			}
+		}
+
 		if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
 		const mql = window.matchMedia('(hover: none), (pointer: coarse)');
 		const update = () => {
@@ -359,11 +398,17 @@
 		update();
 		if (typeof mql.addEventListener === 'function') {
 			mql.addEventListener('change', update);
-			return () => mql.removeEventListener('change', update);
+			return () => {
+				mql.removeEventListener('change', update);
+				if (updateUrlTimeout) clearTimeout(updateUrlTimeout);
+			};
 		}
 		// Safari < 14
 		(mql as any).addListener?.(update);
-		return () => (mql as any).removeListener?.(update);
+		return () => {
+			(mql as any).removeListener?.(update);
+			if (updateUrlTimeout) clearTimeout(updateUrlTimeout);
+		};
 	});
 
 	// FullMap handles cluster theme styling + cluster expansion on click.
@@ -465,7 +510,10 @@
 							{getMarkerProps}
 							mapClass="w-full h-full min-h-[70vh] rounded-lg"
 							standardControls
+							zoom={mapZoom}
+							center={mapCenter}
 							on:mapClick={addMarker}
+							on:mapMove={handleMapMove}
 						>
 							<svelte:fragment
 								slot="marker"

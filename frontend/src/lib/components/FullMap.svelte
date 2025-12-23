@@ -38,6 +38,7 @@
 	export let mapClass = 'w-full h-full';
 	export let standardControls = true;
 	export let zoom = 2;
+	export let center: [number, number] = [0, 0];
 	export let mapClickEnabled: boolean = true;
 
 	// Basemap
@@ -128,10 +129,23 @@
 		mapClick: { lngLat: { lng: number; lat: number } };
 		markerClick: { feature: unknown; markerProps: Record<string, unknown> | null };
 		clusterClick: LayerClickInfo;
+		mapMove: { center: { lng: number; lat: number }; zoom: number };
 	}>();
 
 	function handleMapClick(e: CustomEvent<{ lngLat: { lng: number; lat: number } }>) {
 		dispatch('mapClick', e.detail);
+	}
+
+	function handleMapMove() {
+		if (!map) return;
+		const mapCenter = map.getCenter();
+		const mapZoom = map.getZoom();
+		if (mapCenter && typeof mapZoom === 'number') {
+			dispatch('mapMove', {
+				center: { lng: mapCenter.lng, lat: mapCenter.lat },
+				zoom: mapZoom
+			});
+		}
 	}
 
 	function setBasemapType(next: string) {
@@ -261,7 +275,14 @@
 		{/if}
 	{/if}
 
-	<MapLibre bind:map style={getBasemapUrl(basemapType)} class={mapClass} {standardControls} {zoom}>
+	<MapLibre
+		bind:map
+		style={getBasemapUrl(basemapType)}
+		class={mapClass}
+		{standardControls}
+		{zoom}
+		{center}
+	>
 		{#key styleNonce}
 			{#if effectiveGeoJson && Array.isArray(effectiveGeoJson.features) && effectiveGeoJson.features.length > 0}
 				{#if clusterEnabled}
@@ -331,7 +352,9 @@
 		{/key}
 
 		{#if mapClickEnabled}
-			<MapEvents on:click={handleMapClick} />
+			<MapEvents on:click={handleMapClick} on:moveend={handleMapMove} />
+		{:else}
+			<MapEvents on:moveend={handleMapMove} />
 		{/if}
 		<slot name="overlays" {map} />
 	</MapLibre>
