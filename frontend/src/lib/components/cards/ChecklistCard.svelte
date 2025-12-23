@@ -1,47 +1,43 @@
 <script lang="ts">
-	import { t } from 'svelte-i18n';
 	import { addToast } from '$lib/toasts';
-	import type { Collection, Note, User } from '$lib/types';
+	import type { Checklist, Collection, User } from '$lib/types';
 	import { createEventDispatcher } from 'svelte';
 	const dispatch = createEventDispatcher();
+	import { t } from 'svelte-i18n';
 
-	import { marked } from 'marked'; // Import the markdown parser
-
-	const renderMarkdown = (markdown: string) => {
-		return marked(markdown);
-	};
-
+	import Launch from '~icons/mdi/launch';
 	import TrashCan from '~icons/mdi/trash-can';
 	import Calendar from '~icons/mdi/calendar';
-	import DeleteWarning from './DeleteWarning.svelte';
+	import DeleteWarning from '../DeleteWarning.svelte';
 	import DotsHorizontal from '~icons/mdi/dots-horizontal';
 	import FileDocumentEdit from '~icons/mdi/file-document-edit';
-	import LinkVariant from '~icons/mdi/link-variant';
+	import CheckCircle from '~icons/mdi/check-circle';
+	import CheckboxBlankCircleOutline from '~icons/mdi/checkbox-blank-circle-outline';
 	import CalendarRemove from '~icons/mdi/calendar-remove';
 	import type { CollectionItineraryItem } from '$lib/types';
 
-	export let note: Note;
+	export let checklist: Checklist;
 	export let user: User | null = null;
-	export let collection: Collection | null = null;
+	export let collection: Collection;
 	export let readOnly: boolean = false;
 	export let itineraryItem: CollectionItineraryItem | null = null;
 
 	let isWarningModalOpen: boolean = false;
 
-	function editNote() {
-		dispatch('edit', note);
+	function editChecklist() {
+		dispatch('edit', checklist);
 	}
 
-	async function deleteNote() {
-		const res = await fetch(`/api/notes/${note.id}`, {
+	async function deleteChecklist() {
+		const res = await fetch(`/api/checklists/${checklist.id}`, {
 			method: 'DELETE'
 		});
 		if (res.ok) {
-			addToast('success', $t('notes.note_deleted'));
+			addToast('success', $t('checklist.checklist_deleted'));
 			isWarningModalOpen = false;
-			dispatch('delete', note.id);
+			dispatch('delete', checklist.id);
 		} else {
-			addToast($t('notes.note_delete_error'), 'error');
+			addToast($t('checklist.checklist_delete_error'), 'error');
 		}
 	}
 
@@ -61,30 +57,29 @@
 
 {#if isWarningModalOpen}
 	<DeleteWarning
-		title={$t('adventures.delete_note')}
+		title={$t('adventures.delete_checklist')}
 		button_text="Delete"
-		description={$t('adventures.note_delete_confirm')}
+		description={$t('adventures.checklist_delete_confirm')}
 		is_warning={false}
 		on:close={() => (isWarningModalOpen = false)}
-		on:confirm={deleteNote}
+		on:confirm={deleteChecklist}
 	/>
 {/if}
-
 <div
 	class="card w-full max-w-md bg-base-300 shadow hover:shadow-md transition-all duration-200 border border-base-300 group"
-	aria-label="note-card"
+	aria-label="checklist-card"
 >
 	<div class="card-body p-4 space-y-3">
 		<!-- Header -->
 		<div class="flex items-start justify-between gap-3">
 			<div class="flex-1 min-w-0">
-				<h2 class="text-lg font-semibold line-clamp-2">{note.name}</h2>
+				<h2 class="text-lg font-semibold line-clamp-2">{checklist.name}</h2>
 				<div class="flex flex-wrap items-center gap-2 mt-2">
-					<div class="badge badge-primary badge-sm">{$t('adventures.note')}</div>
+					<div class="badge badge-primary badge-sm">{$t('adventures.checklist')}</div>
 				</div>
 			</div>
 
-			{#if !readOnly && (note.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid)))}
+			{#if !readOnly && (checklist.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid)))}
 				<details class="dropdown dropdown-end relative z-50">
 					<summary class="btn btn-square btn-sm p-1 text-base-content">
 						<DotsHorizontal class="w-5 h-5" />
@@ -93,7 +88,7 @@
 						class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow-lg border border-base-300"
 					>
 						<li>
-							<button on:click={editNote} class="flex items-center gap-2">
+							<button on:click={editChecklist} class="flex items-center gap-2">
 								<FileDocumentEdit class="w-4 h-4" />
 								{$t('notes.open')}
 							</button>
@@ -125,52 +120,51 @@
 			{/if}
 		</div>
 
-		<!-- Note Content Preview -->
-		{#if note.content && note.content?.length > 0}
-			<article
-				class="prose prose-sm max-w-none overflow-hidden max-h-32 text-sm text-base-content/70 line-clamp-4"
-			>
-				{@html renderMarkdown(note.content || '')}
-			</article>
+		<!-- Checklist Items Preview -->
+		{#if checklist.items.length > 0}
+			<div class="space-y-2">
+				{#each checklist.items.slice(0, 3) as item}
+					<div class="flex items-center gap-2 text-sm text-base-content/70">
+						{#if item.is_checked}
+							<CheckCircle class="w-4 h-4 text-success flex-shrink-0" />
+						{:else}
+							<CheckboxBlankCircleOutline class="w-4 h-4 flex-shrink-0" />
+						{/if}
+						<span
+							class="truncate"
+							class:line-through={item.is_checked}
+							class:opacity-60={item.is_checked}
+						>
+							{item.name}
+						</span>
+					</div>
+				{/each}
+				{#if checklist.items.length > 3}
+					<div class="text-sm text-base-content/60 pl-6">
+						+{checklist.items.length - 3}
+						{$t('checklist.more_items')}
+					</div>
+				{/if}
+			</div>
 		{/if}
 
 		<!-- Inline Stats -->
 		<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70">
-			{#if note.date && note.date !== ''}
+			{#if checklist.date && checklist.date !== ''}
 				<div class="flex items-center gap-1">
 					<Calendar class="w-4 h-4 text-primary" />
-					<span>{new Date(note.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span>
+					<span>{new Date(checklist.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span>
 				</div>
 			{/if}
 
-			{#if note.links && note.links?.length > 0}
+			{#if checklist.items.length > 0}
+				{@const completedCount = checklist.items.filter((item) => item.is_checked).length}
 				<div class="badge badge-ghost badge-sm">
-					<LinkVariant class="w-3 h-3 mr-1" />
-					{note.links.length}
-					{note.links.length > 1 ? $t('adventures.links') : $t('adventures.link')}
+					{completedCount}/{checklist.items.length}
+					{$t('checklist.completed')}
 				</div>
 			{/if}
 		</div>
-
-		<!-- Links Preview (compact) -->
-		{#if note.links && note.links?.length > 0}
-			<div class="flex flex-wrap gap-2">
-				{#each note.links.slice(0, 2) as link}
-					<a
-						class="badge badge-outline badge-sm hover:badge-primary transition-colors"
-						href={link}
-						target="_blank"
-						rel="noopener noreferrer"
-					>
-						<LinkVariant class="w-3 h-3 mr-1" />
-						{link.split('//')[1]?.split('/', 1)[0]}
-					</a>
-				{/each}
-				{#if note.links.length > 2}
-					<span class="badge badge-ghost badge-sm">+{note.links.length - 2}</span>
-				{/if}
-			</div>
-		{/if}
 	</div>
 </div>
 
@@ -179,14 +173,6 @@
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
 		line-clamp: 2;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-	}
-
-	.line-clamp-4 {
-		display: -webkit-box;
-		-webkit-line-clamp: 4;
-		line-clamp: 4;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 	}

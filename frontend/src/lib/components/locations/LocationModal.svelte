@@ -3,10 +3,10 @@
 	import type { Collection, Location, User } from '$lib/types';
 	import { addToast } from '$lib/toasts';
 	import { t } from 'svelte-i18n';
-	import LocationQuickStart from './locations/LocationQuickStart.svelte';
-	import LocationDetails from './locations/LocationDetails.svelte';
-	import LocationMedia from './locations/LocationMedia.svelte';
-	import LocationVisits from './locations/LocationVisits.svelte';
+	import LocationQuickStart from './LocationQuickStart.svelte';
+	import LocationDetails from './LocationDetails.svelte';
+	import LocationMedia from './LocationMedia.svelte';
+	import LocationVisits from './LocationVisits.svelte';
 
 	export let user: User | null = null;
 	export let collection: Collection | null = null;

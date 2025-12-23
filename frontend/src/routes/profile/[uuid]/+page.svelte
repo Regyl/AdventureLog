@@ -1,7 +1,7 @@
 <script lang="ts">
 	export let data;
-	import LocationCard from '$lib/components/LocationCard.svelte';
-	import CollectionCard from '$lib/components/CollectionCard.svelte';
+	import LocationCard from '$lib/components/cards/LocationCard.svelte';
+	import CollectionCard from '$lib/components/cards/CollectionCard.svelte';
 	import type { Location, Collection, User } from '$lib/types.js';
 	import { t } from 'svelte-i18n';
 	import { onMount } from 'svelte';

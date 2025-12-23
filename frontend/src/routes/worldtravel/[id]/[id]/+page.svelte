@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getBasemapUrl } from '$lib';
-	import CityCard from '$lib/components/CityCard.svelte';
+	import CityCard from '$lib/components/cards/CityCard.svelte';
 	import { addToast } from '$lib/toasts';
 	import type { City, VisitedCity } from '$lib/types';
 	import type { PageData } from './$types';

@@ -16,16 +16,16 @@
 	import Link from '~icons/mdi/link-variant';
 	import LinkVariantRemove from '~icons/mdi/link-variant-remove';
 	import Plus from '~icons/mdi/plus';
-	import CollectionLink from './CollectionLink.svelte';
+	import CollectionLink from '../CollectionLink.svelte';
 	import DotsHorizontal from '~icons/mdi/dots-horizontal';
-	import DeleteWarning from './DeleteWarning.svelte';
-	import CardCarousel from './CardCarousel.svelte';
+	import DeleteWarning from '../DeleteWarning.svelte';
+	import CardCarousel from '../CardCarousel.svelte';
 	import { t } from 'svelte-i18n';
 	import Star from '~icons/mdi/star';
 	import StarOutline from '~icons/mdi/star-outline';
 	import Eye from '~icons/mdi/eye';
 	import EyeOff from '~icons/mdi/eye-off';
-	import CollectionItineraryPlanner from './locations/CollectionItineraryPlanner.svelte';
+	import CollectionItineraryPlanner from '../collections/CollectionItineraryPlanner.svelte';
 	import CalendarRemove from '~icons/mdi/calendar-remove';
 
 	export let type: string | null = null;

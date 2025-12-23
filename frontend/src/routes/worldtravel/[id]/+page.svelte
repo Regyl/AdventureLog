@@ -1,5 +1,5 @@
 <script lang="ts">
-	import RegionCard from '$lib/components/RegionCard.svelte';
+	import RegionCard from '$lib/components/cards/RegionCard.svelte';
 	import type { Region, VisitedRegion } from '$lib/types';
 	import ClusterMap from '$lib/components/ClusterMap.svelte';
 	import type { ClusterOptions } from 'svelte-maplibre';

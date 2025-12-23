@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import LocationCard from '$lib/components/LocationCard.svelte';
+	import LocationCard from '$lib/components/cards/LocationCard.svelte';
 	import CategoryFilterDropdown from '$lib/components/CategoryFilterDropdown.svelte';
 	import CategoryModal from '$lib/components/CategoryModal.svelte';
 	import type { Location } from '$lib/types';
@@ -15,7 +15,7 @@
 	import Calendar from '~icons/mdi/calendar';
 	import Tag from '~icons/mdi/tag';
 	import Compass from '~icons/mdi/compass';
-	import NewLocationModal from '$lib/components/NewLocationModal.svelte';
+	import NewLocationModal from '$lib/components/locations/LocationModal.svelte';
 
 	export let data: any;
 

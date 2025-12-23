@@ -26,7 +26,7 @@
 
 	import { addToast } from '$lib/toasts';
 	import ImageManagement from '../ImageManagement.svelte';
-	import WandererCard from '../WandererCard.svelte';
+	import WandererCard from '../cards/WandererCard.svelte';
 
 	// Props
 	export let images: ContentImage[] = [];

@@ -21,7 +21,7 @@
 	import { CircleLayer, GeoJSON, MapEvents, MapLibre, MarkerLayer } from 'svelte-maplibre';
 	import type { ClusterOptions, LayerClickInfo } from 'svelte-maplibre';
 	import { getBasemapUrl } from '$lib';
-	import MapStyleSelector from '$lib/components/MapStyleSelector.svelte';
+	import MapStyleSelector from '$lib/components/map/MapStyleSelector.svelte';
 	import { resolveThemeColor, withAlpha } from '$lib/utils/resolveThemeColor';
 
 	type Feature = FullMapFeature;

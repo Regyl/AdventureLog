@@ -15,11 +15,11 @@
 	import WeatherSunset from '~icons/mdi/weather-sunset';
 	import ClipboardList from '~icons/mdi/clipboard-list';
 	import ImageDisplayModal from '$lib/components/ImageDisplayModal.svelte';
-	import AttachmentCard from '$lib/components/AttachmentCard.svelte';
+	import AttachmentCard from '$lib/components/cards/AttachmentCard.svelte';
 	import { getActivityColor, getBasemapUrl, isAllDay } from '$lib';
-	import ActivityCard from '$lib/components/ActivityCard.svelte';
-	import TrailCard from '$lib/components/TrailCard.svelte';
-	import NewLocationModal from '$lib/components/NewLocationModal.svelte';
+	import ActivityCard from '$lib/components/cards/ActivityCard.svelte';
+	import TrailCard from '$lib/components/cards/TrailCard.svelte';
+	import NewLocationModal from '$lib/components/locations/LocationModal.svelte';
 
 	let geojson: any;
 

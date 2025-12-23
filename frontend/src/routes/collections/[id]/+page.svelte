@@ -13,8 +13,8 @@
 	import { DateTime } from 'luxon';
 	import Calendar from '~icons/mdi/calendar';
 	import ImageDisplayModal from '$lib/components/ImageDisplayModal.svelte';
-	import CollectionAllItems from '$lib/components/CollectionAllItems.svelte';
-	import CollectionItineraryPlanner from '$lib/components/locations/CollectionItineraryPlanner.svelte';
+	import CollectionAllItems from '$lib/components/collections/CollectionAllItems.svelte';
+	import CollectionItineraryPlanner from '$lib/components/collections/CollectionItineraryPlanner.svelte';
 	import CollectionRecommendationView from '$lib/components/CollectionRecommendationView.svelte';
 	import { getBasemapUrl } from '$lib';
 	import FolderMultiple from '~icons/mdi/folder-multiple';

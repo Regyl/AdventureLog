@@ -6,11 +6,11 @@
 	import CalendarBlank from '~icons/mdi/calendar-blank';
 	import Clear from '~icons/mdi/close';
 	import Link from '~icons/mdi/link-variant';
-	import LocationCard from '$lib/components/LocationCard.svelte';
-	import TransportationCard from '$lib/components/TransportationCard.svelte';
-	import LodgingCard from '$lib/components/LodgingCard.svelte';
-	import NoteCard from '$lib/components/NoteCard.svelte';
-	import ChecklistCard from '$lib/components/ChecklistCard.svelte';
+	import LocationCard from '$lib/components/cards/LocationCard.svelte';
+	import TransportationCard from '$lib/components/cards/TransportationCard.svelte';
+	import LodgingCard from '$lib/components/cards/LodgingCard.svelte';
+	import NoteCard from '$lib/components/cards/NoteCard.svelte';
+	import ChecklistCard from '$lib/components/cards/ChecklistCard.svelte';
 	import { t } from 'svelte-i18n';
 
 	const dispatch = createEventDispatcher();

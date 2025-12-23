@@ -15,17 +15,17 @@
 	import { flip } from 'svelte/animate';
 	import CalendarBlank from '~icons/mdi/calendar-blank';
 	import Bed from '~icons/mdi/bed';
-	import LocationCard from '$lib/components/LocationCard.svelte';
-	import TransportationCard from '$lib/components/TransportationCard.svelte';
-	import LodgingCard from '$lib/components/LodgingCard.svelte';
-	import NoteCard from '$lib/components/NoteCard.svelte';
-	import ChecklistCard from '$lib/components/ChecklistCard.svelte';
-	import NewLocationModal from '$lib/components/NewLocationModal.svelte';
+	import LocationCard from '$lib/components/cards/LocationCard.svelte';
+	import TransportationCard from '$lib/components/cards/TransportationCard.svelte';
+	import LodgingCard from '$lib/components/cards/LodgingCard.svelte';
+	import NoteCard from '$lib/components/cards/NoteCard.svelte';
+	import ChecklistCard from '$lib/components/cards/ChecklistCard.svelte';
+	import NewLocationModal from '$lib/components/locations/LocationModal.svelte';
 	import LodgingModal from '$lib/components/LodgingModal.svelte';
 	import TransportationModal from '$lib/components/TransportationModal.svelte';
 	import NoteModal from '$lib/components/NoteModal.svelte';
 	import ChecklistModal from '$lib/components/ChecklistModal.svelte';
-	import ItineraryLinkModal from '$lib/components/ItineraryLinkModal.svelte';
+	import ItineraryLinkModal from '$lib/components/collections/ItineraryLinkModal.svelte';
 
 	export let collection: Collection;
 	export let user: any;

@@ -33,7 +33,7 @@
 	import FileIcon from '~icons/mdi/file';
 	import CloseIcon from '~icons/mdi/close';
 	import StravaActivityCard from '../StravaActivityCard.svelte';
-	import ActivityCard from '../ActivityCard.svelte';
+	import ActivityCard from '../cards/ActivityCard.svelte';
 
 	// Props
 	export let collection: Collection | null = null;

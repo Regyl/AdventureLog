@@ -1,5 +1,5 @@
 <script lang="ts">
-	import LocationCard from '$lib/components/LocationCard.svelte';
+	import LocationCard from '$lib/components/cards/LocationCard.svelte';
 	import type { PageData } from './$types';
 	import { t } from 'svelte-i18n';
 	import { onMount } from 'svelte';

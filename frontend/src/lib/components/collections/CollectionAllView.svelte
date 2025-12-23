@@ -24,12 +24,11 @@
 	import Filter from '~icons/mdi/filter-variant';
 
 	// Component imports
-	import LocationCard from './LocationCard.svelte';
-	import TransportationCard from './TransportationCard.svelte';
-	import LodgingCard from './LodgingCard.svelte';
-	import NoteCard from './NoteCard.svelte';
-	import ChecklistCard from './ChecklistCard.svelte';
-
+	import LocationCard from '../cards/LocationCard.svelte';
+	import TransportationCard from '../cards/TransportationCard.svelte';
+	import LodgingCard from '../cards/LodgingCard.svelte';
+	import NoteCard from '../cards/NoteCard.svelte';
+	import ChecklistCard from '../cards/ChecklistCard.svelte';
 	// Props
 	export let adventures: Location[] = [];
 	export let transportations: Transportation[] = [];

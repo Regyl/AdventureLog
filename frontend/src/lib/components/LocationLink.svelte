@@ -4,7 +4,7 @@
 	const dispatch = createEventDispatcher();
 	import { t } from 'svelte-i18n';
 	import { onMount } from 'svelte';
-	import LocationCard from './LocationCard.svelte';
+	import LocationCard from './cards/LocationCard.svelte';
 	let modal: HTMLDialogElement;
 
 	// Icons - following the worldtravel pattern

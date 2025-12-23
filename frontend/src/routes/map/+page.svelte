@@ -17,9 +17,9 @@
 	import PinIcon from '~icons/mdi/map-marker';
 	import Calendar from '~icons/mdi/calendar';
 	import LocationIcon from '~icons/mdi/crosshairs-gps';
-	import NewLocationModal from '$lib/components/NewLocationModal.svelte';
+	import NewLocationModal from '$lib/components/locations/LocationModal.svelte';
 	import ActivityIcon from '~icons/mdi/run-fast';
-	import FullMap from '$lib/components/FullMap.svelte';
+	import FullMap from '$lib/components/map/FullMap.svelte';
 
 	export let data;
 

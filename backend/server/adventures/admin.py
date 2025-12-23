@@ -1,6 +1,7 @@
 import os
 from django.contrib import admin
-from django.utils.html import mark_safe
+from django.utils.html import mark_safe, format_html
+from django.urls import reverse
 from .models import Location, Checklist, ChecklistItem, Collection, Transportation, Note, ContentImage, Visit, Category, ContentAttachment, Lodging, CollectionInvite, Trail, Activity, CollectionItineraryItem
 from worldtravel.models import Country, Region, VisitedRegion, City, VisitedCity
 from allauth.account.decorators import secure_admin_login
@@ -146,6 +147,32 @@ class CollectionAdmin(admin.ModelAdmin):
 class ActivityAdmin(admin.ModelAdmin):
     list_display = ('name', 'user', 'visit__location', 'sport_type', 'distance', 'elevation_gain', 'moving_time')
 
+class CollectionItineraryItemAdmin(admin.ModelAdmin):
+    list_display = ('collection', 'content_type', 'object_link', 'date', 'order')
+    search_fields = ('collection__name', 'content_type__model')
+    list_filter = ('content_type', 'date')
+    raw_id_fields = ('collection',)
+    readonly_fields = ('created_at',)
+
+    def object_link(self, obj):
+        """
+        Display the generic related object; link to its admin change page if registered.
+        """
+        linked_obj = obj.item
+        if not linked_obj:
+            return "—"
+        try:
+            ct = obj.content_type
+            app_label = ct.app_label
+            model = ct.model
+            admin_url = reverse('admin:%s_%s_change' % (app_label, model), args=[obj.object_id])
+            return format_html('<a href="{}">{}</a>', admin_url, str(linked_obj))
+        except Exception:
+            # Fallback to plain text if any error (object not registered, missing id, etc.)
+            return str(linked_obj)
+
+    object_link.short_description = 'Item'
+
 admin.site.register(CustomUser, CustomUserAdmin)
 admin.site.register(Location, LocationAdmin)
 admin.site.register(Collection, CollectionAdmin)
@@ -166,7 +193,7 @@ admin.site.register(Lodging)
 admin.site.register(CollectionInvite, CollectionInviteAdmin)
 admin.site.register(Trail)
 admin.site.register(Activity, ActivityAdmin)
-admin.site.register(CollectionItineraryItem)
+admin.site.register(CollectionItineraryItem, CollectionItineraryItemAdmin)
 
 admin.site.site_header = 'AdventureLog Admin'
 admin.site.site_title = 'AdventureLog Admin Site'

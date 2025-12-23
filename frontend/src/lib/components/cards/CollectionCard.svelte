@@ -17,9 +17,9 @@
 	import Minus from '~icons/mdi/minus';
 	import DotsHorizontal from '~icons/mdi/dots-horizontal';
 	import TrashCan from '~icons/mdi/trashcan';
-	import DeleteWarning from './DeleteWarning.svelte';
-	import ShareModal from './ShareModal.svelte';
-	import CardCarousel from './CardCarousel.svelte';
+	import DeleteWarning from '../DeleteWarning.svelte';
+	import ShareModal from '../ShareModal.svelte';
+	import CardCarousel from '../CardCarousel.svelte';
 	import ExitRun from '~icons/mdi/exit-run';
 	import Eye from '~icons/mdi/eye';
 	import EyeOff from '~icons/mdi/eye-off';

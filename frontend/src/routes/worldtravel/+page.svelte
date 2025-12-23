@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import CountryCard from '$lib/components/CountryCard.svelte';
+	import CountryCard from '$lib/components/cards/CountryCard.svelte';
 	import ClusterMap from '$lib/components/ClusterMap.svelte';
 	import type { Country } from '$lib/types';
 	import type { PageData } from './$types';
