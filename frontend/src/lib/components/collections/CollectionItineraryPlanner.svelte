@@ -21,7 +21,7 @@
 	import NoteCard from '$lib/components/cards/NoteCard.svelte';
 	import ChecklistCard from '$lib/components/cards/ChecklistCard.svelte';
 	import NewLocationModal from '$lib/components/locations/LocationModal.svelte';
-	import LodgingModal from '$lib/components/LodgingModal.svelte';
+	import LodgingModal from '../lodging/LodgingModal.svelte';
 	import TransportationModal from '$lib/components/TransportationModal.svelte';
 	import NoteModal from '$lib/components/NoteModal.svelte';
 	import ChecklistModal from '$lib/components/ChecklistModal.svelte';
@@ -119,6 +119,13 @@
 		isLocationModalOpen = true;
 	}
 
+	let lodgingToEdit: Lodging | null = null;
+	let isLodgingModalOpen: boolean = false;
+	function handleEditLodging(event: CustomEvent<Lodging>) {
+		lodgingToEdit = event.detail;
+		isLodgingModalOpen = true;
+	}
+
 	function handleItemDelete(event: CustomEvent<CollectionItineraryItem | string | number>) {
 		const payload = event.detail;
 
@@ -185,8 +192,8 @@
 	}
 
 	let locationBeingUpdated: Location | null = null;
+	let lodgingBeingUpdated: Lodging | null = null;
 
-	let isLodgingModalOpen = false;
 	let isTransportationModalOpen = false;
 	let isNoteModalOpen = false;
 	let isChecklistModalOpen = false;
@@ -201,7 +208,8 @@
 	// Track if we've already added this location to the itinerary
 	let addedToItinerary: Set<string> = new Set();
 
-	// Sync the locationBeingUpdated with the collection.locations array
+	// Sync the
+	//  with the collection.locations array
 	$: if (locationBeingUpdated && locationBeingUpdated.id && collection) {
 		// Make a shallow copy of locations (ensure array exists)
 		const locs = collection.locations ? [...collection.locations] : [];
@@ -234,6 +242,47 @@
 		addItineraryItemForObject('location', locationBeingUpdated.id, pendingAddDate);
 		// Mark this location as added to prevent duplicates
 		addedToItinerary.add(locationBeingUpdated.id);
+		addedToItinerary = addedToItinerary; // trigger reactivity
+	}
+
+	// Sync the lodgingBeingUpdated with the collection.lodging array
+	$: if (lodgingBeingUpdated && lodgingBeingUpdated.id && collection) {
+		// Make a shallow copy of lodging (ensure array exists)
+		const lodgings = collection.lodging ? [...collection.lodging] : [];
+
+		const index = lodgings.findIndex((lodge) => lodge.id === lodgingBeingUpdated.id);
+
+		if (index !== -1) {
+			// Replace the item immutably
+			lodgings[index] = {
+				...lodgings[index],
+				...lodgingBeingUpdated
+			};
+		} else {
+			// Prepend new/updated lodging
+			lodgings.unshift({ ...lodgingBeingUpdated });
+		}
+
+		// Assign back to collection immutably to trigger reactivity
+		collection = { ...collection, lodging: lodgings };
+	}
+
+	// If a new lodging was just created and we have a pending add-date,
+	// attach it to that date in the itinerary.
+	$: if (
+		lodgingBeingUpdated?.id &&
+		pendingAddDate &&
+		!addedToItinerary.has(lodgingBeingUpdated.id)
+	) {
+		// Normalize check_in to date-only (YYYY-MM-DD) if present
+		const lodgingCheckInDate = lodgingBeingUpdated.check_in
+			? String(lodgingBeingUpdated.check_in).split('T')[0]
+			: null;
+		const targetDate = lodgingCheckInDate || pendingAddDate;
+
+		addItineraryItemForObject('lodging', lodgingBeingUpdated.id, targetDate);
+		// Mark this lodging as added to prevent duplicates
+		addedToItinerary.add(lodgingBeingUpdated.id);
 		addedToItinerary = addedToItinerary; // trigger reactivity
 	}
 
@@ -539,6 +588,7 @@
 
 			const created = await res.json();
 			collection.itinerary = collection.itinerary.map((it) => (it.id === tempId ? created : it));
+			pendingAddDate = null;
 
 			// If we updated the item's date, update local state directly
 			if (updateItemDate) {
@@ -609,6 +659,8 @@
 	<NewLocationModal
 		on:close={() => {
 			isLocationModalOpen = false;
+			locationToEdit = null;
+			locationBeingUpdated = null;
 			pendingAddDate = null;
 			addedToItinerary.clear();
 			addedToItinerary = addedToItinerary;
@@ -623,17 +675,19 @@
 
 {#if isLodgingModalOpen}
 	<LodgingModal
-		on:close={() => (isLodgingModalOpen = false)}
-		{collection}
-		on:save={(e) => {
-			const lodging = e.detail;
-			collection.lodging = [...(collection.lodging || []), lodging];
-			if (pendingAddDate) {
-				addItineraryItemForObject('lodging', lodging.id, pendingAddDate);
-				pendingAddDate = null;
-			}
+		on:close={() => {
 			isLodgingModalOpen = false;
+			lodgingToEdit = null;
+			lodgingBeingUpdated = null;
+			pendingAddDate = null;
+			addedToItinerary.clear();
+			addedToItinerary = addedToItinerary;
 		}}
+		{user}
+		{lodgingToEdit}
+		bind:lodging={lodgingBeingUpdated}
+		{collection}
+		initialVisitDate={pendingAddDate}
 	/>
 {/if}
 
@@ -819,6 +873,8 @@
 											<a
 												on:click={() => {
 													pendingAddDate = day.date;
+													locationToEdit = null;
+													locationBeingUpdated = null;
 													isLocationModalOpen = true;
 												}}>Location</a
 											>
@@ -827,6 +883,8 @@
 											<a
 												on:click={() => {
 													pendingAddDate = day.date;
+													lodgingToEdit = null;
+													lodgingBeingUpdated = null;
 													isLodgingModalOpen = true;
 												}}>Lodging</a
 											>
@@ -992,6 +1050,7 @@
 														itineraryItem={item}
 														on:delete={handleItemDelete}
 														on:removeFromItinerary={handleRemoveItineraryItem}
+														on:edit={handleEditLodging}
 													/>
 												{:else if objectType === 'note'}
 													<!-- @ts-ignore - TypeScript can't narrow union type properly -->

@@ -2,15 +2,12 @@
 	import type { Attachment, ContentImage, Trail, WandererTrail } from '$lib/types';
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { t } from 'svelte-i18n';
-	import { deserialize } from '$app/forms';
 
 	// Icons
 	import SaveIcon from '~icons/mdi/content-save';
 	import ArrowLeftIcon from '~icons/mdi/arrow-left';
 	import TrashIcon from '~icons/mdi/delete';
 	import EditIcon from '~icons/mdi/pencil';
-	import FileIcon from '~icons/mdi/file-document';
-	import AttachmentIcon from '~icons/mdi/attachment';
 	import CheckIcon from '~icons/mdi/check';
 	import CloseIcon from '~icons/mdi/close';
 	import Star from '~icons/mdi/star';
@@ -26,6 +23,7 @@
 
 	import { addToast } from '$lib/toasts';
 	import ImageManagement from '../ImageManagement.svelte';
+	import AttachmentManagement from '../AttachmentManagement.svelte';
 	import WandererCard from '../cards/WandererCard.svelte';
 
 	// Props
@@ -36,18 +34,10 @@
 	export let itemId: string = '';
 	export let measurementSystem: 'metric' | 'imperial' = 'metric';
 	export let userIsOwner: boolean = false;
+
 	// Component state
-	let attachmentFileInput: HTMLInputElement;
-	let attachmentError: string = '';
 	let immichIntegration: boolean = false;
 	let copyImmichLocally: boolean = false;
-	let isAttachmentLoading: boolean = false;
-
-	// Attachment state
-	let selectedFile: File | null = null;
-	let attachmentName: string = '';
-	let attachmentToEdit: Attachment | null = null;
-	let editingAttachmentName: string = '';
 
 	// Trail state
 	let trailName: string = '';
@@ -67,151 +57,10 @@
 
 	let wandererFetchedTrails: WandererTrail[] = [];
 
-	// Allowed file types for attachments
-	const allowedFileTypes = [
-		'.gpx',
-		'.kml',
-		'.kmz',
-		'.pdf',
-		'.doc',
-		'.docx',
-		'.txt',
-		'.md',
-		'.json',
-		'.xml',
-		'.csv',
-		'.xlsx'
-	];
-
 	const dispatch = createEventDispatcher();
-
-	// Helper functions
-	function updateAttachmentsList(newAttachment: Attachment) {
-		attachments = [...attachments, newAttachment];
-	}
 
 	function updateTrailsList(newTrail: Trail) {
 		trails = [...trails, newTrail];
-	}
-
-	// Attachment event handlers
-	function handleAttachmentFileChange(event: Event) {
-		const files = (event.target as HTMLInputElement).files;
-		if (files && files.length > 0) {
-			selectedFile = files[0];
-			// Auto-fill attachment name if empty
-			if (!attachmentName.trim()) {
-				attachmentName = selectedFile.name.split('.')[0];
-			}
-		} else {
-			selectedFile = null;
-		}
-		attachmentError = '';
-	}
-
-	async function uploadAttachment() {
-		if (!selectedFile) {
-			attachmentError = $t('adventures.no_file_selected');
-			return;
-		}
-
-		if (!attachmentName.trim()) {
-			attachmentError = $t('adventures.attachment_name_required');
-			return;
-		}
-
-		isAttachmentLoading = true;
-		attachmentError = '';
-
-		const formData = new FormData();
-		formData.append('file', selectedFile);
-		formData.append('location', itemId);
-		formData.append('name', attachmentName.trim());
-
-		try {
-			const res = await fetch('/locations?/attachment', {
-				method: 'POST',
-				body: formData
-			});
-
-			if (res.ok) {
-				const newData = deserialize(await res.text()) as { data: Attachment };
-				updateAttachmentsList(newData.data);
-				addToast('success', $t('adventures.attachment_upload_success'));
-
-				// Reset form
-				attachmentName = '';
-				selectedFile = null;
-				if (attachmentFileInput) {
-					attachmentFileInput.value = '';
-				}
-			} else {
-				throw new Error('Upload failed');
-			}
-		} catch (error) {
-			console.error('Attachment upload error:', error);
-			attachmentError = $t('adventures.attachment_upload_error');
-			addToast('error', $t('adventures.attachment_upload_error'));
-		} finally {
-			isAttachmentLoading = false;
-		}
-	}
-
-	function startEditingAttachment(attachment: Attachment) {
-		attachmentToEdit = attachment;
-		editingAttachmentName = attachment.name;
-	}
-
-	function cancelEditingAttachment() {
-		attachmentToEdit = null;
-		editingAttachmentName = '';
-	}
-
-	async function saveAttachmentEdit() {
-		if (!attachmentToEdit || !editingAttachmentName.trim()) return;
-
-		try {
-			const res = await fetch(`/api/attachments/${attachmentToEdit.id}`, {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					name: editingAttachmentName.trim()
-				})
-			});
-
-			if (res.ok) {
-				attachments = attachments.map((att) =>
-					att.id === attachmentToEdit!.id ? { ...att, name: editingAttachmentName.trim() } : att
-				);
-				addToast('success', $t('adventures.attachment_updated'));
-				cancelEditingAttachment();
-			} else {
-				throw new Error('Failed to update attachment');
-			}
-		} catch (error) {
-			console.error('Error updating attachment:', error);
-			addToast('error', $t('adventures.attachment_update_error'));
-		}
-	}
-
-	async function removeAttachment(attachmentId: string) {
-		try {
-			const res = await fetch(`/api/attachments/${attachmentId}`, {
-				method: 'DELETE'
-			});
-
-			if (res.status === 204) {
-				attachments = attachments.filter((attachment) => attachment.id !== attachmentId);
-				addToast('success', $t('adventures.attachment_removed'));
-			} else {
-				throw new Error('Failed to remove attachment');
-			}
-		} catch (error) {
-			console.error('Error removing attachment:', error);
-			addToast('error', $t('adventures.attachment_remove_error'));
-		}
 	}
 
 	async function createTrail() {
@@ -462,6 +311,10 @@
 		images = event.detail;
 	}
 
+	function handleAttachmentsUpdated(event: CustomEvent<Attachment[]>) {
+		attachments = event.detail;
+	}
+
 	// Lifecycle
 	onMount(async () => {
 		try {
@@ -505,141 +358,12 @@
 		/>
 
 		<!-- Attachment Management Section -->
-		<div class="card bg-base-100 border border-base-300 shadow-lg">
-			<div class="card-body p-6">
-				<div class="flex items-center gap-3 mb-6">
-					<div class="p-2 bg-secondary/10 rounded-lg">
-						<AttachmentIcon class="w-5 h-5 text-secondary" />
-					</div>
-					<h2 class="text-xl font-bold">{$t('adventures.attachment_management')}</h2>
-				</div>
-
-				<!-- Upload Options -->
-				<div class="grid gap-4 mb-6">
-					<!-- File Upload -->
-					<div class="bg-base-50 p-4 rounded-lg border border-base-200">
-						<h4 class="font-medium mb-3 text-base-content/80">
-							{$t('adventures.upload_attachment')}
-						</h4>
-						<div class="grid gap-3 md:grid-cols-3">
-							<input
-								type="file"
-								bind:this={attachmentFileInput}
-								class="file-input file-input-bordered col-span-2 md:col-span-1"
-								accept={allowedFileTypes.join(',')}
-								disabled={isAttachmentLoading}
-								on:change={handleAttachmentFileChange}
-							/>
-							<input
-								type="text"
-								bind:value={attachmentName}
-								class="input input-bordered"
-								placeholder={$t('adventures.attachment_name')}
-								disabled={isAttachmentLoading}
-							/>
-							<button
-								class="btn btn-secondary btn-sm md:btn-md"
-								class:loading={isAttachmentLoading}
-								disabled={isAttachmentLoading || !selectedFile || !attachmentName.trim()}
-								on:click={uploadAttachment}
-							>
-								{$t('adventures.upload')}
-							</button>
-						</div>
-						{#if attachmentError}
-							<div class="alert alert-error mt-2 py-2">
-								<span class="text-sm">{attachmentError}</span>
-							</div>
-						{/if}
-					</div>
-				</div>
-
-				<!-- Attachment Gallery -->
-				{#if attachments.length > 0}
-					<div class="divider">{$t('adventures.current_attachments')}</div>
-					<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-						{#each attachments as attachment (attachment.id)}
-							<div class="relative group">
-								{#if attachmentToEdit?.id === attachment.id}
-									<!-- Edit Mode -->
-									<div class="bg-warning/10 p-4 rounded-lg border border-warning/30">
-										<div class="flex items-center gap-2 mb-3">
-											<EditIcon class="w-4 h-4 text-warning" />
-											<span class="text-sm font-medium text-warning">Editing</span>
-										</div>
-										<input
-											type="text"
-											bind:value={editingAttachmentName}
-											class="input input-bordered input-sm w-full mb-3"
-											placeholder="Attachment name"
-										/>
-										<div class="flex gap-2">
-											<button class="btn btn-success btn-xs flex-1" on:click={saveAttachmentEdit}>
-												<CheckIcon class="w-3 h-3" />
-												Save
-											</button>
-											<button
-												class="btn btn-ghost btn-xs flex-1"
-												on:click={cancelEditingAttachment}
-											>
-												<CloseIcon class="w-3 h-3" />
-												{$t('adventures.cancel')}
-											</button>
-										</div>
-									</div>
-								{:else}
-									<!-- Normal Display -->
-									<div
-										class="bg-base-50 p-4 rounded-lg border border-base-200 hover:border-base-300 transition-colors"
-									>
-										<div class="flex items-center gap-3 mb-2">
-											<div class="p-2 bg-secondary/10 rounded">
-												<FileIcon class="w-4 h-4 text-secondary" />
-											</div>
-											<div class="flex-1 min-w-0">
-												<div class="font-medium truncate">{attachment.name}</div>
-												<div class="text-xs text-base-content/60">
-													{attachment.extension.toUpperCase()}
-												</div>
-											</div>
-										</div>
-
-										<!-- Attachment Controls -->
-										<div class="flex gap-2 mt-3 justify-end">
-											<button
-												type="button"
-												class="btn btn-warning btn-xs btn-square tooltip tooltip-top"
-												data-tip="Edit Name"
-												on:click={() => startEditingAttachment(attachment)}
-											>
-												<EditIcon class="w-3 h-3" />
-											</button>
-											<button
-												type="button"
-												class="btn btn-error btn-xs btn-square tooltip tooltip-top"
-												data-tip="Remove Attachment"
-												on:click={() => removeAttachment(attachment.id)}
-											>
-												<TrashIcon class="w-3 h-3" />
-											</button>
-										</div>
-									</div>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				{:else}
-					<div class="bg-base-200/50 rounded-lg p-8 text-center">
-						<div class="text-base-content/60 mb-2">
-							{$t('adventures.no_attachments_uploaded_yet')}
-						</div>
-						<div class="text-sm text-base-content/40">
-							{$t('adventures.upload_first_attachment')}
-						</div>
-					</div>
-				{/if}
-			</div>
-		</div>
+		<AttachmentManagement
+			bind:attachments
+			{itemId}
+			contentType="location"
+			on:attachmentsUpdated={handleAttachmentsUpdated}
+		/>
 
 		<!-- Trails Management -->
 		<div class="card bg-base-100 border border-base-300 shadow-lg">
