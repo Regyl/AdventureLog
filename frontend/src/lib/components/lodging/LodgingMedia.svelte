@@ -72,7 +72,7 @@
 		<ImageManagement
 			bind:images
 			objectId={itemId}
-			contentType="location"
+			contentType="lodging"
 			defaultSearchTerm={itemName}
 			{immichIntegration}
 			{copyImmichLocally}

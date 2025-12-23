@@ -71,7 +71,7 @@
 		formData.append('content_type', contentType);
 
 		try {
-			const res = await fetch(`/${contentType}s?/image`, {
+			const res = await fetch(`/locations?/image`, {
 				method: 'POST',
 				body: formData
 			});
