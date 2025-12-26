@@ -716,11 +716,13 @@ class UltraSlimCollectionSerializer(serializers.ModelSerializer):
             location__collections=obj
         ).select_related('user').prefetch_related('location')
 
-        return ContentImageSerializer(
+        serializer = ContentImageSerializer(
             images,
             many=True,
             context={'request': self.context.get('request')}
-        ).data
+        )
+        # Filter out None values from the serialized data
+        return [image for image in serializer.data if image is not None]
 
     def get_location_count(self, obj):
         """Get count of locations in this collection"""

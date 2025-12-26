@@ -5,7 +5,7 @@
 
 	// Icons
 	import ArrowLeftIcon from '~icons/mdi/arrow-left';
-	import CloseIcon from '~icons/mdi/close';
+	import CheckIcon from '~icons/mdi/check';
 
 	import { addToast } from '$lib/toasts';
 	import ImageManagement from '../ImageManagement.svelte';
@@ -16,8 +16,8 @@
 	export let attachments: Attachment[] = [];
 	export let itemName: string = '';
 	export let itemId: string = '';
-	export let measurementSystem: 'metric' | 'imperial' = 'metric';
-	export let user: User | null = null;
+	// export let measurementSystem: 'metric' | 'imperial' = 'metric';
+	// export let user: User | null = null;
 
 	// Component state
 	let immichIntegration: boolean = false;
@@ -95,8 +95,8 @@
 			</button>
 
 			<button class="btn btn-primary gap-2" on:click={handleClose}>
-				<CloseIcon class="w-5 h-5" />
-				{$t('about.close')}
+				<CheckIcon class="w-5 h-5" />
+				{$t('adventures.done')}
 			</button>
 		</div>
 	</div>

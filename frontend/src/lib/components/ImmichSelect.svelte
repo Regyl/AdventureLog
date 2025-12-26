@@ -306,7 +306,7 @@
 					<figure class="aspect-square bg-base-200 overflow-hidden">
 						<img
 							src={image.image_url}
-							alt="Image from Immich"
+							alt="Immich"
 							class="w-full h-full object-cover transition-transform group-hover:scale-105"
 							loading="lazy"
 						/>

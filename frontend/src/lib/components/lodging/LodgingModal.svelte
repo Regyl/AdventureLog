@@ -258,14 +258,12 @@
 				bind:images={lodging.images}
 				bind:attachments={lodging.attachments}
 				itemName={lodging.name}
-				{user}
 				on:back={() => {
 					steps[1].selected = false;
 					steps[0].selected = true;
 				}}
 				on:close={() => close()}
 				itemId={lodging.id}
-				measurementSystem={user?.measurement_system || 'metric'}
 			/>
 		{/if}
 	</div>

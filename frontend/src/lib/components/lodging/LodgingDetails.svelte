@@ -745,10 +745,6 @@
 
 		<!-- Action Buttons -->
 		<div class="flex gap-3 justify-end pt-4">
-			<button class="btn btn-neutral-200 gap-2" on:click={handleBack}>
-				<ArrowLeftIcon class="w-5 h-5" />
-				{$t('adventures.back')}
-			</button>
 			<button
 				class="btn btn-primary gap-2"
 				disabled={!lodging.name || !lodging.type || isReverseGeocoding}

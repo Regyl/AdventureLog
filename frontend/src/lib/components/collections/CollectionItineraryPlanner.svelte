@@ -593,6 +593,7 @@
 			// If we updated the item's date, update local state directly
 			if (updateItemDate) {
 				const isoDate = `${dateISO}T00:00:00`;
+				const nextDayISO = DateTime.fromISO(dateISO).plus({ days: 1 }).toISODate();
 
 				if (objectType === 'location') {
 					// For locations, create a new visit locally
@@ -620,15 +621,59 @@
 					}
 				} else if (objectType === 'transportation') {
 					if (collection.transportations) {
-						collection.transportations = collection.transportations.map((t) =>
-							t.id === objectId ? { ...t, date: isoDate } : t
-						);
+						collection.transportations = collection.transportations.map((t) => {
+							if (t.id === objectId) {
+								// If end_date exists and is before the new start date, set it to next day
+								let newEndDate = t.end_date;
+								if (newEndDate) {
+									const endDate = DateTime.fromISO(newEndDate);
+									const startDate = DateTime.fromISO(isoDate);
+									if (endDate < startDate) {
+										// Check if original end_date has a time component (not all-day)
+										const hasTime = !newEndDate.includes('T00:00:00');
+										if (hasTime && t.end_timezone) {
+											// Set to 9am in the end timezone
+											newEndDate = DateTime.fromISO(nextDayISO, { zone: t.end_timezone })
+												.set({ hour: 9, minute: 0, second: 0 })
+												.toISO();
+										} else {
+											// All-day event, keep at UTC 0
+											newEndDate = `${nextDayISO}T00:00:00`;
+										}
+									}
+								}
+								return { ...t, date: isoDate, end_date: newEndDate };
+							}
+							return t;
+						});
 					}
 				} else if (objectType === 'lodging') {
 					if (collection.lodging) {
-						collection.lodging = collection.lodging.map((l) =>
-							l.id === objectId ? { ...l, check_in: isoDate } : l
-						);
+						collection.lodging = collection.lodging.map((l) => {
+							if (l.id === objectId) {
+								// If check_out exists and is before the new check_in, set it to next day
+								let newCheckOut = l.check_out;
+								if (newCheckOut) {
+									const checkOut = DateTime.fromISO(newCheckOut);
+									const checkIn = DateTime.fromISO(isoDate);
+									if (checkOut < checkIn) {
+										// Check if original check_out has a time component (not all-day)
+										const hasTime = !newCheckOut.includes('T00:00:00');
+										if (hasTime && l.timezone) {
+											// Set to 9am in the lodging timezone
+											newCheckOut = DateTime.fromISO(nextDayISO, { zone: l.timezone })
+												.set({ hour: 9, minute: 0, second: 0 })
+												.toISO();
+										} else {
+											// All-day event, keep at UTC 0
+											newCheckOut = `${nextDayISO}T00:00:00`;
+										}
+									}
+								}
+								return { ...l, check_in: isoDate, check_out: newCheckOut };
+							}
+							return l;
+						});
 					}
 				} else if (objectType === 'note') {
 					if (collection.notes) {
