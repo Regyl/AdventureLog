@@ -58,25 +58,15 @@
 	let isLocationModalOpen: boolean = false;
 	let sidebarOpen = false;
 
-	// Reactive statements
-	$: {
-		if (typeof window !== 'undefined') {
-			let url = new URL(window.location.href);
-			if (typeString) {
-				url.searchParams.set('types', typeString);
-			} else {
-				url.searchParams.delete('types');
-			}
-			goto(url.toString(), { invalidateAll: true, replaceState: true });
-		}
-	}
-
+	// Reactive statements - Only read from URL, don't write
 	$: {
 		if (typeof window !== 'undefined') {
 			let url = new URL(window.location.href);
 			let types = url.searchParams.get('types');
 			if (types) {
 				typeString = types;
+			} else {
+				typeString = '';
 			}
 		}
 	}

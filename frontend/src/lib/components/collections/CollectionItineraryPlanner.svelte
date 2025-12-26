@@ -521,7 +521,7 @@
 			}
 
 			// Optionally show success feedback
-			console.log('Itinerary order saved successfully');
+			// console.log('Itinerary order saved successfully');
 			// Make sure to sync the collection.itinerary with the new order
 			const updatedItinerary = collection.itinerary?.map((it) => {
 				const updatedItem = itemsToUpdate.find((upd) => upd.id === it.id);
@@ -899,64 +899,101 @@
 
 							{#if canModify}
 								<div class="dropdown z-[9999]">
-									<label tabindex="0" class="btn btn-sm btn-outline gap-2">Add</label>
+									<button
+										type="button"
+										class="btn btn-sm btn-outline gap-2"
+										aria-haspopup="menu"
+										aria-expanded="false"
+									>
+										Add
+									</button>
 									<ul
-										tabindex="0"
 										class="dropdown-content menu p-2 shadow bg-base-300 rounded-box w-56"
+										role="menu"
 									>
 										<li>
-											<a
+											<button
+												type="button"
+												role="menuitem"
+												class="w-full text-left"
 												on:click={() => {
 													linkModalTargetDate = day.date;
 													linkModalDisplayDate = day.displayDate;
 													isItineraryLinkModalOpen = true;
-												}}>Link existing item</a
+												}}
 											>
+												Link existing item
+											</button>
 										</li>
 										<li class="menu-title">Create new</li>
 										<li>
-											<a
+											<button
+												type="button"
+												role="menuitem"
+												class="w-full text-left"
 												on:click={() => {
 													pendingAddDate = day.date;
 													locationToEdit = null;
 													locationBeingUpdated = null;
 													isLocationModalOpen = true;
-												}}>Location</a
+												}}
 											>
+												Location
+											</button>
 										</li>
 										<li>
-											<a
+											<button
+												type="button"
+												role="menuitem"
+												class="w-full text-left"
 												on:click={() => {
 													pendingAddDate = day.date;
 													lodgingToEdit = null;
 													lodgingBeingUpdated = null;
 													isLodgingModalOpen = true;
-												}}>Lodging</a
+												}}
 											>
+												Lodging
+											</button>
 										</li>
 										<li>
-											<a
+											<button
+												type="button"
+												role="menuitem"
+												class="w-full text-left"
 												on:click={() => {
 													pendingAddDate = day.date;
 													isTransportationModalOpen = true;
-												}}>Transportation</a
+												}}
 											>
+												Transportation
+											</button>
 										</li>
 										<li>
-											<a
+											<button
+												type="button"
+												role="menuitem"
+												class="w-full text-left"
 												on:click={() => {
 													pendingAddDate = day.date;
 													isNoteModalOpen = true;
-												}}>Note</a
+												}}
 											>
+												Note
+											</button>
 										</li>
 										<li>
-											<a
+											<button
+												type="button"
+												role="menuitem"
+												class="w-full text-left"
 												on:click={() => {
 													pendingAddDate = day.date;
 													isChecklistModalOpen = true;
-												}}>Checklist</a
+												}}
 											>
+												Checklist
+											</button>
 										</li>
 									</ul>
 								</div>

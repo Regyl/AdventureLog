@@ -4,7 +4,7 @@ from django.db import transaction
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from adventures.models import Collection, Location, Transportation, Note, Checklist, CollectionInvite, ContentImage, CollectionItineraryItem
+from adventures.models import Collection, Location, Transportation, Note, Checklist, CollectionInvite, ContentImage, CollectionItineraryItem, Lodging
 from adventures.permissions import CollectionShared
 from adventures.serializers import CollectionSerializer, CollectionInviteSerializer, UltraSlimCollectionSerializer, CollectionItineraryItemSerializer
 from users.models import CustomUser as User
@@ -268,11 +268,12 @@ class CollectionViewSet(viewsets.ModelViewSet):
                 # Bulk update those locations
                 Location.objects.filter(id__in=location_ids_to_set_private).update(is_public=False)
 
-            # Update transportations, notes, and checklists related to this collection
+            # Update transportations, notes, checklists, and lodgings related to this collection
             # These still use direct ForeignKey relationships
             Transportation.objects.filter(collection=instance).update(is_public=new_public_status)
             Note.objects.filter(collection=instance).update(is_public=new_public_status)
             Checklist.objects.filter(collection=instance).update(is_public=new_public_status)
+            Lodging.objects.filter(collection=instance).update(is_public=new_public_status)
 
             # Log the action (optional)
             action = "public" if new_public_status else "private"
