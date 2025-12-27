@@ -16,6 +16,7 @@
 	export let attachments: Attachment[] = [];
 	export let itemName: string = '';
 	export let itemId: string = '';
+	export let contentType: 'location' | 'lodging' | 'transportation' | '' = 'location';
 	// export let measurementSystem: 'metric' | 'imperial' = 'metric';
 	// export let user: User | null = null;
 
@@ -72,7 +73,7 @@
 		<ImageManagement
 			bind:images
 			objectId={itemId}
-			contentType="lodging"
+			{contentType}
 			defaultSearchTerm={itemName}
 			{immichIntegration}
 			{copyImmichLocally}
@@ -83,7 +84,7 @@
 		<AttachmentManagement
 			bind:attachments
 			{itemId}
-			contentType="lodging"
+			{contentType}
 			on:attachmentsUpdated={handleAttachmentsUpdated}
 		/>
 

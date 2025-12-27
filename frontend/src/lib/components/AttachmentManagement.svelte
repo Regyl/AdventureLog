@@ -18,7 +18,7 @@
 	// Props
 	export let attachments: Attachment[] = [];
 	export let itemId: string = '';
-	export let contentType: 'location' | 'lodging' = 'location';
+	export let contentType: 'location' | 'lodging' | 'transportation' | '' = 'location';
 
 	// Component state
 	let attachmentFileInput: HTMLInputElement;
@@ -88,13 +88,8 @@
 		formData.append('file', selectedFile);
 		formData.append('name', attachmentName.trim());
 
-		// Different field names based on content type
-		if (contentType === 'lodging') {
-			formData.append('object_id', itemId);
-			formData.append('content_type', 'lodging');
-		} else {
-			formData.append('location', itemId);
-		}
+		formData.append('object_id', itemId);
+		formData.append('content_type', contentType);
 
 		try {
 			const res = await fetch('/locations?/attachment', {

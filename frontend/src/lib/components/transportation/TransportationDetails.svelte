@@ -2,7 +2,7 @@
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { t } from 'svelte-i18n';
 	import { updateLocalDate, updateUTCDate, validateDateRange } from '$lib/dateUtils';
-	import type { Collection, Lodging } from '$lib/types';
+	import type { Collection, Lodging, Transportation } from '$lib/types';
 	import LocationSearchMap from '../shared/LocationSearchMap.svelte';
 
 	// Icons
@@ -13,6 +13,7 @@
 	import ArrowLeftIcon from '~icons/mdi/arrow-left';
 	import SaveIcon from '~icons/mdi/content-save';
 	import type { Category, User } from '$lib/types';
+	import { TRANSPORTATION_TYPES_ICONS } from '$lib';
 	import MarkdownEditor from '../MarkdownEditor.svelte';
 	import TimezoneSelector from '../TimezoneSelector.svelte';
 	// @ts-ignore
@@ -22,6 +23,7 @@
 	const dispatch = createEventDispatcher();
 
 	let isReverseGeocoding = false;
+	let airportMode = false;
 
 	let initialSelection: {
 		name: string;
@@ -32,45 +34,31 @@
 	} | null = null;
 
 	// Props (would be passed in from parent component)
-	export let initialLodging: any = null;
+	export let initialTransportation: any = null;
 	export let currentUser: any = null;
-	export let editingLodging: any = null;
+	export let editingTransportation: any = null;
 	export let collection: Collection | null = null;
 	export let initialVisitDate: string | null = null; // Used to pre-fill visit date when adding from itinerary planner
 
 	// Form data properties
-	let lodging: {
-		name: string;
-		type: string;
-		description: string;
-		rating: number;
-		link: string;
-		check_in: string | null;
-		check_out: string | null;
-		timezone: string | null;
-		reservation_number: string | null;
-		price: number | null;
-		latitude: number | null;
-		longitude: number | null;
-		location: string;
-		category?: Category | null;
-		collection?: string;
-		is_public?: boolean;
-	} = {
+	let transportation: any = {
 		name: '',
 		type: '',
 		description: '',
 		rating: NaN,
 		link: '',
-		check_in: null,
-		check_out: null,
-		timezone: null,
-		reservation_number: null,
-		price: null,
-		latitude: null,
-		longitude: null,
-		location: '',
-		category: null,
+		date: null,
+		end_date: null,
+		start_timezone: null,
+		end_timezone: null,
+		flight_number: null,
+		from_location: null,
+		to_location: null,
+		origin_latitude: null,
+		origin_longitude: null,
+		destination_latitude: null,
+		destination_longitude: null,
+		distance: null,
 		collection: collection?.id,
 		is_public: true
 	};
@@ -84,30 +72,18 @@
 	let fullEndDate: string = '';
 
 	let user: User | null = null;
-	let lodgingToEdit: Lodging | null = null;
+	let transportationToEdit: Transportation | null = null;
 	let wikiError = '';
 	let isGeneratingDesc = false;
 	let ownerUser: User | null = null;
 	let dateError = '';
 
 	$: user = currentUser;
-	$: lodgingToEdit = editingLodging;
-	// Only assign a timezone when this is a timed stay. Keep timezone null for all-day entries.
-	$: lodging.timezone = allDay ? null : selectedTimezone;
-	$: initialSelection =
-		initialLodging && initialLodging.latitude && initialLodging.longitude
-			? {
-					name: initialLodging.name || '',
-					lat: Number(initialLodging.latitude),
-					lng: Number(initialLodging.longitude),
-					location: initialLodging.location || ''
-				}
-			: null;
-
-	// Set the full date range for constraining purposes
-	$: if (collection && collection.start_date && collection.end_date) {
-		fullStartDate = `${collection.start_date}T00:00`;
-		fullEndDate = `${collection.end_date}T23:59`;
+	$: transportationToEdit = editingTransportation;
+	// Only assign timezones when this is a timed transportation. Keep timezones null for all-day entries.
+	$: {
+		transportation.start_timezone = allDay ? null : selectedTimezone;
+		transportation.end_timezone = allDay ? null : selectedTimezone;
 	}
 
 	// Reactive constraints
@@ -122,33 +98,52 @@
 			: ''
 		: fullEndDate || '';
 
-	function handleLocationUpdate(
-		event: CustomEvent<{ name?: string; lat: number; lng: number; location: string }>
+	function handleTransportationUpdate(
+		event: CustomEvent<{
+			start: { name: string; lat: number; lng: number; location: string };
+			end: { name: string; lat: number; lng: number; location: string };
+		}>
 	) {
-		const { name, lat, lng, location } = event.detail;
-		if (!lodging.name && name) lodging.name = name;
-		lodging.latitude = lat;
-		lodging.longitude = lng;
-		lodging.location = location;
+		const { start, end } = event.detail;
+
+		// Update from location
+		transportation.from_location = start.location;
+		transportation.origin_latitude = start.lat;
+		transportation.origin_longitude = start.lng;
+
+		// Update to location
+		transportation.to_location = end.location;
+		transportation.destination_latitude = end.lat;
+		transportation.destination_longitude = end.lng;
+
+		// Update name if empty (use route)
+		if (!transportation.name) {
+			transportation.name = `${start.name} → ${end.name}`;
+		}
 	}
 
 	function handleLocationClear() {
-		lodging.latitude = null;
-		lodging.longitude = null;
-		lodging.location = '';
+		transportation.from_location = null;
+		transportation.to_location = null;
+		transportation.origin_latitude = null;
+		transportation.origin_longitude = null;
+		transportation.destination_latitude = null;
+		transportation.destination_longitude = null;
 	}
 
 	function handleAllDayToggle() {
 		if (allDay) {
 			localStartDate = localStartDate ? localStartDate.split('T')[0] : '';
 			localEndDate = localEndDate ? localEndDate.split('T')[0] : '';
-			// Clear timezone for all-day stays
-			lodging.timezone = null;
+			// Clear timezones for all-day transportation
+			transportation.start_timezone = null;
+			transportation.end_timezone = null;
 		} else {
 			localStartDate = localStartDate ? `${localStartDate}T00:00` : '';
 			localEndDate = localEndDate ? `${localEndDate}T23:59` : '';
-			// Restore selected timezone when switching back to timed
-			lodging.timezone = selectedTimezone;
+			// Restore selected timezones when switching back to timed
+			transportation.start_timezone = selectedTimezone;
+			transportation.end_timezone = selectedTimezone;
 		}
 
 		syncAndValidateDates(false);
@@ -164,13 +159,13 @@
 		if (localEndDate && !localStartDate) {
 			dateError = 'Start date is required when end date is provided';
 			localEndDate = '';
-			lodging.check_out = null;
+			transportation.end_date = null;
 		}
 
-		lodging.check_in = localStartDate
+		transportation.date = localStartDate
 			? updateUTCDate({ localDate: localStartDate, timezone: selectedTimezone, allDay }).utcDate
 			: null;
-		lodging.check_out = localEndDate
+		transportation.end_date = localEndDate
 			? updateUTCDate({ localDate: localEndDate, timezone: selectedTimezone, allDay }).utcDate
 			: null;
 
@@ -183,7 +178,7 @@
 					const defaultEnd = start.plus({ days: 1 }).toISODate();
 					if (defaultEnd) {
 						localEndDate = defaultEnd;
-						lodging.check_out = updateUTCDate({
+						transportation.end_date = updateUTCDate({
 							localDate: defaultEnd,
 							timezone: selectedTimezone,
 							allDay
@@ -200,7 +195,7 @@
 					});
 					if (defaultEndLocal) {
 						localEndDate = defaultEndLocal.slice(0, 16);
-						lodging.check_out = updateUTCDate({
+						transportation.end_date = updateUTCDate({
 							localDate: localEndDate,
 							timezone: selectedTimezone,
 							allDay
@@ -210,11 +205,15 @@
 			}
 		}
 
-		if (lodging.check_in || lodging.check_out) {
-			const validation = validateDateRange(lodging.check_in || '', lodging.check_out || '');
+		if (transportation.date || transportation.end_date) {
+			// validate start/end dates (constraints are handled elsewhere)
+			const validation = validateDateRange(
+				transportation.date || '',
+				transportation.end_date || ''
+			);
 			if (!validation.valid) {
 				dateError = validation.error || 'Invalid date range';
-				lodging.check_out = null;
+				transportation.end_date = null;
 				localEndDate = '';
 				return false;
 			}
@@ -224,17 +223,19 @@
 	}
 
 	async function generateDesc() {
-		if (!lodging.name) return;
+		if (!transportation.name) return;
 
 		isGeneratingDesc = true;
 		wikiError = '';
 
 		try {
 			// Mock Wikipedia API call - replace with actual implementation
-			const response = await fetch(`/api/generate/desc/?name=${encodeURIComponent(lodging.name)}`);
+			const response = await fetch(
+				`/api/generate/desc/?name=${encodeURIComponent(transportation.name)}`
+			);
 			if (response.ok) {
 				const data = await response.json();
-				lodging.description = data.extract || '';
+				transportation.description = data.extract || '';
 			} else {
 				wikiError = `${$t('adventures.wikipedia_error') || 'Error fetching description from Wikipedia'}`;
 			}
@@ -246,30 +247,53 @@
 	}
 
 	async function handleSave() {
-		if (!lodging.name || !lodging.type) {
+		if (!transportation.name || !transportation.type) {
 			return;
 		}
 
-		// Ensure timezone is only persisted for timed stays
-		lodging.timezone = allDay ? null : selectedTimezone;
+		// Ensure timezones are only persisted for timed transportation
+		transportation.start_timezone = allDay ? null : selectedTimezone;
+		transportation.end_timezone = allDay ? null : selectedTimezone;
 
 		if (!syncAndValidateDates(true)) {
 			return;
 		}
 
-		// round latitude and longitude to 6 decimal places
-		if (lodging.latitude !== null && typeof lodging.latitude === 'number') {
-			lodging.latitude = parseFloat(lodging.latitude.toFixed(6));
+		// round origin and destination coordinates to 6 decimal places
+		if (
+			transportation.origin_latitude !== null &&
+			typeof transportation.origin_latitude === 'number'
+		) {
+			transportation.origin_latitude = parseFloat(transportation.origin_latitude.toFixed(6));
 		}
-		if (lodging.longitude !== null && typeof lodging.longitude === 'number') {
-			lodging.longitude = parseFloat(lodging.longitude.toFixed(6));
+		if (
+			transportation.origin_longitude !== null &&
+			typeof transportation.origin_longitude === 'number'
+		) {
+			transportation.origin_longitude = parseFloat(transportation.origin_longitude.toFixed(6));
+		}
+		if (
+			transportation.destination_latitude !== null &&
+			typeof transportation.destination_latitude === 'number'
+		) {
+			transportation.destination_latitude = parseFloat(
+				transportation.destination_latitude.toFixed(6)
+			);
+		}
+		if (
+			transportation.destination_longitude !== null &&
+			typeof transportation.destination_longitude === 'number'
+		) {
+			transportation.destination_longitude = parseFloat(
+				transportation.destination_longitude.toFixed(6)
+			);
 		}
 		if (collection && collection.id) {
-			lodging.collection = collection.id;
+			transportation.collection = collection.id;
 		}
 
 		// Build payload and avoid sending an empty `collection` array when editing
-		const payload: any = { ...lodging };
+		const payload: any = { ...transportation };
 
 		// Remove empty link to avoid URL validation errors
 		if (!payload.link || payload.link.trim() === '') {
@@ -279,16 +303,15 @@
 		// If we're editing and the original location had collection, but the form's collection
 		// is empty (i.e. user didn't modify collection), omit collection from payload so the
 		// server doesn't clear them unintentionally.
-		if (lodgingToEdit && lodgingToEdit.id) {
+		if (transportationToEdit && transportationToEdit.id) {
 			if (
 				(!payload.collection || payload.collection.length === 0) &&
-				lodgingToEdit.collection &&
-				lodgingToEdit.collection.length > 0
+				transportationToEdit.collection
 			) {
 				delete payload.collection;
 			}
 
-			let res = await fetch(`/api/lodging/${lodgingToEdit.id}`, {
+			let res = await fetch(`/api/transportations/${transportationToEdit.id}`, {
 				method: 'PATCH',
 				headers: {
 					'Content-Type': 'application/json'
@@ -296,21 +319,21 @@
 				body: JSON.stringify(payload)
 			});
 			let updatedLocation = await res.json();
-			lodging = updatedLocation;
+			transportation = updatedLocation;
 		} else {
-			let res = await fetch(`/api/lodging`, {
+			let res = await fetch(`/api/transportations`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify(payload)
 			});
-			let newLodging = await res.json();
-			lodging = newLodging;
+			let newTransportation = await res.json();
+			transportation = newTransportation;
 		}
 
 		dispatch('save', {
-			...lodging
+			...transportation
 		});
 	}
 
@@ -319,74 +342,70 @@
 	}
 
 	onMount(() => {
-		if (initialLodging && initialLodging.latitude && initialLodging.longitude) {
-			lodging.latitude = initialLodging.latitude;
-			lodging.longitude = initialLodging.longitude;
-			if (!lodging.name) lodging.name = initialLodging.name || '';
-			if (initialLodging.location) lodging.location = initialLodging.location;
-		}
-	});
-
-	onMount(() => {
-		// Prefer lodging timezone if present, otherwise keep current selection
-		if (initialLodging?.timezone) {
-			selectedTimezone = initialLodging.timezone;
+		// Prefer transportation start_timezone if present, otherwise keep current selection
+		if (initialTransportation?.start_timezone) {
+			selectedTimezone = initialTransportation.start_timezone;
 		}
 
 		// Determine if existing dates are all-day using shared helper
-		if (initialLodging?.check_in) {
-			allDay = isAllDay(initialLodging.check_in);
+		if (initialTransportation?.date) {
+			allDay = isAllDay(initialTransportation.date);
 		}
 
-		// Keep lodging.timezone null for all-day entries, otherwise use selectedTimezone
-		lodging.timezone = allDay ? null : selectedTimezone;
+		// Keep transportation timezones null for all-day entries, otherwise use selectedTimezone
+		transportation.start_timezone = allDay ? null : selectedTimezone;
+		transportation.end_timezone = allDay ? null : selectedTimezone;
 
 		// Convert UTC dates to local display, respecting all-day formatting
-		if (initialLodging?.check_in) {
+		if (initialTransportation?.date) {
 			if (allDay) {
-				localStartDate = initialLodging.check_in.split('T')[0];
+				localStartDate = initialTransportation.date.split('T')[0];
 			} else {
 				const result = updateLocalDate({
-					utcDate: initialLodging.check_in,
+					utcDate: initialTransportation.date,
 					timezone: selectedTimezone
 				});
 				localStartDate = result.localDate;
 			}
 		}
-		if (initialLodging?.check_out) {
+		if (initialTransportation?.end_date) {
 			if (allDay) {
-				localEndDate = initialLodging.check_out.split('T')[0];
+				localEndDate = initialTransportation.end_date.split('T')[0];
 			} else {
 				const result = updateLocalDate({
-					utcDate: initialLodging.check_out,
+					utcDate: initialTransportation.end_date,
 					timezone: selectedTimezone
 				});
 				localEndDate = result.localDate;
 			}
 		}
 
-		if (initialLodging && typeof initialLodging === 'object') {
-			// Populate all fields from initialLodging
-			lodging.name = initialLodging.name || '';
-			lodging.type = initialLodging.type || '';
-			lodging.link = initialLodging.link || '';
-			lodging.description = initialLodging.description || '';
-			lodging.rating = initialLodging.rating ?? NaN;
-			lodging.is_public = initialLodging.is_public ?? true;
-			lodging.reservation_number = initialLodging.reservation_number || null;
-			lodging.price = initialLodging.price ?? null;
+		if (initialTransportation && typeof initialTransportation === 'object') {
+			// Populate all fields from initialTransportation
+			transportation.name = initialTransportation.name || '';
+			transportation.type = initialTransportation.type || '';
+			transportation.link = initialTransportation.link || '';
+			transportation.description = initialTransportation.description || '';
+			transportation.rating = initialTransportation.rating ?? NaN;
+			transportation.is_public = initialTransportation.is_public ?? true;
+			transportation.flight_number = initialTransportation.flight_number || null;
+			transportation.distance = initialTransportation.distance || null;
 
-			if (initialLodging.location) {
-				lodging.location = initialLodging.location;
-			}
+			// Populate origin/destination data
+			transportation.from_location = initialTransportation.from_location || null;
+			transportation.to_location = initialTransportation.to_location || null;
+			transportation.origin_latitude = initialTransportation.origin_latitude || null;
+			transportation.origin_longitude = initialTransportation.origin_longitude || null;
+			transportation.destination_latitude = initialTransportation.destination_latitude || null;
+			transportation.destination_longitude = initialTransportation.destination_longitude || null;
 
-			if (initialLodging.user) {
-				ownerUser = initialLodging.user;
+			if (initialTransportation.user) {
+				ownerUser = initialTransportation.user;
 			}
 		}
 
 		// If adding from itinerary, pre-fill all-day stay with next-day checkout
-		if (!initialLodging?.check_in && initialVisitDate && !localStartDate) {
+		if (!initialTransportation?.date && initialVisitDate && !localStartDate) {
 			const start = DateTime.fromISO(initialVisitDate, { zone: 'UTC' });
 			if (start.isValid) {
 				allDay = true;
@@ -419,11 +438,29 @@
 				</div>
 
 				<LocationSearchMap
-					{initialSelection}
 					bind:isReverseGeocoding
-					bind:displayName={lodging.location}
-					displayNamePosition="after"
-					on:update={handleLocationUpdate}
+					transportationMode={true}
+					bind:airportMode
+					showDisplayNameInput={false}
+					initialStartLocation={initialTransportation?.origin_latitude &&
+					initialTransportation?.origin_longitude
+						? {
+								name: initialTransportation.from_location || '',
+								lat: Number(initialTransportation.origin_latitude),
+								lng: Number(initialTransportation.origin_longitude),
+								location: initialTransportation.from_location || ''
+							}
+						: null}
+					initialEndLocation={initialTransportation?.destination_latitude &&
+					initialTransportation?.destination_longitude
+						? {
+								name: initialTransportation.to_location || '',
+								lat: Number(initialTransportation.destination_latitude),
+								lng: Number(initialTransportation.destination_longitude),
+								location: initialTransportation.to_location || ''
+							}
+						: null}
+					on:transportationUpdate={handleTransportationUpdate}
 					on:clear={handleLocationClear}
 				/>
 			</div>
@@ -452,9 +489,9 @@
 							<input
 								type="text"
 								id="name"
-								bind:value={lodging.name}
+								bind:value={transportation.name}
 								class="input input-bordered bg-base-100/80 focus:bg-base-100"
-								placeholder="Enter lodging name"
+								placeholder="Enter transportation name"
 								required
 							/>
 						</div>
@@ -471,21 +508,27 @@
 								name="type"
 								id="type"
 								required
-								bind:value={lodging.type}
+								bind:value={transportation.type}
 							>
 								<option disabled value="">{$t('transportation.select_type')}</option>
-								<option value="hotel">{$t('lodging.hotel')}</option>
-								<option value="hostel">{$t('lodging.hostel')}</option>
-								<option value="resort">{$t('lodging.resort')}</option>
-								<option value="bnb">{$t('lodging.bnb')}</option>
-								<option value="campground">{$t('lodging.campground')}</option>
-								<option value="cabin">{$t('lodging.cabin')}</option>
-								<option value="apartment">{$t('lodging.apartment')}</option>
-								<option value="house">{$t('lodging.house')}</option>
-								<option value="villa">{$t('lodging.villa')}</option>
-								<option value="motel">{$t('lodging.motel')}</option>
-								<option value="other">{$t('lodging.other')}</option>
+								{#each Object.entries(TRANSPORTATION_TYPES_ICONS) as [key, icon]}
+									<option value={key}>{icon} {key.charAt(0).toUpperCase() + key.slice(1)}</option>
+								{/each}
 							</select>
+						</div>
+
+						<!-- Flight Number Field -->
+						<div class="form-control">
+							<label class="label" for="flight_number">
+								<span class="label-text font-medium">{$t('transportation.flight_number')}</span>
+							</label>
+							<input
+								type="text"
+								id="flight_number"
+								bind:value={transportation.flight_number}
+								class="input input-bordered bg-base-100/80 focus:bg-base-100"
+								placeholder="Enter flight number"
+							/>
 						</div>
 
 						<!-- Rating Field -->
@@ -502,43 +545,29 @@
 										name="rating"
 										id="rating"
 										class="rating-hidden"
-										checked={Number.isNaN(lodging.rating)}
+										checked={Number.isNaN(transportation.rating)}
 									/>
 									{#each [1, 2, 3, 4, 5] as star}
 										<input
 											type="radio"
 											name="rating"
 											class="mask mask-star-2 bg-warning"
-											on:click={() => (lodging.rating = star)}
-											checked={lodging.rating === star}
+											on:click={() => (transportation.rating = star)}
+											checked={transportation.rating === star}
 										/>
 									{/each}
 								</div>
-								{#if !Number.isNaN(lodging.rating)}
+								{#if !Number.isNaN(transportation.rating)}
 									<button
 										type="button"
 										class="btn btn-sm btn-error btn-outline gap-2"
-										on:click={() => (lodging.rating = NaN)}
+										on:click={() => (transportation.rating = NaN)}
 									>
 										<ClearIcon class="w-4 h-4" />
 										{$t('adventures.remove')}
 									</button>
 								{/if}
 							</div>
-						</div>
-
-						<!-- Reservation Number -->
-						<div class="form-control">
-							<label class="label" for="reservation">
-								<span class="label-text font-medium">{$t('lodging.reservation_number')}</span>
-							</label>
-							<input
-								type="text"
-								id="reservation"
-								bind:value={lodging.reservation_number}
-								class="input input-bordered bg-base-100/80 focus:bg-base-100"
-								placeholder="Enter reservation/confirmation number"
-							/>
 						</div>
 					</div>
 
@@ -552,25 +581,9 @@
 							<input
 								type="url"
 								id="link"
-								bind:value={lodging.link}
+								bind:value={transportation.link}
 								class="input input-bordered bg-base-100/80 focus:bg-base-100"
 								placeholder="https://example.com"
-							/>
-						</div>
-
-						<!-- Price Field -->
-						<div class="form-control">
-							<label class="label" for="price">
-								<span class="label-text font-medium">{$t('adventures.price')}</span>
-							</label>
-							<input
-								type="number"
-								id="price"
-								min="0"
-								step="0.01"
-								bind:value={lodging.price}
-								class="input input-bordered bg-base-100/80 focus:bg-base-100"
-								placeholder="0.00"
 							/>
 						</div>
 
@@ -579,14 +592,14 @@
 							<label class="label" for="description">
 								<span class="label-text font-medium">{$t('adventures.description')}</span>
 							</label>
-							<MarkdownEditor bind:text={lodging.description} editor_height="h-32" />
+							<MarkdownEditor bind:text={transportation.description} editor_height="h-32" />
 
 							<div class="flex items-center gap-4 mt-3">
 								<button
 									type="button"
 									class="btn btn-neutral btn-sm gap-2"
 									on:click={generateDesc}
-									disabled={!lodging.name || isGeneratingDesc || !lodging.type}
+									disabled={!transportation.name || isGeneratingDesc || !transportation.type}
 								>
 									{#if isGeneratingDesc}
 										<span class="loading loading-spinner loading-xs"></span>
@@ -608,7 +621,7 @@
 			</div>
 		</div>
 
-		<!-- Check-in/Check-out Dates & Timezone Section -->
+		<!-- Departure/Arrival Dates & Timezone Section -->
 		<div class="card bg-base-100 border border-base-300 shadow-lg">
 			<div class="card-body p-6">
 				<div class="flex items-center gap-3 mb-6">
@@ -658,14 +671,14 @@
 					{/if}
 
 					<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-						<!-- Check-in Date -->
+						<!-- Departure Date -->
 						<div class="form-control">
-							<label class="label" for="check-in">
-								<span class="label-text font-medium">{$t('adventures.check_in')}</span>
+							<label class="label" for="departure-date">
+								<span class="label-text font-medium">{$t('transportation.departure_date')}</span>
 							</label>
 							{#if allDay}
 								<input
-									id="check-in"
+									id="departure-date"
 									type="date"
 									class="input input-bordered bg-base-100/80 focus:bg-base-100"
 									bind:value={localStartDate}
@@ -675,7 +688,7 @@
 								/>
 							{:else}
 								<input
-									id="check-in"
+									id="departure-date"
 									type="datetime-local"
 									class="input input-bordered bg-base-100/80 focus:bg-base-100"
 									bind:value={localStartDate}
@@ -686,14 +699,14 @@
 							{/if}
 						</div>
 
-						<!-- Check-out Date -->
+						<!-- Arrival Date -->
 						<div class="form-control">
-							<label class="label" for="check-out">
-								<span class="label-text font-medium">{$t('adventures.check_out')}</span>
+							<label class="label" for="arrival-date">
+								<span class="label-text font-medium">{$t('transportation.arrival_date')}</span>
 							</label>
 							{#if allDay}
 								<input
-									id="check-out"
+									id="arrival-date"
 									type="date"
 									class="input input-bordered bg-base-100/80 focus:bg-base-100"
 									bind:value={localEndDate}
@@ -703,7 +716,7 @@
 								/>
 							{:else}
 								<input
-									id="check-out"
+									id="arrival-date"
 									type="datetime-local"
 									class="input input-bordered bg-base-100/80 focus:bg-base-100"
 									bind:value={localEndDate}
@@ -714,7 +727,7 @@
 							{/if}
 						</div>
 
-						<!-- Timezone Selector (only for timed stays) -->
+						<!-- Timezone Selector (only for timed transportation) -->
 						{#if !allDay}
 							<TimezoneSelector bind:selectedTimezone />
 						{/if}
@@ -727,7 +740,7 @@
 		<div class="flex gap-3 justify-end pt-4">
 			<button
 				class="btn btn-primary gap-2"
-				disabled={!lodging.name || !lodging.type || isReverseGeocoding}
+				disabled={!transportation.name || !transportation.type || isReverseGeocoding}
 				on:click={handleSave}
 			>
 				{#if isReverseGeocoding}

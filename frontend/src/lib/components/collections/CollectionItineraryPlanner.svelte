@@ -22,10 +22,11 @@
 	import ChecklistCard from '$lib/components/cards/ChecklistCard.svelte';
 	import NewLocationModal from '$lib/components/locations/LocationModal.svelte';
 	import LodgingModal from '../lodging/LodgingModal.svelte';
-	import TransportationModal from '$lib/components/TransportationModal.svelte';
+	import TransportationModal from '../transportation/TransportationModal.svelte';
 	import NoteModal from '$lib/components/NoteModal.svelte';
 	import ChecklistModal from '$lib/components/ChecklistModal.svelte';
 	import ItineraryLinkModal from '$lib/components/collections/ItineraryLinkModal.svelte';
+	import { t } from 'svelte-i18n';
 
 	export let collection: Collection;
 	export let user: any;
@@ -126,6 +127,13 @@
 		isLodgingModalOpen = true;
 	}
 
+	let transportationToEdit: Transportation | null = null;
+	let isTransportationModalOpen: boolean = false;
+	function handleEditTransportation(event: CustomEvent<Transportation>) {
+		transportationToEdit = event.detail;
+		isTransportationModalOpen = true;
+	}
+
 	function handleItemDelete(event: CustomEvent<CollectionItineraryItem | string | number>) {
 		const payload = event.detail;
 
@@ -193,8 +201,8 @@
 
 	let locationBeingUpdated: Location | null = null;
 	let lodgingBeingUpdated: Lodging | null = null;
+	let transportationBeingUpdated: Transportation | null = null;
 
-	let isTransportationModalOpen = false;
 	let isNoteModalOpen = false;
 	let isChecklistModalOpen = false;
 	let isItineraryLinkModalOpen = false;
@@ -283,6 +291,41 @@
 		addItineraryItemForObject('lodging', lodgingBeingUpdated.id, targetDate);
 		// Mark this lodging as added to prevent duplicates
 		addedToItinerary.add(lodgingBeingUpdated.id);
+		addedToItinerary = addedToItinerary; // trigger reactivity
+	}
+
+	// Sync the transportationBeingUpdated with the collection.transportations array
+	$: if (transportationBeingUpdated && transportationBeingUpdated.id && collection) {
+		// Make a shallow copy of transportations (ensure array exists)
+		const transports = collection.transportations ? [...collection.transportations] : [];
+
+		const index = transports.findIndex((t) => t.id === transportationBeingUpdated.id);
+
+		if (index !== -1) {
+			// Replace the item immutably
+			transports[index] = {
+				...transports[index],
+				...transportationBeingUpdated
+			};
+		} else {
+			// Prepend new/updated transportation
+			transports.unshift({ ...transportationBeingUpdated });
+		}
+
+		// Assign back to collection immutably to trigger reactivity
+		collection = { ...collection, transportations: transports };
+	}
+
+	// If a new transportation was just created and we have a pending add-date,
+	// attach it to that date in the itinerary.
+	$: if (
+		transportationBeingUpdated?.id &&
+		pendingAddDate &&
+		!addedToItinerary.has(transportationBeingUpdated.id)
+	) {
+		addItineraryItemForObject('transportation', transportationBeingUpdated.id, pendingAddDate);
+		// Mark this transportation as added to prevent duplicates
+		addedToItinerary.add(transportationBeingUpdated.id);
 		addedToItinerary = addedToItinerary; // trigger reactivity
 	}
 
@@ -738,17 +781,19 @@
 
 {#if isTransportationModalOpen}
 	<TransportationModal
-		on:close={() => (isTransportationModalOpen = false)}
-		{collection}
-		on:save={(e) => {
-			const transportation = e.detail;
-			collection.transportations = [...(collection.transportations || []), transportation];
-			if (pendingAddDate) {
-				addItineraryItemForObject('transportation', transportation.id, pendingAddDate);
-				pendingAddDate = null;
-			}
+		on:close={() => {
 			isTransportationModalOpen = false;
+			transportationToEdit = null;
+			transportationBeingUpdated = null;
+			pendingAddDate = null;
+			addedToItinerary.clear();
+			addedToItinerary = addedToItinerary;
 		}}
+		{user}
+		{transportationToEdit}
+		bind:transportation={transportationBeingUpdated}
+		{collection}
+		initialVisitDate={pendingAddDate}
 	/>
 {/if}
 
@@ -1123,6 +1168,7 @@
 														on:delete={handleItemDelete}
 														itineraryItem={item}
 														on:removeFromItinerary={handleRemoveItineraryItem}
+														on:edit={handleEditTransportation}
 													/>
 												{:else if objectType === 'lodging'}
 													<LodgingCard

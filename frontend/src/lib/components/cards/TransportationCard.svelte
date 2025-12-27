@@ -18,6 +18,8 @@
 	import StarOutline from '~icons/mdi/star-outline';
 	import DotsHorizontal from '~icons/mdi/dots-horizontal';
 	import CalendarRemove from '~icons/mdi/calendar-remove';
+	import Launch from '~icons/mdi/launch';
+	import { goto } from '$app/navigation';
 	import type { CollectionItineraryItem } from '$lib/types';
 
 	function getTransportationIcon(type: string) {
@@ -139,47 +141,62 @@
 	<div class="card-body p-4 space-y-3">
 		<!-- Header -->
 		<div class="flex items-start justify-between gap-3">
-			<h2 class="text-lg font-semibold line-clamp-2">{transportation.name}</h2>
+			<a
+				href="/transportations/{transportation.id}"
+				class="hover:text-primary transition-colors duration-200 line-clamp-2 text-lg font-semibold"
+			>
+				{transportation.name}
+			</a>
 
-			{#if !readOnly && (transportation.user === user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid)))}
-				<details class="dropdown dropdown-end relative z-50">
-					<summary class="btn btn-square btn-sm p-1 text-base-content">
-						<DotsHorizontal class="w-5 h-5" />
-					</summary>
-					<ul
-						class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow-lg border border-base-300"
-					>
-						<li>
-							<button on:click={editTransportation} class="flex items-center gap-2">
-								<FileDocumentEdit class="w-4 h-4" />
-								{$t('transportation.edit')}
-							</button>
-						</li>
-						{#if itineraryItem && itineraryItem.id}
+			<div class="flex items-center gap-2">
+				<button
+					class="btn btn-sm p-1 text-base-content"
+					aria-label="open-details"
+					on:click={() => goto(`/transportations/${transportation.id}`)}
+				>
+					<Launch class="w-4 h-4" />
+				</button>
+
+				{#if !readOnly && (transportation.user === user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid)))}
+					<details class="dropdown dropdown-end relative z-50">
+						<summary class="btn btn-square btn-sm p-1 text-base-content">
+							<DotsHorizontal class="w-5 h-5" />
+						</summary>
+						<ul
+							class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow-lg border border-base-300"
+						>
+							<li>
+								<button on:click={editTransportation} class="flex items-center gap-2">
+									<FileDocumentEdit class="w-4 h-4" />
+									{$t('transportation.edit')}
+								</button>
+							</li>
+							{#if itineraryItem && itineraryItem.id}
+								<div class="divider my-1"></div>
+								<li>
+									<button
+										on:click={() => removeFromItinerary()}
+										class="text-error flex items-center gap-2"
+									>
+										<CalendarRemove class="w-4 h-4 text-error" />
+										{$t('itinerary.remove_from_itinerary')}
+									</button>
+								</li>
+							{/if}
 							<div class="divider my-1"></div>
 							<li>
 								<button
-									on:click={() => removeFromItinerary()}
 									class="text-error flex items-center gap-2"
+									on:click={() => (isWarningModalOpen = true)}
 								>
-									<CalendarRemove class="w-4 h-4 text-error" />
-									{$t('itinerary.remove_from_itinerary')}
+									<TrashCanOutline class="w-4 h-4" />
+									{$t('adventures.delete')}
 								</button>
 							</li>
-						{/if}
-						<div class="divider my-1"></div>
-						<li>
-							<button
-								class="text-error flex items-center gap-2"
-								on:click={() => (isWarningModalOpen = true)}
-							>
-								<TrashCanOutline class="w-4 h-4" />
-								{$t('adventures.delete')}
-							</button>
-						</li>
-					</ul>
-				</details>
-			{/if}
+						</ul>
+					</details>
+				{/if}
+			</div>
 		</div>
 
 		<!-- Route Info (Compact) -->

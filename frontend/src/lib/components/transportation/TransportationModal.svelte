@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { createEventDispatcher, onMount } from 'svelte';
-	import type { Collection, Lodging, User } from '$lib/types';
+	import type { Collection, Location, Transportation, User } from '$lib/types';
 	import { addToast } from '$lib/toasts';
 	import { t } from 'svelte-i18n';
-	import Bed from '~icons/mdi/bed';
-	import LodgingDetails from './LodgingDetails.svelte';
+	import Plane from '~icons/mdi/airplane';
 	import MediaStep from '../shared/MediaStep.svelte';
+	import TransportationDetails from './TransportationDetails.svelte';
 
 	export let user: User | null = null;
 	export let collection: Collection | null = null;
@@ -31,7 +31,7 @@
 		}
 	];
 
-	function createEmptyLodging(): Lodging {
+	function createEmptyTransportation(): Transportation {
 		return {
 			id: '',
 			user: '',
@@ -40,15 +40,19 @@
 			description: null,
 			rating: null,
 			link: null,
-			check_in: null,
-			check_out: null,
-			timezone: null,
-			reservation_number: null,
-			price: null,
-			latitude: null,
-			longitude: null,
-			location: null,
+			date: null,
+			end_date: null,
+			start_timezone: null,
+			end_timezone: null,
+			flight_number: null,
+			from_location: null,
+			to_location: null,
+			origin_latitude: null,
+			origin_longitude: null,
+			destination_latitude: null,
+			destination_longitude: null,
 			is_public: false,
+			distance: null,
 			collection: null,
 			created_at: '',
 			updated_at: '',
@@ -57,51 +61,55 @@
 		};
 	}
 
-	export let lodging: Lodging = createEmptyLodging();
+	export let transportation: Transportation = createEmptyTransportation();
 
-	export let lodgingToEdit: Lodging | null = null;
+	export let transportationToEdit: Transportation | null = null;
 
-	// Track which lodging we're currently editing to prevent unnecessary overwrites
-	let previousLodgingId: string | null = null;
+	// Track which transportation we're currently editing to prevent unnecessary overwrites
+	let previousTransportationId: string | null = null;
 
 	// Reactively update internal state when switching between edit/new.
-	// This prevents stale values when the parent reuses `bind:lodging`.
-	// Only runs when actually switching to a different lodging, not on every reactive update.
+	// This prevents stale values when the parent reuses `bind:transportation`.
+	// Only runs when actually switching to a different transportation, not on every reactive update.
 	$: {
-		const currentLodgingId = lodgingToEdit?.id || null;
+		const currentTransportationId = transportationToEdit?.id || null;
 
-		if (currentLodgingId !== previousLodgingId) {
-			previousLodgingId = currentLodgingId;
+		if (currentTransportationId !== previousTransportationId) {
+			previousTransportationId = currentTransportationId;
 
-			if (lodgingToEdit) {
-				lodging = {
-					id: lodgingToEdit.id || '',
-					user: lodgingToEdit.user || '',
-					name: lodgingToEdit.name || '',
-					type: lodgingToEdit.type || '',
-					description: lodgingToEdit.description || null,
-					rating: lodgingToEdit.rating || null,
-					link: lodgingToEdit.link || null,
-					check_in: lodgingToEdit.check_in || null,
-					check_out: lodgingToEdit.check_out || null,
-					timezone: lodgingToEdit.timezone || null,
-					reservation_number: lodgingToEdit.reservation_number || null,
-					price: lodgingToEdit.price || null,
-					latitude: lodgingToEdit.latitude || null,
-					longitude: lodgingToEdit.longitude || null,
-					location: lodgingToEdit.location || null,
-					is_public: lodgingToEdit.is_public || false,
-					collection: lodgingToEdit.collection || null,
-					created_at: lodgingToEdit.created_at || '',
-					updated_at: lodgingToEdit.updated_at || '',
-					images: lodgingToEdit.images || [],
-					attachments: lodgingToEdit.attachments || []
+			if (transportationToEdit) {
+				transportation = {
+					id: transportationToEdit.id || '',
+					user: transportationToEdit.user || '',
+					name: transportationToEdit.name || '',
+					type: transportationToEdit.type || '',
+					description: transportationToEdit.description || null,
+					rating: transportationToEdit.rating || null,
+					link: transportationToEdit.link || null,
+					date: transportationToEdit.date || null,
+					end_date: transportationToEdit.end_date || null,
+					start_timezone: transportationToEdit.start_timezone || null,
+					end_timezone: transportationToEdit.end_timezone || null,
+					flight_number: transportationToEdit.flight_number || null,
+					from_location: transportationToEdit.from_location || null,
+					to_location: transportationToEdit.to_location || null,
+					origin_latitude: transportationToEdit.origin_latitude || null,
+					origin_longitude: transportationToEdit.origin_longitude || null,
+					destination_latitude: transportationToEdit.destination_latitude || null,
+					destination_longitude: transportationToEdit.destination_longitude || null,
+					is_public: transportationToEdit.is_public || false,
+					distance: transportationToEdit.distance || null,
+					collection: transportationToEdit.collection || null,
+					created_at: transportationToEdit.created_at || '',
+					updated_at: transportationToEdit.updated_at || '',
+					images: transportationToEdit.images || [],
+					attachments: transportationToEdit.attachments || []
 				};
-			} else if (!lodging?.id) {
-				// Only reset to empty if we don't already have a saved lodging with an ID
-				lodging = createEmptyLodging();
+			} else if (!transportation?.id) {
+				// Only reset to empty if we don't already have a saved transportation with an ID
+				transportation = createEmptyTransportation();
 				storedInitialVisitDate = initialVisitDate;
-				// Reset steps to details when creating a new lodging
+				// Reset steps to details when creating a new transportation
 				steps = [
 					{ name: $t('adventures.details'), selected: true, requires_id: false },
 					{ name: $t('settings.media'), selected: false, requires_id: true }
@@ -111,7 +119,7 @@
 	}
 
 	onMount(async () => {
-		modal = document.getElementById('my_modal_1') as HTMLDialogElement;
+		modal = document.getElementById('transportation_modal') as HTMLDialogElement;
 		modal.showModal();
 	});
 
@@ -127,7 +135,7 @@
 </script>
 
 <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
-<dialog id="my_modal_1" class="modal backdrop-blur-sm">
+<dialog id="transportation_modal" class="modal backdrop-blur-sm">
 	<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
 	<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 	<div
@@ -143,16 +151,18 @@
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-3">
 					<div class="p-2 bg-primary/10 rounded-xl">
-						<Bed class="w-6 h-6 text-primary" />
+						<Plane class="w-6 h-6 text-primary" />
 					</div>
 					<div>
 						<h1 class="text-3xl font-bold text-primary bg-clip-text">
-							{lodgingToEdit ? $t('lodging.edit_lodging') : $t('lodging.new_lodging')}
+							{transportationToEdit
+								? $t('transportation.edit_transportation')
+								: $t('transportation.new_transportation')}
 						</h1>
 						<p class="text-sm text-base-content/60">
-							{lodgingToEdit
-								? $t('lodging.update_lodging_details')
-								: $t('lodging.create_new_lodging')}
+							{transportationToEdit
+								? $t('transportation.update_transportation_details')
+								: $t('transportation.create_new_transportation')}
 						</p>
 					</div>
 				</div>
@@ -184,7 +194,7 @@
 							<button
 								class="timeline-end timeline-box text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2 {step.selected
 									? 'bg-primary text-primary-content'
-									: 'bg-base-200'} {step.requires_id && !lodging?.id
+									: 'bg-base-200'} {step.requires_id && !transportation?.id
 									? 'opacity-50 cursor-not-allowed'
 									: 'hover:bg-primary/80 cursor-pointer'} transition-colors"
 								on:click={() => {
@@ -193,7 +203,7 @@
 									// Select clicked step
 									steps[index].selected = true;
 								}}
-								disabled={step.requires_id && !lodging?.id}
+								disabled={step.requires_id && !transportation?.id}
 							>
 								<span class="hidden sm:inline">{step.name}</span>
 								<span class="sm:hidden"
@@ -222,21 +232,21 @@
 		</div>
 
 		{#if steps[0].selected}
-			<LodgingDetails
+			<TransportationDetails
 				currentUser={user}
-				initialLodging={lodging}
+				initialTransportation={transportation}
 				{collection}
-				bind:editingLodging={lodging}
+				bind:editingTransportation={transportation}
 				on:back={() => {
 					steps[1].selected = false;
 					steps[0].selected = true;
 				}}
 				on:save={(e) => {
-					// Update the entire lodging object with all saved data
-					lodging = { ...lodging, ...e.detail };
+					// Update the entire transportation object with all saved data
+					transportation = { ...transportation, ...e.detail };
 
 					// Only allow moving to Media once we have a persisted id.
-					if (!lodging?.id) {
+					if (!transportation?.id) {
 						addToast('error', $t('adventures.lodging_save_error'));
 						steps[1].selected = false;
 						steps[0].selected = true;
@@ -251,16 +261,16 @@
 		{/if}
 		{#if steps[1].selected}
 			<MediaStep
-				bind:images={lodging.images}
-				bind:attachments={lodging.attachments}
-				itemName={lodging.name}
+				bind:images={transportation.images}
+				bind:attachments={transportation.attachments}
+				itemName={transportation.name}
 				on:back={() => {
 					steps[1].selected = false;
 					steps[0].selected = true;
 				}}
 				on:close={() => close()}
-				itemId={lodging.id}
-				contentType="lodging"
+				itemId={transportation.id}
+				contentType="transportation"
 			/>
 		{/if}
 	</div>

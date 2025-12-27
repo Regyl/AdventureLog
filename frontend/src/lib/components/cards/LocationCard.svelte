@@ -37,7 +37,7 @@
 
 	let isCollectionModalOpen: boolean = false;
 	let isWarningModalOpen: boolean = false;
-	let copied = false;
+	let copied: boolean = false;
 
 	async function copyLink() {
 		try {
