@@ -2,7 +2,7 @@
 	import type { Collection, ContentImage, Location } from '$lib/types';
 	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/stores';
 	import Lost from '$lib/assets/undraw_lost.svg';
 	import { DefaultMarker, MapLibre, Popup } from 'svelte-maplibre';
@@ -16,12 +16,15 @@
 	import CollectionAllItems from '$lib/components/collections/CollectionAllItems.svelte';
 	import CollectionItineraryPlanner from '$lib/components/collections/CollectionItineraryPlanner.svelte';
 	import CollectionRecommendationView from '$lib/components/CollectionRecommendationView.svelte';
+	import LocationLink from '$lib/components/LocationLink.svelte';
 	import { getBasemapUrl } from '$lib';
 	import FolderMultiple from '~icons/mdi/folder-multiple';
 	import FormatListBulleted from '~icons/mdi/format-list-bulleted';
 	import Timeline from '~icons/mdi/timeline';
 	import Map from '~icons/mdi/map';
 	import Lightbulb from '~icons/mdi/lightbulb';
+	import Plus from '~icons/mdi/plus';
+	import { addToast } from '$lib/toasts';
 
 	const renderMarkdown = (markdown: string) => {
 		return marked(markdown) as string;
@@ -37,6 +40,7 @@
 	let heroImages: ContentImage[] = [];
 	let modalInitialIndex: number = 0;
 	let isImageModalOpen: boolean = false;
+	let isLocationLinkModalOpen: boolean = false;
 
 	// View state from URL params
 	type ViewType = 'all' | 'itinerary' | 'map' | 'recommendations';
@@ -141,6 +145,64 @@
 		url.searchParams.set('view', view);
 		goto(url.toString(), { replaceState: true, noScroll: true });
 	}
+
+	function openLocationLinkModal() {
+		isLocationLinkModalOpen = true;
+	}
+
+	function closeLocationLinkModal() {
+		isLocationLinkModalOpen = false;
+	}
+
+	async function handleLocationAdded(event: CustomEvent<Location>) {
+		// Link the location to this collection
+		const location = event.detail;
+
+		try {
+			const response = await fetch(`/api/locations/${location.id}/`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					collections: [...(location.collections || []), collection.id]
+				})
+			});
+
+			if (response.ok) {
+				// Keep modal open so user can link more locations.
+				// Update local collection state so UI reflects the new link immediately.
+				try {
+					if (!collection.locations) collection.locations = [];
+					// Avoid duplicates
+					const exists = collection.locations.some((l) => String(l.id) === String(location.id));
+					if (!exists) {
+						collection.locations = [...collection.locations, location];
+					}
+				} catch (e) {
+					// if collection shape is unexpected, ignore and continue
+					console.warn('Unable to update local collection.locations', e);
+				}
+
+				// Show success message but do NOT close the modal or reload the page
+				addToast(
+					'success',
+					$t('adventures.collection_link_location_success') || 'Location added successfully'
+				);
+			} else {
+				addToast(
+					'error',
+					$t('adventures.collection_link_location_error') || 'Failed to add location'
+				);
+			}
+		} catch (error) {
+			console.error('Error linking location:', error);
+			addToast(
+				'error',
+				$t('adventures.collection_link_location_error') || 'Failed to add location'
+			);
+		}
+	}
 </script>
 
 {#if notFound}
@@ -164,6 +226,15 @@
 		initialIndex={modalInitialIndex}
 		name={collection.name}
 		on:close={closeImageModal}
+	/>
+{/if}
+
+{#if isLocationLinkModalOpen && collection}
+	<LocationLink
+		user={data.user}
+		collectionId={collection.id}
+		on:close={closeLocationLinkModal}
+		on:add={handleLocationAdded}
 	/>
 {/if}
 
@@ -603,6 +674,19 @@
 				{/if}
 			</div>
 		</div>
+	</div>
+{/if}
+
+<!-- Floating Action Button (FAB) - Only shown if user can modify collection -->
+{#if collection && canModifyCollection}
+	<div class="fixed bottom-6 right-6 z-40">
+		<button
+			class="btn btn-primary btn-circle w-16 h-16 shadow-2xl hover:shadow-primary/25 transition-all duration-200"
+			on:click={openLocationLinkModal}
+			aria-label="Add locations to collection"
+		>
+			<Plus class="w-8 h-8" />
+		</button>
 	</div>
 {/if}
 

@@ -1,5 +1,6 @@
 from typing import List
 from django.db import transaction
+from django.utils.dateparse import parse_date, parse_datetime
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from adventures.models import CollectionItineraryItem
 
@@ -75,6 +76,27 @@ def reorder_itinerary_items(user, items_data: List[dict]):
         new_date = item_data.get('date')
         new_order = item_data.get('order')
         if new_date is not None:
+            # validate date is within collection bounds (if collection has start/end)
+            parsed = None
+            try:
+                parsed = parse_date(str(new_date))
+            except Exception:
+                parsed = None
+            if parsed is None:
+                try:
+                    dt = parse_datetime(str(new_date))
+                    if dt:
+                        parsed = dt.date()
+                except Exception:
+                    parsed = None
+
+            collection = item.collection
+            if parsed and collection:
+                if collection.start_date and parsed < collection.start_date:
+                    raise ValidationError({"items": f"Item {item_id} date {parsed} is before collection start date {collection.start_date}."})
+                if collection.end_date and parsed > collection.end_date:
+                    raise ValidationError({"items": f"Item {item_id} date {parsed} is after collection end date {collection.end_date}."})
+
             item.date = new_date
         if new_order is not None:
             item.order = new_order

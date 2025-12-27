@@ -7,7 +7,8 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 import requests
-from adventures.models import Location, Category
+from adventures.models import Location, Category, CollectionItineraryItem
+from django.contrib.contenttypes.models import ContentType
 from adventures.permissions import IsOwnerOrSharedWithFullAccess
 from adventures.serializers import LocationSerializer, MapPinSerializer
 from adventures.utils import pagination
@@ -277,6 +278,25 @@ class LocationViewSet(viewsets.ModelViewSet):
                     raise PermissionDenied(
                         f"You don't have permission to remove this location from one of the collections it's linked to.'"
                     )
+            else:
+                # If the removal is permitted, also remove any itinerary items
+                # in this collection that reference this Location instance.
+                try:
+                    ct = ContentType.objects.get_for_model(instance.__class__)
+                    # Try deleting by native PK type first, then by string.
+                    qs = CollectionItineraryItem.objects.filter(
+                        collection=collection, content_type=ct, object_id=instance.pk
+                    )
+                    if qs.exists():
+                        qs.delete()
+                    else:
+                        CollectionItineraryItem.objects.filter(
+                            collection=collection, content_type=ct, object_id=str(instance.pk)
+                        ).delete()
+                except Exception:
+                    # Don't raise on cleanup failures; deletion of itinerary items
+                    # is best-effort and shouldn't block the update operation.
+                    pass
 
     def _validate_collection_permissions(self, collections):
         """Validate permissions for all collections (used in create)."""

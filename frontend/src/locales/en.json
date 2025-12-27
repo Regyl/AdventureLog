@@ -842,7 +842,9 @@
     "enter_link": "Enter link",
     "enter_flight_number": "Enter flight number",
     "enter_from_location": "Enter from location",
-    "enter_to_location": "Enter to location"
+    "enter_to_location": "Enter to location",
+    "arrival_code": "Arrival Code",
+    "departure_code": "Departure Code"
   },
   "lodging": {
     "new_lodging": "New Lodging",

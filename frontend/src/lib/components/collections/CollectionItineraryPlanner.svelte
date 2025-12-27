@@ -26,6 +26,7 @@
 	import NoteModal from '$lib/components/NoteModal.svelte';
 	import ChecklistModal from '$lib/components/ChecklistModal.svelte';
 	import ItineraryLinkModal from '$lib/components/collections/ItineraryLinkModal.svelte';
+	import ItineraryDayPickModal from '$lib/components/collections/ItineraryDayPickModal.svelte';
 	import { t } from 'svelte-i18n';
 
 	export let collection: Collection;
@@ -210,6 +211,10 @@
 	// Store the target date and display date for the link modal
 	let linkModalTargetDate: string = '';
 	let linkModalDisplayDate: string = '';
+
+	// Day picker modal state for unscheduled items
+	let isDayPickModalOpen = false;
+	let dayPickItemToAdd: { type: string; item: any } | null = null;
 
 	// When opening a "create new item" modal we store the target date here
 	let pendingAddDate: string | null = null;
@@ -585,6 +590,89 @@
 		}
 	}
 
+	// Handle opening the day picker modal for an unscheduled item
+	function handleOpenDayPickerForItem(type: string, item: any) {
+		// Check if the item already has a date, and if so, add it directly
+		let itemDate: string | null = null;
+
+		if (type === 'location') {
+			// For locations, check if there's a visit with a start_date
+			const firstVisit = item.visits?.[0];
+			if (firstVisit?.start_date) {
+				itemDate = firstVisit.start_date.split('T')[0]; // Extract date only (YYYY-MM-DD)
+			}
+		} else if (type === 'transportation') {
+			if (item.date) {
+				itemDate = item.date.split('T')[0]; // Extract date only (YYYY-MM-DD)
+			}
+		} else if (type === 'lodging') {
+			if (item.check_in) {
+				itemDate = item.check_in.split('T')[0]; // Extract date only (YYYY-MM-DD)
+			}
+		} else if (type === 'note') {
+			if (item.date) {
+				itemDate = item.date.split('T')[0]; // Extract date only (YYYY-MM-DD)
+			}
+		} else if (type === 'checklist') {
+			if (item.date) {
+				itemDate = item.date.split('T')[0]; // Extract date only (YYYY-MM-DD)
+			}
+		}
+
+		// If we found a date, add it directly to that date
+		// Helper: check if a date is within collection start/end bounds (if set)
+		function isDateWithinCollectionRange(dateISO: string | null) {
+			if (!dateISO) return false;
+			if (!collection) return true; // no collection context -> allow
+			try {
+				const d = DateTime.fromISO(dateISO).startOf('day');
+				if (collection.start_date) {
+					const s = DateTime.fromISO(collection.start_date).startOf('day');
+					if (d < s) return false;
+				}
+				if (collection.end_date) {
+					const e = DateTime.fromISO(collection.end_date).startOf('day');
+					if (d > e) return false;
+				}
+				return true;
+			} catch (err) {
+				return false;
+			}
+		}
+
+		if (itemDate) {
+			// If the item's date is outside the collection range, prompt the day picker
+			if (!isDateWithinCollectionRange(itemDate)) {
+				dayPickItemToAdd = { type, item };
+				isDayPickModalOpen = true;
+				return;
+			}
+
+			addItineraryItemForObject(type, item.id, itemDate, false);
+		} else {
+			// Otherwise, show the day picker modal
+			dayPickItemToAdd = { type, item };
+			isDayPickModalOpen = true;
+		}
+	}
+
+	// Handle day selection from the day picker modal
+	async function handleDaySelected(event: CustomEvent<{ date: string; updateDate: boolean }>) {
+		const { date: selectedDate, updateDate } = event.detail;
+		if (!dayPickItemToAdd) return;
+
+		const { type, item } = dayPickItemToAdd;
+		const objectType = type; // 'location', 'transportation', 'lodging', 'note', 'checklist'
+		const objectId = item.id;
+
+		// Add the item to the selected day
+		await addItineraryItemForObject(objectType, objectId, selectedDate, updateDate);
+
+		// Reset state
+		dayPickItemToAdd = null;
+		isDayPickModalOpen = false;
+	}
+
 	// Add an itinerary item locally and attempt to persist to backend
 	async function addItineraryItemForObject(
 		objectType: string,
@@ -839,6 +927,19 @@
 		on:addItem={(e) => {
 			const { type, itemId, updateDate } = e.detail;
 			addItineraryItemForObject(type, itemId, linkModalTargetDate, updateDate);
+		}}
+	/>
+{/if}
+
+{#if isDayPickModalOpen}
+	<ItineraryDayPickModal
+		isOpen={isDayPickModalOpen}
+		{days}
+		itemName={dayPickItemToAdd?.item?.name || 'Item'}
+		on:daySelected={handleDaySelected}
+		on:close={() => {
+			isDayPickModalOpen = false;
+			dayPickItemToAdd = null;
 		}}
 	/>
 {/if}
@@ -1284,7 +1385,11 @@
 								<!-- "Add to itinerary" indicator -->
 								{#if canModify}
 									<div class="absolute -right-2 top-2 z-10">
-										<button class="btn btn-circle btn-sm btn-primary" title="Add to itinerary">
+										<button
+											class="btn btn-circle btn-sm btn-primary"
+											title="Add to itinerary"
+											on:click={() => handleOpenDayPickerForItem(type, item)}
+										>
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
 												class="h-4 w-4"

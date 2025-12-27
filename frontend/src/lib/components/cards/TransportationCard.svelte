@@ -199,36 +199,37 @@
 			</div>
 		</div>
 
-		<!-- Route Info (Compact) -->
-		<div class="space-y-2">
-			{#if transportation.from_location && transportation.to_location}
-				<div class="flex items-center gap-2 text-sm text-base-content/70">
-					<span class="font-medium">{$t('adventures.route')}:</span>
-					<span class="truncate">{transportation.from_location} → {transportation.to_location}</span
-					>
-				</div>
-			{:else if transportation.from_location}
-				<div class="flex items-center gap-2 text-sm text-base-content/70">
-					<span class="font-medium">{$t('adventures.from')}:</span>
-					<span class="truncate">{transportation.from_location}</span>
-				</div>
-			{:else if transportation.to_location}
-				<div class="flex items-center gap-2 text-sm text-base-content/70">
-					<span class="font-medium">{$t('adventures.to')}:</span>
-					<span class="truncate">{transportation.to_location}</span>
-				</div>
-			{/if}
-
-			{#if transportation.type === 'plane' && transportation.flight_number}
-				<div class="flex items-center gap-2 text-sm text-base-content/70">
-					<span class="font-medium">{$t('adventures.flight')}:</span>
-					<span>{transportation.flight_number}</span>
-				</div>
-			{/if}
-		</div>
+		<!-- Route Info -->
+		{#if (transportation.start_code && transportation.end_code) || transportation.from_location || transportation.to_location}
+			<div class="text-sm text-base-content/70">
+				{#if transportation.start_code && transportation.end_code}
+					<div class="flex items-center gap-2">
+						<span class="font-semibold text-base-content">{transportation.start_code}</span>
+						<span class="text-base-content/40">→</span>
+						<span class="font-semibold text-base-content">{transportation.end_code}</span>
+					</div>
+				{:else if transportation.from_location && transportation.to_location}
+					<div class="flex items-start gap-2">
+						<span class="flex-1">{transportation.from_location}</span>
+						<span class="text-base-content/40 mt-0.5">→</span>
+						<span class="flex-1">{transportation.to_location}</span>
+					</div>
+				{:else if transportation.from_location}
+					<span>{transportation.from_location}</span>
+				{:else}
+					<span>{transportation.to_location}</span>
+				{/if}
+			</div>
+		{/if}
 
 		<!-- Inline Stats -->
 		<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70">
+			{#if transportation.type === 'plane' && transportation.flight_number}
+				<div class="badge badge-ghost badge-sm">
+					{transportation.flight_number}
+				</div>
+			{/if}
+
 			{#if transportation.date}
 				<div class="flex items-center gap-1">
 					<span class="font-medium">

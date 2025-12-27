@@ -595,10 +595,6 @@
 									maxlength="5"
 									placeholder={airportMode ? 'JFK' : 'Code'}
 								/>
-								<p class="text-xs text-base-content/60 mt-1">
-									{$t('transportation.autofill_code_hint') ||
-										'Auto-filled from airport search; you can override'}
-								</p>
 							</div>
 							<div class="form-control">
 								<label class="label" for="end_code">
@@ -615,10 +611,6 @@
 									maxlength="5"
 									placeholder={airportMode ? 'LHR' : 'Code'}
 								/>
-								<p class="text-xs text-base-content/60 mt-1">
-									{$t('transportation.autofill_code_hint_arrival') ||
-										'Auto-filled from arrival search; you can override'}
-								</p>
 							</div>
 						</div>
 

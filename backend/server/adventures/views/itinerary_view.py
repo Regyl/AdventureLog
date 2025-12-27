@@ -179,6 +179,34 @@ class ItineraryViewSet(viewsets.ModelViewSet):
         item_date = data.get('date')
         item_order = data.get('order', 0)
         
+        # Validate that the itinerary date (if provided) falls within the
+        # collection's start_date/end_date range (if those bounds are set).
+        if collection_id and item_date:
+            # Try parse date or datetime-like values
+            parsed_date = None
+            try:
+                parsed_date = parse_date(str(item_date))
+            except Exception:
+                parsed_date = None
+            if parsed_date is None:
+                try:
+                    dt = parse_datetime(str(item_date))
+                    if dt:
+                        parsed_date = dt.date()
+                except Exception:
+                    parsed_date = None
+
+            if parsed_date is not None:
+                try:
+                    collection_obj = Collection.objects.get(id=collection_id)
+                except Collection.DoesNotExist:
+                    return Response({'error': 'Collection not found'}, status=status.HTTP_404_NOT_FOUND)
+
+                if collection_obj.start_date and parsed_date < collection_obj.start_date:
+                    return Response({'error': 'Itinerary item date is before the collection start_date'}, status=status.HTTP_400_BAD_REQUEST)
+                if collection_obj.end_date and parsed_date > collection_obj.end_date:
+                    return Response({'error': 'Itinerary item date is after the collection end_date'}, status=status.HTTP_400_BAD_REQUEST)
+
         if collection_id and item_date:
             # Find the maximum order for this collection+date
             existing_max = CollectionItineraryItem.objects.filter(
