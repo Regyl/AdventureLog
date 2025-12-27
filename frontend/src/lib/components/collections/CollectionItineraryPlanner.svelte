@@ -1235,7 +1235,12 @@
 											<Bed class="w-4 h-4" />
 										</div>
 										<div class="flex-1 min-w-0">
-											<p class="font-medium truncate">{lodging.name}</p>
+											<a
+												href={`/lodging/${lodging.id}`}
+												class="hover:text-primary transition-colors duration-200 line-clamp-2 text-md font-semibold"
+											>
+												{lodging.name}
+											</a>
 											{#if lodging.location}
 												<p class="text-xs opacity-60 truncate">{lodging.location}</p>
 											{/if}

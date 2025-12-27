@@ -58,6 +58,8 @@
 		origin_longitude: null,
 		destination_latitude: null,
 		destination_longitude: null,
+		start_code: null,
+		end_code: null,
 		distance: null,
 		collection: collection?.id,
 		is_public: true
@@ -70,6 +72,8 @@
 	let constrainDates: boolean = true;
 	let fullStartDate: string = '';
 	let fullEndDate: string = '';
+	let startCodeField: string = '';
+	let endCodeField: string = '';
 
 	let user: User | null = null;
 	let transportationToEdit: Transportation | null = null;
@@ -86,6 +90,33 @@
 		transportation.end_timezone = allDay ? null : selectedTimezone;
 	}
 
+	function handleStartCodeInput(value: string) {
+		startCodeField = value;
+		transportation.start_code = normalizeCode(value);
+	}
+
+	function handleEndCodeInput(value: string) {
+		endCodeField = value;
+		transportation.end_code = normalizeCode(value);
+	}
+
+	function handleStartCodeEvent(event: Event) {
+		const target = event.target as HTMLInputElement;
+		handleStartCodeInput(target?.value || '');
+	}
+
+	function handleEndCodeEvent(event: Event) {
+		const target = event.target as HTMLInputElement;
+		handleEndCodeInput(target?.value || '');
+	}
+
+	function normalizeCode(code: string | null): string | null {
+		if (!code) return null;
+		const trimmed = code.trim().toUpperCase();
+		if (!trimmed) return null;
+		return trimmed.slice(0, 5);
+	}
+
 	// Reactive constraints
 	$: constraintStartDate = allDay
 		? fullStartDate && fullStartDate.includes('T')
@@ -100,8 +131,8 @@
 
 	function handleTransportationUpdate(
 		event: CustomEvent<{
-			start: { name: string; lat: number; lng: number; location: string };
-			end: { name: string; lat: number; lng: number; location: string };
+			start: { name: string; lat: number; lng: number; location: string; code?: string | null };
+			end: { name: string; lat: number; lng: number; location: string; code?: string | null };
 		}>
 	) {
 		const { start, end } = event.detail;
@@ -110,11 +141,15 @@
 		transportation.from_location = start.location;
 		transportation.origin_latitude = start.lat;
 		transportation.origin_longitude = start.lng;
+		transportation.start_code = normalizeCode(start.code || '');
+		startCodeField = startCodeField || transportation.start_code || '';
 
 		// Update to location
 		transportation.to_location = end.location;
 		transportation.destination_latitude = end.lat;
 		transportation.destination_longitude = end.lng;
+		transportation.end_code = normalizeCode(end.code || '');
+		endCodeField = endCodeField || transportation.end_code || '';
 
 		// Update name if empty (use route)
 		if (!transportation.name) {
@@ -129,6 +164,8 @@
 		transportation.origin_longitude = null;
 		transportation.destination_latitude = null;
 		transportation.destination_longitude = null;
+		transportation.start_code = null;
+		transportation.end_code = null;
 	}
 
 	function handleAllDayToggle() {
@@ -254,6 +291,10 @@
 		// Ensure timezones are only persisted for timed transportation
 		transportation.start_timezone = allDay ? null : selectedTimezone;
 		transportation.end_timezone = allDay ? null : selectedTimezone;
+
+		// Normalize codes before sending
+		transportation.start_code = normalizeCode(startCodeField || transportation.start_code);
+		transportation.end_code = normalizeCode(endCodeField || transportation.end_code);
 
 		if (!syncAndValidateDates(true)) {
 			return;
@@ -389,6 +430,8 @@
 			transportation.rating = initialTransportation.rating ?? NaN;
 			transportation.is_public = initialTransportation.is_public ?? true;
 			transportation.flight_number = initialTransportation.flight_number || null;
+			transportation.start_code = initialTransportation.start_code || null;
+			transportation.end_code = initialTransportation.end_code || null;
 			transportation.distance = initialTransportation.distance || null;
 
 			// Populate origin/destination data
@@ -398,6 +441,8 @@
 			transportation.origin_longitude = initialTransportation.origin_longitude || null;
 			transportation.destination_latitude = initialTransportation.destination_latitude || null;
 			transportation.destination_longitude = initialTransportation.destination_longitude || null;
+			startCodeField = transportation.start_code || '';
+			endCodeField = transportation.end_code || '';
 
 			if (initialTransportation.user) {
 				ownerUser = initialTransportation.user;
@@ -460,6 +505,8 @@
 								location: initialTransportation.to_location || ''
 							}
 						: null}
+					initialStartCode={initialTransportation?.start_code || null}
+					initialEndCode={initialTransportation?.end_code || null}
 					on:transportationUpdate={handleTransportationUpdate}
 					on:clear={handleLocationClear}
 				/>
@@ -529,6 +576,50 @@
 								class="input input-bordered bg-base-100/80 focus:bg-base-100"
 								placeholder="Enter flight number"
 							/>
+						</div>
+
+						<!-- Start/End Codes -->
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+							<div class="form-control">
+								<label class="label" for="start_code">
+									<span class="label-text font-medium"
+										>{$t('transportation.departure_code') || 'Departure code'}</span
+									>
+								</label>
+								<input
+									type="text"
+									id="start_code"
+									value={startCodeField}
+									on:input={handleStartCodeEvent}
+									class="input input-bordered bg-base-100/80 focus:bg-base-100 uppercase"
+									maxlength="5"
+									placeholder={airportMode ? 'JFK' : 'Code'}
+								/>
+								<p class="text-xs text-base-content/60 mt-1">
+									{$t('transportation.autofill_code_hint') ||
+										'Auto-filled from airport search; you can override'}
+								</p>
+							</div>
+							<div class="form-control">
+								<label class="label" for="end_code">
+									<span class="label-text font-medium"
+										>{$t('transportation.arrival_code') || 'Arrival code'}</span
+									>
+								</label>
+								<input
+									type="text"
+									id="end_code"
+									value={endCodeField}
+									on:input={handleEndCodeEvent}
+									class="input input-bordered bg-base-100/80 focus:bg-base-100 uppercase"
+									maxlength="5"
+									placeholder={airportMode ? 'LHR' : 'Code'}
+								/>
+								<p class="text-xs text-base-content/60 mt-1">
+									{$t('transportation.autofill_code_hint_arrival') ||
+										'Auto-filled from arrival search; you can override'}
+								</p>
+							</div>
 						</div>
 
 						<!-- Rating Field -->

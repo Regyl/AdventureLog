@@ -490,7 +490,9 @@
     "lodging_not_found": "Lodging Not Found",
     "stay_dates": "Stay Dates",
     "nights": "Nights",
-    "reservation": "Reservation"
+    "reservation": "Reservation",
+    "flight": "Flight",
+    "route": "Route"
   },
   "worldtravel": {
     "country_list": "Country List",
@@ -764,7 +766,11 @@
     "archived_appear_here": "Archived collections will appear here.",
     "linked": "Linked",
     "available": "Available",
-    "try_different_search": "Try a different search or filter."
+    "try_different_search": "Try a different search or filter.",
+    "update_collection_details": "Updte collection details",
+    "create_new_collection": "Create new collection",
+    "public_collection_description": "Allow anyone with the link to view",
+    "enter_collection_name": "Enter collection name"
   },
   "notes": {
     "note_deleted": "Note deleted successfully!",

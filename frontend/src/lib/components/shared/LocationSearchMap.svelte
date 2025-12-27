@@ -55,6 +55,8 @@
 		lng: number;
 		location: string;
 	} | null = null;
+	export let initialStartCode: string | null = null;
+	export let initialEndCode: string | null = null;
 
 	let isSearching = false;
 	let searchResults: GeoSelection[] = [];
@@ -67,6 +69,10 @@
 	let searchTimeout: ReturnType<typeof setTimeout>;
 	let initialApplied = false;
 	let initialTransportationApplied = false;
+
+	// Track any provided codes (airport / station / etc)
+	let startCode: string | null = null;
+	let endCode: string | null = null;
 
 	// track previous airport mode to detect toggles
 	let prevAirportMode = airportMode;
@@ -91,6 +97,8 @@
 		startMarker = null;
 		endMarker = null;
 		startLocationData = null;
+		startCode = null;
+		endCode = null;
 		endLocationData = null;
 	}
 
@@ -115,7 +123,7 @@
 		selectedMarker = { lng: selection.lng, lat: selection.lat };
 		mapCenter = [selection.lng, selection.lat];
 		mapZoom = 14;
-		searchQuery = selection.name || '';
+		searchQuery = selection.location || selection.name || '';
 		displayName = selection.location || selection.name;
 		await performDetailedReverseGeocode(selection.lat, selection.lng);
 	}
@@ -129,7 +137,9 @@
 				location: initialStartLocation.location
 			};
 			startMarker = { lng: initialStartLocation.lng, lat: initialStartLocation.lat };
-			startSearchQuery = initialStartLocation.name;
+			startCode =
+				initialStartCode || deriveCode(initialStartLocation.name, initialStartLocation.name);
+			startSearchQuery = startCode || initialStartLocation.location || initialStartLocation.name;
 			await performDetailedReverseGeocode(
 				initialStartLocation.lat,
 				initialStartLocation.lng,
@@ -145,7 +155,8 @@
 				location: initialEndLocation.location
 			};
 			endMarker = { lng: initialEndLocation.lng, lat: initialEndLocation.lat };
-			endSearchQuery = initialEndLocation.name;
+			endCode = initialEndCode || deriveCode(initialEndLocation.name, initialEndLocation.name);
+			endSearchQuery = endCode || initialEndLocation.location || initialEndLocation.name;
 			await performDetailedReverseGeocode(initialEndLocation.lat, initialEndLocation.lng, 'end');
 		}
 
@@ -273,6 +284,28 @@
 		}, 300);
 	}
 
+	function deriveCode(value: string | undefined, fallback?: string): string | null {
+		if (!value && !fallback) return null;
+		const match = value?.match(/\b([A-Z0-9]{3,5})\b/) || value?.match(/\(([A-Z0-9]{3,5})\)/);
+		if (match && match[1]) return match[1].toUpperCase();
+		const candidate = (fallback || '').trim();
+		if (candidate.length && candidate.length <= 5) return candidate.toUpperCase();
+		return null;
+	}
+
+	function resolveCode(selection: GeoSelection | null, typedQuery: string): string | null {
+		// Prefer explicit user-typed code when in airport mode
+		const fromTyped = deriveCode(typedQuery, typedQuery);
+		if (fromTyped) return fromTyped;
+		if (selection) {
+			const fromName = deriveCode(selection.name, typedQuery);
+			if (fromName) return fromName;
+			const fromLocation = deriveCode(selection.location, typedQuery);
+			if (fromLocation) return fromLocation;
+		}
+		return null;
+	}
+
 	function emitUpdate(selection: GeoSelection) {
 		dispatch('update', {
 			name: selection.name,
@@ -289,13 +322,15 @@
 					name: selectedStartLocation.name,
 					lat: selectedStartLocation.lat,
 					lng: selectedStartLocation.lng,
-					location: selectedStartLocation.location
+					location: selectedStartLocation.location,
+					code: startCode
 				},
 				end: {
 					name: selectedEndLocation.name,
 					lat: selectedEndLocation.lat,
 					lng: selectedEndLocation.lng,
-					location: selectedEndLocation.location
+					location: selectedEndLocation.location,
+					code: endCode
 				}
 			});
 		}
@@ -307,7 +342,7 @@
 		mapCenter = [searchResult.lng, searchResult.lat];
 		mapZoom = 14;
 		searchResults = [];
-		searchQuery = searchResult.name;
+		searchQuery = searchResult.location || searchResult.name;
 
 		displayName = searchResult.location || searchResult.name;
 
@@ -320,12 +355,23 @@
 		startMarker = { lng: searchResult.lng, lat: searchResult.lat };
 		startSearchResults = [];
 
-		// Extract airport code if in airport mode
+		const typedQuery = startSearchQuery;
+
+		// Only auto-derive and surface codes in airport mode
 		if (airportMode) {
 			const airportCodeMatch = searchResult.name.match(/\(([A-Z]{3})\)/);
 			startSearchQuery = airportCodeMatch ? airportCodeMatch[1] : searchResult.name;
+			startCode = resolveCode(searchResult, typedQuery);
+			if (!startCode) {
+				startCode =
+					deriveCode(searchResult.name, startSearchQuery) || deriveCode(searchResult.location);
+			}
+			if (startCode) {
+				startSearchQuery = startCode;
+			}
 		} else {
-			startSearchQuery = searchResult.name;
+			startSearchQuery = searchResult.location || searchResult.name;
+			startCode = null;
 		}
 
 		await performDetailedReverseGeocode(searchResult.lat, searchResult.lng, 'start');
@@ -338,12 +384,23 @@
 		endMarker = { lng: searchResult.lng, lat: searchResult.lat };
 		endSearchResults = [];
 
-		// Extract airport code if in airport mode
+		const typedQuery = endSearchQuery;
+
+		// Only auto-derive and surface codes in airport mode
 		if (airportMode) {
 			const airportCodeMatch = searchResult.name.match(/\(([A-Z]{3})\)/);
 			endSearchQuery = airportCodeMatch ? airportCodeMatch[1] : searchResult.name;
+			endCode = resolveCode(searchResult, typedQuery);
+			if (!endCode) {
+				endCode =
+					deriveCode(searchResult.name, endSearchQuery) || deriveCode(searchResult.location);
+			}
+			if (endCode) {
+				endSearchQuery = endCode;
+			}
 		} else {
-			endSearchQuery = searchResult.name;
+			endSearchQuery = searchResult.location || searchResult.name;
+			endCode = null;
 		}
 
 		await performDetailedReverseGeocode(searchResult.lat, searchResult.lng, 'end');
@@ -394,7 +451,7 @@
 					type: result.type,
 					category: result.category
 				};
-				searchQuery = result.name;
+				searchQuery = result.display_name || result.name;
 				displayName = result.display_name || result.name;
 			} else {
 				selectedLocation = {
@@ -522,6 +579,8 @@
 			endMarker = null;
 			startLocationData = null;
 			endLocationData = null;
+			startCode = null;
+			endCode = null;
 			startSearchQuery = '';
 			endSearchQuery = '';
 			startSearchResults = [];
@@ -736,6 +795,9 @@
 									<div class="min-w-0 flex-1">
 										<p class="text-sm font-medium text-base-content/80 truncate">
 											{selectedStartLocation.name}
+											{#if startCode}
+												<span class="badge badge-success badge-sm ml-2">{startCode}</span>
+											{/if}
 										</p>
 										<p class="text-xs text-base-content/60">
 											{startMarker?.lat.toFixed(6)}, {startMarker?.lng.toFixed(6)}
@@ -751,6 +813,9 @@
 									<div class="min-w-0 flex-1">
 										<p class="text-sm font-medium text-base-content/80 truncate">
 											{selectedEndLocation.name}
+											{#if endCode}
+												<span class="badge badge-error badge-sm ml-2">{endCode}</span>
+											{/if}
 										</p>
 										<p class="text-xs text-base-content/60">
 											{endMarker?.lat.toFixed(6)}, {endMarker?.lng.toFixed(6)}

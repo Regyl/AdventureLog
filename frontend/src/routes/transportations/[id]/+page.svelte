@@ -19,10 +19,8 @@
 	import StarOutline from '~icons/mdi/star-outline';
 	import MapMarker from '~icons/mdi/map-marker';
 	import CalendarRange from '~icons/mdi/calendar-range';
-	import Eye from '~icons/mdi/eye';
-	import EyeOff from '~icons/mdi/eye-off';
 	import OpenInNew from '~icons/mdi/open-in-new';
-	import CashMultiple from '~icons/mdi/cash-multiple';
+	import MapMarkerDistanceIcon from '~icons/mdi/map-marker-distance';
 	import CardAccountDetails from '~icons/mdi/card-account-details';
 	import { formatDateInTimezone, formatAllDayDate } from '$lib/dateUtils';
 	import TransportationModal from '$lib/components/transportation/TransportationModal.svelte';
@@ -169,6 +167,13 @@
 		}
 		return null;
 	}
+
+	function getRouteCodes(item: Transportation): string | null {
+		if (item.start_code && item.end_code) return `${item.start_code} → ${item.end_code}`;
+		if (item.start_code) return item.start_code;
+		if (item.end_code) return item.end_code;
+		return null;
+	}
 </script>
 
 {#if notFound}
@@ -295,6 +300,11 @@
 						{#if transportation.to_location}
 							<div class="badge badge-lg badge-secondary font-semibold px-4 py-3">
 								🏁 {transportation.to_location}
+							</div>
+						{/if}
+						{#if getRouteCodes(transportation)}
+							<div class="badge badge-lg badge-outline font-semibold px-4 py-3 gap-2">
+								✈️ {getRouteCodes(transportation)}
 							</div>
 						{/if}
 						{#if transportation.is_public}
@@ -549,10 +559,23 @@
 								</div>
 							{/if}
 
+							<!-- Route Codes -->
+							{#if getRouteCodes(transportation)}
+								<div class="flex items-start gap-3">
+									<MapMarker class="w-5 h-5 text-primary mt-1 flex-shrink-0" />
+									<div>
+										<p class="font-semibold text-sm opacity-70">
+											{$t('transportation.codes') ?? 'Codes'}
+										</p>
+										<p class="text-base font-mono">{getRouteCodes(transportation)}</p>
+									</div>
+								</div>
+							{/if}
+
 							<!-- Distance -->
 							{#if transportation.distance}
 								<div class="flex items-start gap-3">
-									<CashMultiple class="w-5 h-5 text-primary mt-1 flex-shrink-0" />
+									<MapMarkerDistanceIcon class="w-5 h-5 text-primary mt-1 flex-shrink-0" />
 									<div>
 										<p class="font-semibold text-sm opacity-70">
 											{$t('adventures.distance') ?? 'Distance'}

@@ -189,6 +189,8 @@ export type Transportation = {
 	origin_longitude: number | null;
 	destination_latitude: number | null;
 	destination_longitude: number | null;
+	start_code: string | null; // Could be airport code, station code, etc.
+	end_code: string | null; // Could be airport code, station code, etc.
 	is_public: boolean;
 	distance: number | null; // in kilometers
 	collection: Collection | null | string;

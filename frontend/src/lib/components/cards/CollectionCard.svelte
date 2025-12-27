@@ -183,12 +183,11 @@
 	<!-- Content -->
 	<div class="card-body p-4 space-y-3">
 		<!-- Title -->
-		<button
-			on:click={() => goto(`/collections/${collection.id}`)}
-			class="text-lg font-semibold text-left hover:text-primary transition-colors duration-200 line-clamp-2 group-hover:underline"
+		<a
+			href="/collections/{collection.id}"
+			class="hover:text-primary transition-colors duration-200 line-clamp-2 text-lg font-semibold"
+			>{collection.name}</a
 		>
-			{collection.name}
-		</button>
 
 		<!-- Stats -->
 		<div class="flex flex-wrap items-center gap-2 text-sm text-base-content/70">
