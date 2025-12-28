@@ -229,7 +229,7 @@
 					</div>
 					<div>
 						<h1 class="text-3xl font-bold text-primary bg-clip-text">
-							{$t('adventures.my_adventures')}
+							{$t('adventures.my_locations')}
 						</h1>
 						<p class="text-sm text-base-content/60">
 							{filteredPins.length}
@@ -339,9 +339,9 @@
 				<div class="p-6 bg-base-200/50 rounded-2xl mb-6">
 					<span class="loading loading-spinner w-16 h-16 text-primary"></span>
 				</div>
-				<h3 class="text-xl font-semibold text-base-content/70 mb-2">
-					{$t('adventures.loading_adventures')}
-				</h3>
+				<!-- <h3 class="text-xl font-semibold text-base-content/70 mb-2">
+					{$t('immich.loading')}
+				</h3> -->
 			</div>
 		{:else}
 			<!-- Main Content -->
@@ -364,10 +364,10 @@
 							</button>
 						{:else}
 							<h3 class="text-xl font-semibold text-base-content/70 mb-2">
-								{$t('adventures.no_linkable_adventures')}
+								{$t('adventures.no_linkable_locations')}
 							</h3>
 							<p class="text-base-content/50 text-center max-w-md">
-								{$t('adventures.all_adventures_already_linked')}
+								{$t('adventures.all_locations_already_linked')}
 							</p>
 						{/if}
 					</div>
@@ -406,7 +406,7 @@
 			<div class="flex items-center justify-between">
 				<div class="text-sm text-base-content/60">
 					{filteredPins.length}
-					{$t('adventures.adventures_available')}
+					{$t('locations.locations')}
 				</div>
 				<button class="btn btn-primary gap-2" on:click={close}>
 					<Link class="w-4 h-4" />

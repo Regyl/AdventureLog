@@ -51,7 +51,7 @@
 				</div>
 			</div>
 
-			<div class="px-2 max-h-[28rem] overflow-y-auto space-y-3">
+			<div class="px-2 max-h-[28rem] overflow-y-auto space-y-3 pt-4 pb-4">
 				{#if days.length === 0}
 					<div class="card bg-base-200 border border-base-300">
 						<div class="card-body text-center py-10">

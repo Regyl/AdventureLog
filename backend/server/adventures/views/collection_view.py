@@ -38,18 +38,18 @@ class CollectionViewSet(viewsets.ModelViewSet):
         if order_by == 'name':
             queryset = queryset.annotate(lower_name=Lower('name'))
             ordering = 'lower_name'
-            if order_direction == 'desc':
+            if order_direction == 'asc':
                 ordering = f'-{ordering}'
         elif order_by == 'start_date':
             ordering = 'start_date'
-            if order_direction == 'asc':
+            if order_direction == 'desc':
                 ordering = 'start_date'
             else:
                 ordering = '-start_date'
         else:
             order_by == 'updated_at'
             ordering = 'updated_at'
-            if order_direction == 'asc':
+            if order_direction == 'desc':
                 ordering = '-updated_at'
 
         return queryset.order_by(ordering)
