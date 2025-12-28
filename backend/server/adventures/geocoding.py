@@ -157,10 +157,10 @@ def extractIsoCode(user, data):
             for key in keys:
                 if key.find("ISO") != -1:
                     iso_code = data['address'][key]
-            if 'town' in keys:
-                town_city_or_county = data['address']['town']
             if 'county' in keys:
                 town_city_or_county = data['address']['county']
+            if 'town' in keys:
+                town_city_or_county = data['address']['town']
             if 'city' in keys:
                 town_city_or_county = data['address']['city']
         if not iso_code:
