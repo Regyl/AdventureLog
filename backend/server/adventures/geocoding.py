@@ -157,12 +157,7 @@ def extractIsoCode(user, data):
             for key in keys:
                 if key.find("ISO") != -1:
                     iso_code = data['address'][key]
-            if 'town' in keys:
-                town_city_or_county = data['address']['town']
-            if 'county' in keys:
-                town_city_or_county = data['address']['county']
-            if 'city' in keys:
-                town_city_or_county = data['address']['city']
+
         if not iso_code:
             return {"error": "No region found"}
         
@@ -174,9 +169,15 @@ def extractIsoCode(user, data):
         country_code = iso_code[:2]
         
         if region:
-            if town_city_or_county:
-                display_name = f"{town_city_or_county}, {region.name}, {country_code}"
-                city = City.objects.filter(name__contains=town_city_or_county, region=region).first()
+            if 'city' in keys:
+                city = City.objects.filter(name__contains=data['address']['city'], region=region).first()
+            if 'county' in keys and not city:
+                city = City.objects.filter(name__contains=data['address']['county'], region=region).first()
+            if 'town' in keys and not city:
+                city = City.objects.filter(name__contains=data['address']['town'], region=region).first()
+
+            if city:
+                display_name = f"{city.name}, {region.name}, {country_code}"
                 visited_city = VisitedCity.objects.filter(city=city, user=user).first()
 
         if visited_region:
