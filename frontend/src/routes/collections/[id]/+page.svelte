@@ -25,6 +25,11 @@
 	import Lightbulb from '~icons/mdi/lightbulb';
 	import Plus from '~icons/mdi/plus';
 	import { addToast } from '$lib/toasts';
+	import NoteModal from '$lib/components/NoteModal.svelte';
+	import ChecklistModal from '$lib/components/ChecklistModal.svelte';
+	import LodgingModal from '$lib/components/lodging/LodgingModal.svelte';
+	import TransportationModal from '$lib/components/transportation/TransportationModal.svelte';
+	import LocationModal from '$lib/components/locations/LocationModal.svelte';
 
 	const renderMarkdown = (markdown: string) => {
 		return marked(markdown) as string;
@@ -36,11 +41,41 @@
 	let collection: Collection = (data.props as any).collection || (data.props as any).adventure;
 	let currentSlide = 0;
 	let notFound: boolean = false;
-	let isEditModalOpen: boolean = false;
+	let isLocationModalOpen: boolean = false;
+	let isLodgingModalOpen: boolean = false;
+	let isTransportationModalOpen: boolean = false;
+	let isChecklistModalOpen: boolean = false;
+	let isNoteModalOpen: boolean = false;
+	// Edit placeholders used when creating new items from FAB dropdown
+	let adventureToEdit: any = null;
+	let transportationToEdit: any = null;
+	let noteToEdit: any = null;
+	let checklistToEdit: any = null;
+	let lodgingToEdit: any = null;
 	let heroImages: ContentImage[] = [];
 	let modalInitialIndex: number = 0;
 	let isImageModalOpen: boolean = false;
 	let isLocationLinkModalOpen: boolean = false;
+
+	// Shared helpers for keeping collection sub-items in sync after modal actions
+	type CollectionArrayKey = 'locations' | 'transportations' | 'lodging' | 'notes' | 'checklists';
+
+	function ensureCollectionArray(key: CollectionArrayKey) {
+		if (!collection) return [] as any[];
+		if (!(collection as any)[key]) {
+			(collection as any)[key] = [];
+		}
+		return (collection as any)[key] as any[];
+	}
+
+	function upsertCollectionItem(key: CollectionArrayKey, item: any) {
+		if (!item || item.id === undefined || item.id === null) return;
+		const items = ensureCollectionArray(key);
+		const exists = items.some((entry: any) => String(entry.id) === String(item.id));
+		(collection as any)[key] = exists
+			? items.map((entry: any) => (String(entry.id) === String(item.id) ? item : entry))
+			: [...items, item];
+	}
 
 	// View state from URL params
 	type ViewType = 'all' | 'itinerary' | 'map' | 'recommendations';
@@ -154,6 +189,35 @@
 		isLocationLinkModalOpen = false;
 	}
 
+	function handleOpenEdit(event: CustomEvent<{ type: CollectionArrayKey; item: any }>) {
+		const { type, item } = event.detail;
+
+		switch (type) {
+			case 'locations':
+				adventureToEdit = item;
+				isLocationModalOpen = true;
+				break;
+			case 'transportations':
+				transportationToEdit = item;
+				isTransportationModalOpen = true;
+				break;
+			case 'lodging':
+				lodgingToEdit = item;
+				isLodgingModalOpen = true;
+				break;
+			case 'notes':
+				noteToEdit = item;
+				isNoteModalOpen = true;
+				break;
+			case 'checklists':
+				checklistToEdit = item;
+				isChecklistModalOpen = true;
+				break;
+			default:
+				break;
+		}
+	}
+
 	async function handleLocationAdded(event: CustomEvent<Location>) {
 		// Link the location to this collection
 		const location = event.detail;
@@ -235,6 +299,115 @@
 		collectionId={collection.id}
 		on:close={closeLocationLinkModal}
 		on:add={handleLocationAdded}
+	/>
+{/if}
+
+{#if isNoteModalOpen}
+	<NoteModal
+		on:close={() => {
+			noteToEdit = null;
+			isNoteModalOpen = false;
+		}}
+		note={noteToEdit}
+		{collection}
+		on:save={(e) => {
+			upsertCollectionItem('notes', e.detail);
+			noteToEdit = null;
+			isNoteModalOpen = false;
+		}}
+		on:create={(e) => {
+			upsertCollectionItem('notes', e.detail);
+			noteToEdit = null;
+			isNoteModalOpen = false;
+		}}
+	/>
+{/if}
+
+{#if isLocationModalOpen}
+	<LocationModal
+		on:close={() => {
+			adventureToEdit = null;
+			isLocationModalOpen = false;
+		}}
+		user={data.user}
+		{collection}
+		locationToEdit={adventureToEdit}
+		on:save={(e) => {
+			upsertCollectionItem('locations', e.detail);
+			adventureToEdit = null;
+			isLocationModalOpen = false;
+		}}
+		on:create={(e) => {
+			upsertCollectionItem('locations', e.detail);
+			adventureToEdit = null;
+			isLocationModalOpen = false;
+		}}
+	/>
+{/if}
+
+{#if isTransportationModalOpen}
+	<TransportationModal
+		on:close={() => {
+			transportationToEdit = null;
+			isTransportationModalOpen = false;
+		}}
+		user={data.user}
+		{collection}
+		{transportationToEdit}
+		on:save={(e) => {
+			upsertCollectionItem('transportations', e.detail);
+			transportationToEdit = null;
+			isTransportationModalOpen = false;
+		}}
+		on:create={(e) => {
+			upsertCollectionItem('transportations', e.detail);
+			transportationToEdit = null;
+			isTransportationModalOpen = false;
+		}}
+	/>
+{/if}
+
+{#if isChecklistModalOpen}
+	<ChecklistModal
+		on:close={() => {
+			checklistToEdit = null;
+			isChecklistModalOpen = false;
+		}}
+		{collection}
+		user={data.user}
+		checklist={checklistToEdit}
+		on:save={(e) => {
+			upsertCollectionItem('checklists', e.detail);
+			checklistToEdit = null;
+			isChecklistModalOpen = false;
+		}}
+		on:create={(e) => {
+			upsertCollectionItem('checklists', e.detail);
+			checklistToEdit = null;
+			isChecklistModalOpen = false;
+		}}
+	/>
+{/if}
+
+{#if isLodgingModalOpen}
+	<LodgingModal
+		on:close={() => {
+			lodgingToEdit = null;
+			isLodgingModalOpen = false;
+		}}
+		{collection}
+		user={data.user}
+		{lodgingToEdit}
+		on:save={(e) => {
+			upsertCollectionItem('lodging', e.detail);
+			lodgingToEdit = null;
+			isLodgingModalOpen = false;
+		}}
+		on:create={(e) => {
+			upsertCollectionItem('lodging', e.detail);
+			lodgingToEdit = null;
+			isLodgingModalOpen = false;
+		}}
 	/>
 {/if}
 
@@ -434,12 +607,12 @@
 				{/if}
 
 				<!-- All Items View -->
-				{#if currentView === 'all' && collection.locations && collection.locations.length > 0}
+				{#if currentView === 'all'}
 					<CollectionAllItems
-						{collection}
+						bind:collection
 						user={data.user}
 						{isFolderView}
-						canModify={canModifyCollection}
+						on:openEdit={handleOpenEdit}
 					/>
 				{/if}
 
@@ -678,15 +851,82 @@
 {/if}
 
 <!-- Floating Action Button (FAB) - Only shown if user can modify collection -->
-{#if collection && canModifyCollection}
-	<div class="fixed bottom-6 right-6 z-40">
-		<button
-			class="btn btn-primary btn-circle w-16 h-16 shadow-2xl hover:shadow-primary/25 transition-all duration-200"
-			on:click={openLocationLinkModal}
-			aria-label="Add locations to collection"
-		>
-			<Plus class="w-8 h-8" />
-		</button>
+{#if collection && canModifyCollection && !collection.is_archived}
+	<div class="fixed bottom-4 right-4 z-[999]">
+		<div class="flex flex-row items-center justify-center gap-4">
+			<div class="dropdown dropdown-top dropdown-end z-[999]">
+				<div tabindex="0" role="button" class="btn m-1 size-16 btn-primary">
+					<Plus class="w-8 h-8" />
+				</div>
+				<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+				<ul
+					tabindex="0"
+					class="dropdown-content z-[1] menu p-4 shadow bg-base-300 text-base-content rounded-box w-52 gap-4"
+				>
+					<p class="text-center font-bold text-lg">{$t('adventures.link_new')}</p>
+					<!-- Link existing location to collection -->
+					<button
+						class="btn btn-primary"
+						on:click={() => {
+							isLocationLinkModalOpen = true;
+						}}
+					>
+						{$t('locations.location')}
+					</button>
+
+					<p class="text-center font-bold text-lg">{$t('adventures.add_new')}</p>
+					<button
+						class="btn btn-primary"
+						on:click={() => {
+							isLocationModalOpen = true;
+							adventureToEdit = null;
+						}}
+					>
+						{$t('locations.location')}
+					</button>
+
+					<button
+						class="btn btn-primary"
+						on:click={() => {
+							transportationToEdit = null;
+							isTransportationModalOpen = true;
+						}}
+					>
+						{$t('adventures.transportation')}
+					</button>
+
+					<button
+						class="btn btn-primary"
+						on:click={() => {
+							isNoteModalOpen = true;
+							noteToEdit = null;
+						}}
+					>
+						{$t('adventures.note')}
+					</button>
+
+					<button
+						class="btn btn-primary"
+						on:click={() => {
+							checklistToEdit = null;
+							isChecklistModalOpen = true;
+						}}
+					>
+						{$t('adventures.checklist')}
+					</button>
+
+					<button
+						class="btn btn-primary"
+						on:click={() => {
+							lodgingToEdit = null;
+							isLodgingModalOpen = true;
+						}}
+					>
+						{$t('adventures.lodging')}
+					</button>
+				</ul>
+			</div>
+		</div>
 	</div>
 {/if}
 

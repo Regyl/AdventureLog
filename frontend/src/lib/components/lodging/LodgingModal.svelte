@@ -18,6 +18,9 @@
 
 	let modal: HTMLDialogElement;
 
+	// Whether a save/create occurred during this modal session
+	let didSave = false;
+
 	let steps = [
 		{
 			name: $t('adventures.details'),
@@ -116,6 +119,15 @@
 	});
 
 	function close() {
+		// If a save occurred, notify the parent with appropriate event
+		if (didSave) {
+			if (lodgingToEdit) {
+				dispatch('save', lodging);
+			} else {
+				dispatch('create', lodging);
+			}
+		}
+
 		dispatch('close');
 	}
 
@@ -234,6 +246,9 @@
 				on:save={(e) => {
 					// Update the entire lodging object with all saved data
 					lodging = { ...lodging, ...e.detail };
+
+					// Mark that a save occurred so close() will notify parent
+					didSave = true;
 
 					// Only allow moving to Media once we have a persisted id.
 					if (!lodging?.id) {

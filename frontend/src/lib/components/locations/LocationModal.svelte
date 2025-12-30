@@ -20,6 +20,9 @@
 
 	let modal: HTMLDialogElement;
 
+	// Whether a save/create occurred during this modal session
+	let didSave = false;
+
 	let steps = [
 		{
 			name: $t('adventures.quick_start'),
@@ -116,6 +119,15 @@
 	});
 
 	function close() {
+		// If a save occurred, notify the parent with appropriate event
+		if (didSave) {
+			if (locationToEdit) {
+				dispatch('save', location);
+			} else {
+				dispatch('create', location);
+			}
+		}
+
 		dispatch('close');
 	}
 
@@ -288,6 +300,9 @@
 					location.tags = e.detail.tags;
 					location.user = e.detail.user;
 					location.id = e.detail.id;
+
+					// Mark that a save occurred so close() will notify parent
+					didSave = true;
 
 					steps[1].selected = false;
 					steps[2].selected = true;
