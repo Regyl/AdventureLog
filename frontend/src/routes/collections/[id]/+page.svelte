@@ -16,6 +16,7 @@
 	import CollectionAllItems from '$lib/components/collections/CollectionAllItems.svelte';
 	import CollectionItineraryPlanner from '$lib/components/collections/CollectionItineraryPlanner.svelte';
 	import CollectionRecommendationView from '$lib/components/CollectionRecommendationView.svelte';
+	import CollectionMap from '$lib/components/collections/CollectionMap.svelte';
 	import LocationLink from '$lib/components/LocationLink.svelte';
 	import { getBasemapUrl } from '$lib';
 	import FolderMultiple from '~icons/mdi/folder-multiple';
@@ -631,39 +632,7 @@
 						<div class="card-body">
 							<h2 class="card-title text-2xl mb-4">🗺️ Map</h2>
 							<div class="rounded-lg overflow-hidden shadow-lg">
-								<MapLibre
-									style={getBasemapUrl()}
-									class="w-full h-full min-h-[600px]"
-									standardControls
-									center={getMapCenter()}
-									zoom={8}
-								>
-									{#each collection.locations as location}
-										{#if location.latitude && location.longitude}
-											<DefaultMarker lngLat={{ lng: location.longitude, lat: location.latitude }}>
-												<Popup openOn="click" offset={[0, -10]}>
-													<div class="p-2">
-														<a
-															href={`/adventures/${location.id}`}
-															class="text-lg font-bold text-black hover:underline mb-1 block"
-														>
-															{location.name}
-														</a>
-														{#if location.category}
-															<p class="font-semibold text-black text-sm mb-2">
-																{location.category.display_name}
-																{location.category.icon}
-															</p>
-														{/if}
-														{#if location.location}
-															<p class="text-xs text-black opacity-70">📍 {location.location}</p>
-														{/if}
-													</div>
-												</Popup>
-											</DefaultMarker>
-										{/if}
-									{/each}
-								</MapLibre>
+								<CollectionMap {collection} />
 							</div>
 						</div>
 					</div>

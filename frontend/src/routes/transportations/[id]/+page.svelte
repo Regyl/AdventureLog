@@ -4,7 +4,7 @@
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
 	import Lost from '$lib/assets/undraw_lost.svg';
-	import { DefaultMarker, MapLibre, Popup } from 'svelte-maplibre';
+	import { DefaultMarker, MapLibre, Popup, GeoJSON, LineLayer } from 'svelte-maplibre';
 	import { t } from 'svelte-i18n';
 	import { marked } from 'marked';
 	import DOMPurify from 'dompurify';
@@ -41,6 +41,7 @@
 
 	let notFound: boolean = false;
 	let mapCenter: [number, number] | null = null;
+	let attachmentGeojson: any = null;
 	let modalInitialIndex: number = 0;
 	let isImageModalOpen: boolean = false;
 	let isEditModalOpen: boolean = false;
@@ -78,6 +79,7 @@
 	});
 
 	$: mapCenter = transportation ? getMapCenter(transportation) : null;
+	$: attachmentGeojson = transportation ? collectAttachmentGeojson(transportation) : null;
 
 	function closeImageModal() {
 		isImageModalOpen = false;
@@ -173,6 +175,26 @@
 		if (item.start_code) return item.start_code;
 		if (item.end_code) return item.end_code;
 		return null;
+	}
+
+	function collectAttachmentGeojson(item: Transportation) {
+		if (!item.attachments || item.attachments.length === 0) return null;
+		const features: any[] = [];
+		for (const a of item.attachments) {
+			if (a && a.geojson && a.geojson.features) {
+				// If it's a FeatureCollection
+				if (a.geojson.type === 'FeatureCollection' && Array.isArray(a.geojson.features)) {
+					features.push(...a.geojson.features);
+				} else if (a.geojson.type === 'Feature') {
+					features.push(a.geojson);
+				}
+			}
+		}
+		if (features.length === 0) return null;
+		return {
+			type: 'FeatureCollection',
+			features
+		};
 	}
 </script>
 
@@ -403,7 +425,7 @@
 				{#if mapCenter}
 					<div class="card bg-base-200 shadow-xl">
 						<div class="card-body">
-							<h2 class="card-title text-2xl mb-4">🗺️ {$t('adventures.location')}</h2>
+							<h2 class="card-title text-2xl mb-4">🗺️ {$t('adventures.transportation')}</h2>
 							<div class="rounded-lg overflow-hidden shadow-lg">
 								<MapLibre
 									style={getBasemapUrl()}
@@ -486,6 +508,16 @@
 												</div>
 											</Popup>
 										</DefaultMarker>
+									{/if}
+
+									{#if attachmentGeojson}
+										<!-- Render attachment GeoJSON (e.g., GPX converted to GeoJSON) -->
+										<GeoJSON data={attachmentGeojson}>
+											<LineLayer
+												id="transportation-route"
+												paint={{ 'line-color': '#60a5fa', 'line-width': 4, 'line-opacity': 0.9 }}
+											/>
+										</GeoJSON>
 									{/if}
 								</MapLibre>
 							</div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Attachment } from '$lib/types';
+	import type { Attachment, User } from '$lib/types';
 	import { createEventDispatcher } from 'svelte';
 	import { t } from 'svelte-i18n';
 	import { deserialize } from '$app/forms';
@@ -12,13 +12,19 @@
 	import LaunchIcon from '~icons/mdi/open-in-new';
 	import CheckIcon from '~icons/mdi/check';
 	import CloseIcon from '~icons/mdi/close';
+	import LightbubOnIcon from '~icons/mdi/lightbulb-on';
 
 	import { addToast } from '$lib/toasts';
+	import StravaGpxList from './transportation/StravaGpxList.svelte';
 
 	// Props
 	export let attachments: Attachment[] = [];
 	export let itemId: string = '';
 	export let contentType: 'location' | 'lodging' | 'transportation' | '' = 'location';
+	export let user: User | null = null;
+
+	export let start_date: string | null = null;
+	export let end_date: string | null = null;
 
 	// Component state
 	let attachmentFileInput: HTMLInputElement;
@@ -189,6 +195,20 @@
 			<h2 class="text-xl font-bold">{$t('adventures.attachment_management')}</h2>
 		</div>
 
+		<!-- transportation GPX tip box -->
+		{#if contentType === 'transportation'}
+			<div class="alert alert-neutral mb-6">
+				<div class="flex-1">
+					<div class="flex items-center gap-2">
+						<LightbubOnIcon class="w-5 h-5 " />
+						<p class="text-sm">
+							{$t('adventures.transportation_gpx_tip')}
+						</p>
+					</div>
+				</div>
+			</div>
+		{/if}
+
 		<!-- Upload Options -->
 		<div class="grid gap-4 mb-6">
 			<!-- File Upload -->
@@ -221,6 +241,9 @@
 						{$t('adventures.upload')}
 					</button>
 				</div>
+				{#if contentType === 'transportation'}
+					<StravaGpxList {start_date} {end_date} {user} />
+				{/if}
 				{#if attachmentError}
 					<div class="alert alert-error mt-2 py-2">
 						<span class="text-sm">{attachmentError}</span>

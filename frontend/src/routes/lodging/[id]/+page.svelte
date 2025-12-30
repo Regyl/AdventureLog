@@ -345,7 +345,7 @@
 				{#if lodging.latitude && lodging.longitude}
 					<div class="card bg-base-200 shadow-xl">
 						<div class="card-body">
-							<h2 class="card-title text-2xl mb-4">🗺️ {$t('adventures.location')}</h2>
+							<h2 class="card-title text-2xl mb-4">🗺️ {$t('adventures.lodging')}</h2>
 							<div class="rounded-lg overflow-hidden shadow-lg">
 								<MapLibre
 									style={getBasemapUrl()}

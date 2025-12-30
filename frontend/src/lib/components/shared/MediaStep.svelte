@@ -17,6 +17,10 @@
 	export let itemName: string = '';
 	export let itemId: string = '';
 	export let contentType: 'location' | 'lodging' | 'transportation' | '' = 'location';
+	export let user: User | null = null;
+
+	export let start_date: string | null = null;
+	export let end_date: string | null = null;
 	// export let measurementSystem: 'metric' | 'imperial' = 'metric';
 	// export let user: User | null = null;
 
@@ -86,6 +90,9 @@
 			{itemId}
 			{contentType}
 			on:attachmentsUpdated={handleAttachmentsUpdated}
+			{start_date}
+			{end_date}
+			{user}
 		/>
 
 		<!-- Action Buttons -->

@@ -290,6 +290,9 @@
 				on:close={() => close()}
 				itemId={transportation.id}
 				contentType="transportation"
+				start_date={transportation.date}
+				end_date={transportation.end_date}
+				{user}
 			/>
 		{/if}
 	</div>
