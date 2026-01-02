@@ -177,6 +177,33 @@
 		return null;
 	}
 
+	/**
+	 * Format a distance given in kilometers according to the current user's
+	 * measurement system (metric or imperial). For metric show meters for <1km,
+	 * otherwise km; for imperial show feet for very small distances, otherwise miles.
+	 */
+	function formatDistance(distanceKm: number | null): string | null {
+		if (distanceKm === null || distanceKm === undefined) return null;
+		const ms = data.user?.measurement_system ?? 'metric';
+
+		if (ms === 'imperial') {
+			const miles = distanceKm * 0.621371;
+			// show miles if at least 0.1 mi, otherwise show feet
+			if (miles >= 0.1) {
+				return `${miles.toFixed(1)} mi`;
+			}
+			const feet = Math.round(miles * 5280);
+			return `${feet} ft`;
+		} else {
+			// metric
+			if (distanceKm >= 1) {
+				return `${distanceKm.toFixed(1)} km`;
+			}
+			const meters = Math.round(distanceKm * 1000);
+			return `${meters} m`;
+		}
+	}
+
 	function collectAttachmentGeojson(item: Transportation) {
 		if (!item.attachments || item.attachments.length === 0) return null;
 		const features: any[] = [];
@@ -612,7 +639,7 @@
 										<p class="font-semibold text-sm opacity-70">
 											{$t('adventures.distance') ?? 'Distance'}
 										</p>
-										<p class="text-base">{transportation.distance} km</p>
+										<p class="text-base">{formatDistance(transportation.distance)}</p>
 									</div>
 								</div>
 							{/if}

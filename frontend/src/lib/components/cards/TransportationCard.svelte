@@ -11,6 +11,7 @@
 	import { formatAllDayDate, formatDateInTimezone } from '$lib/dateUtils';
 	import { isAllDay } from '$lib';
 	import CardCarousel from '../CardCarousel.svelte';
+	import TransportationRoutePreview from './TransportationRoutePreview.svelte';
 
 	import Eye from '~icons/mdi/eye';
 	import EyeOff from '~icons/mdi/eye-off';
@@ -47,6 +48,23 @@
 	export let itineraryItem: CollectionItineraryItem | null = null;
 
 	const toMiles = (km: any) => (Number(km) * 0.621371).toFixed(1);
+
+	const formatTravelDuration = (minutes: number | null | undefined) => {
+		if (minutes === null || minutes === undefined || Number.isNaN(minutes)) return null;
+		const safeMinutes = Math.max(0, Math.floor(minutes));
+		const hours = Math.floor(safeMinutes / 60);
+		const mins = safeMinutes % 60;
+		const parts = [] as string[];
+		if (hours) parts.push(`${hours}h`);
+		parts.push(`${mins}m`);
+		return parts.join(' ');
+	};
+
+	let travelDurationLabel: string | null = null;
+	$: travelDurationLabel = formatTravelDuration(transportation?.travel_duration_minutes ?? null);
+
+	$: routeGeojson =
+		transportation?.attachments?.find((attachment) => attachment?.geojson)?.geojson ?? null;
 
 	let isWarningModalOpen: boolean = false;
 
@@ -101,11 +119,19 @@
 >
 	<!-- Image Section with Overlay -->
 	<div class="relative overflow-hidden rounded-t-2xl">
-		<CardCarousel
-			images={transportation.images}
-			icon={getTransportationIcon(transportation.type)}
-			name={transportation.name}
-		/>
+		{#if routeGeojson}
+			<TransportationRoutePreview
+				geojson={routeGeojson}
+				name={transportation.name}
+				images={transportation.images}
+			/>
+		{:else}
+			<CardCarousel
+				images={transportation.images}
+				icon={getTransportationIcon(transportation.type)}
+				name={transportation.name}
+			/>
+		{/if}
 
 		<!-- Privacy Indicator -->
 		<div class="absolute top-2 right-4">
@@ -247,6 +273,12 @@
 					{user?.measurement_system === 'imperial'
 						? `${toMiles(transportation.distance)} mi`
 						: `${(+transportation.distance).toFixed(1)} km`}
+				</div>
+			{/if}
+
+			{#if travelDurationLabel}
+				<div class="badge badge-ghost badge-sm">
+					⏱️ {travelDurationLabel}
 				</div>
 			{/if}
 

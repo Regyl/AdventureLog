@@ -198,6 +198,7 @@ export type Transportation = {
 	updated_at: string; // ISO 8601 date string
 	images: ContentImage[]; // Array of images associated with the transportation
 	attachments: Attachment[]; // Array of attachments associated with the transportation
+	travel_duration_minutes?: number | null;
 };
 
 export type Note = {

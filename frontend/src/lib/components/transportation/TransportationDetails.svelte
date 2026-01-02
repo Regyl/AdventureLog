@@ -84,6 +84,11 @@
 
 	$: user = currentUser;
 	$: transportationToEdit = editingTransportation;
+	// Set the full date range for constraining purposes (from collection)
+	$: if (collection && collection.start_date && collection.end_date) {
+		fullStartDate = `${collection.start_date}T00:00`;
+		fullEndDate = `${collection.end_date}T23:59`;
+	}
 	// Only assign timezones when this is a timed transportation. Keep timezones null for all-day entries.
 	$: {
 		transportation.start_timezone = allDay ? null : selectedTimezone;

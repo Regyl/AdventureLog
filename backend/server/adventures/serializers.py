@@ -7,6 +7,7 @@ from worldtravel.serializers import CountrySerializer, RegionSerializer, CitySer
 from geopy.distance import geodesic
 from integrations.models import ImmichIntegration
 from adventures.utils.geojson import gpx_to_geojson
+import gpxpy
 import logging
 
 logger = logging.getLogger(__name__)
@@ -424,6 +425,7 @@ class TransportationSerializer(CustomModelSerializer):
     distance = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
+    travel_duration_minutes = serializers.SerializerMethodField()
 
     class Meta:
         model = Transportation
@@ -432,9 +434,10 @@ class TransportationSerializer(CustomModelSerializer):
             'link', 'date', 'flight_number', 'from_location', 'to_location', 
             'is_public', 'collection', 'created_at', 'updated_at', 'end_date',
             'origin_latitude', 'origin_longitude', 'destination_latitude', 'destination_longitude',
-            'start_timezone', 'end_timezone', 'distance', 'images', 'attachments', 'start_code', 'end_code'
+            'start_timezone', 'end_timezone', 'distance', 'images', 'attachments', 'start_code', 'end_code',
+            'travel_duration_minutes'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'user', 'distance']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'user', 'distance', 'travel_duration_minutes']
 
     def get_images(self, obj):
         serializer = ContentImageSerializer(obj.images.all(), many=True, context=self.context)
@@ -447,6 +450,10 @@ class TransportationSerializer(CustomModelSerializer):
         return [attachment for attachment in serializer.data if attachment is not None]
 
     def get_distance(self, obj):
+        gpx_distance = self._get_gpx_distance_km(obj)
+        if gpx_distance is not None:
+            return gpx_distance
+
         if (
             obj.origin_latitude and obj.origin_longitude and
             obj.destination_latitude and obj.destination_longitude
@@ -458,6 +465,68 @@ class TransportationSerializer(CustomModelSerializer):
             except ValueError:
                 return None
         return None
+
+    def _get_gpx_distance_km(self, obj):
+        gpx_attachments = obj.attachments.filter(file__iendswith='.gpx')
+        for attachment in gpx_attachments:
+            distance_km = self._parse_gpx_distance_km(attachment.file)
+            if distance_km is not None:
+                return distance_km
+        return None
+
+    def _parse_gpx_distance_km(self, gpx_file_field):
+        try:
+            with gpx_file_field.open('r') as gpx_file:
+                gpx = gpxpy.parse(gpx_file)
+
+            total_meters = 0.0
+
+            for track in gpx.tracks:
+                for segment in track.segments:
+                    segment_length = segment.length_3d() or segment.length_2d()
+                    if segment_length:
+                        total_meters += segment_length
+
+            for route in gpx.routes:
+                route_length = route.length_3d() or route.length_2d()
+                if route_length:
+                    total_meters += route_length
+
+            if total_meters > 0:
+                return round(total_meters / 1000, 2)
+        except Exception as exc:
+            logger.warning(
+                "Failed to calculate GPX distance for file %s: %s",
+                getattr(gpx_file_field, 'name', 'unknown'),
+                exc,
+            )
+        return None
+
+    def get_travel_duration_minutes(self, obj):
+        if not obj.date or not obj.end_date:
+            return None
+
+        if self._is_all_day(obj.date) and self._is_all_day(obj.end_date):
+            return None
+
+        try:
+            total_minutes = int((obj.end_date - obj.date).total_seconds() // 60)
+            return total_minutes if total_minutes >= 0 else None
+        except Exception:
+            logger.warning(
+                "Failed to calculate travel duration for transportation %s",
+                getattr(obj, "id", "unknown"),
+                exc_info=True,
+            )
+            return None
+
+    def _is_all_day(self, dt_value):
+        return (
+            dt_value.time().hour == 0
+            and dt_value.time().minute == 0
+            and dt_value.time().second == 0
+            and dt_value.time().microsecond == 0
+        )
 
 class LodgingSerializer(CustomModelSerializer):
     images = serializers.SerializerMethodField()
