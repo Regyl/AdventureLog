@@ -101,9 +101,10 @@
 
 		loadData();
 
-		const handlePointerDown = (event: PointerEvent) => {
+		const handleOutside = (event: Event) => {
 			if (!dropdownRef) return;
-			if (!dropdownRef.contains(event.target as Node)) {
+			const target = event.target as Node | null;
+			if (target && !dropdownRef.contains(target)) {
 				closeDropdown();
 			}
 		};
@@ -114,17 +115,18 @@
 			}
 		};
 
-		document.addEventListener('pointerdown', handlePointerDown);
+		const outsideEvents: Array<keyof DocumentEventMap> = ['pointerdown', 'mousedown', 'touchstart'];
+		outsideEvents.forEach((eventName) => document.addEventListener(eventName, handleOutside));
 		document.addEventListener('keydown', handleKeyDown);
 
 		return () => {
-			document.removeEventListener('pointerdown', handlePointerDown);
+			outsideEvents.forEach((eventName) => document.removeEventListener(eventName, handleOutside));
 			document.removeEventListener('keydown', handleKeyDown);
 		};
 	});
 </script>
 
-<div class="dropdown w-full" bind:this={dropdownRef}>
+<div class="dropdown w-full" class:dropdown-open={isOpen} bind:this={dropdownRef}>
 	<button
 		type="button"
 		class="btn btn-outline w-full justify-between sm:h-auto h-12"
