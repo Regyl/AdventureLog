@@ -6,7 +6,6 @@
 	import { addToast } from '$lib/toasts';
 	import { t } from 'svelte-i18n';
 	import DeleteWarning from '../DeleteWarning.svelte';
-	// import ArrowDownThick from '~icons/mdi/arrow-down-thick';
 	import { TRANSPORTATION_TYPES_ICONS } from '$lib';
 	import { formatAllDayDate, formatDateInTimezone } from '$lib/dateUtils';
 	import { isAllDay } from '$lib';
@@ -181,7 +180,7 @@
 		{/if}
 	</div>
 
-	<div class="card-body p-4 space-y-3">
+	<div class="card-body p-4 space-y-3 min-w-0">
 		<!-- Header -->
 		<div class="flex items-start justify-between gap-3">
 			<a
@@ -242,108 +241,123 @@
 			</div>
 		</div>
 
-		<!-- Route Info -->
+		<!-- Route & Flight Info -->
 		{#if (transportation.start_code && transportation.end_code) || transportation.from_location || transportation.to_location}
-			<div class="text-sm text-base-content/70">
+			<div class="flex items-center gap-2 min-w-0">
 				{#if transportation.start_code && transportation.end_code}
-					<div class="flex items-center gap-2">
-						<span class="font-semibold text-base-content">{transportation.start_code}</span>
-						<span class="text-base-content/40">→</span>
-						<span class="font-semibold text-base-content">{transportation.end_code}</span>
-					</div>
+					<span class="text-base font-semibold text-base-content">{transportation.start_code}</span>
+					<span class="text-primary text-lg">→</span>
+					<span class="text-base font-semibold text-base-content">{transportation.end_code}</span>
+					{#if transportation.type === 'plane' && transportation.flight_number}
+						<div class="divider divider-horizontal mx-1"></div>
+						<span class="badge badge-primary badge-sm font-medium"
+							>{transportation.flight_number}</span
+						>
+					{/if}
 				{:else if transportation.from_location && transportation.to_location}
-					<div class="flex items-start gap-2">
-						<span class="flex-1">{transportation.from_location}</span>
-						<span class="text-base-content/40 mt-0.5">→</span>
-						<span class="flex-1">{transportation.to_location}</span>
-					</div>
+					<span class="truncate max-w-[10rem] text-sm text-base-content/80"
+						>{transportation.from_location}</span
+					>
+					<span class="text-primary">→</span>
+					<span class="truncate max-w-[10rem] text-sm text-base-content/80"
+						>{transportation.to_location}</span
+					>
 				{:else if transportation.from_location}
-					<span>{transportation.from_location}</span>
+					<span class="truncate text-sm text-base-content/80">{transportation.from_location}</span>
 				{:else}
-					<span>{transportation.to_location}</span>
+					<span class="truncate text-sm text-base-content/80">{transportation.to_location}</span>
 				{/if}
 			</div>
 		{/if}
 
-		<!-- Inline Stats -->
-		<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70">
-			{#if transportation.type === 'plane' && transportation.flight_number}
-				<div class="badge badge-ghost badge-sm">
-					{transportation.flight_number}
-				</div>
-			{/if}
-
-			{#if transportation.date}
-				<div class="flex flex-wrap items-center gap-2">
-					{#if isAllDay(transportation.date) && (!transportation.end_date || isAllDay(transportation.end_date))}
-						<span class="font-medium">{formatAllDayDate(transportation.date)}</span>
+		<!-- Date & Time Section -->
+		{#if transportation.date}
+			<div class="flex flex-col gap-1.5">
+				{#if isAllDay(transportation.date) && (!transportation.end_date || isAllDay(transportation.end_date))}
+					<!-- All-day event -->
+					<div class="flex items-center gap-2 text-sm">
+						<span class="font-medium text-base-content"
+							>{formatAllDayDate(transportation.date)}</span
+						>
 						{#if transportation.end_date && transportation.end_date !== transportation.date}
 							<span class="text-base-content/40">→</span>
-							<span class="font-medium">{formatAllDayDate(transportation.end_date)}</span>
-						{/if}
-					{:else}
-						<div class="flex items-center gap-1">
-							<span class="font-medium">
-								{formatDateInTimezone(transportation.date, transportation.start_timezone)}
-							</span>
-							<span
-								class="tooltip"
-								data-tip={shouldShowTzBadge(transportation.start_timezone)
-									? (getTimezoneTip(transportation.start_timezone) ?? undefined)
-									: ($t('adventures.local_time') ?? 'Local time')}
+							<span class="font-medium text-base-content"
+								>{formatAllDayDate(transportation.end_date)}</span
 							>
-								<span class="badge badge-ghost badge-xs">
-									{transportation.start_timezone
-										? getTimezoneLabel(transportation.start_timezone)
-										: ($t('adventures.local') ?? 'Local')}
-								</span>
-							</span>
-						</div>
-						{#if transportation.end_date}
-							<span class="text-base-content/40">→</span>
-							<div class="flex items-center gap-1">
-								<span class="font-medium">
-									{formatDateInTimezone(
-										transportation.end_date,
-										transportation.end_timezone ?? transportation.start_timezone
-									)}
-								</span>
-								<span
-									class="tooltip"
-									data-tip={shouldShowTzBadge(
-										transportation.end_timezone ?? transportation.start_timezone
-									)
-										? (getTimezoneTip(
-												transportation.end_timezone ?? transportation.start_timezone
-											) ?? undefined)
-										: ($t('adventures.local_time') ?? 'Local time')}
-								>
-									<span class="badge badge-ghost badge-xs">
-										{(transportation.end_timezone ?? transportation.start_timezone)
-											? getTimezoneLabel(
-													transportation.end_timezone ?? transportation.start_timezone
-												)
-											: ($t('adventures.local') ?? 'Local')}
+						{/if}
+					</div>
+				{:else}
+					<!-- Timed events with mini cards -->
+					<div class="flex flex-col gap-1">
+						<!-- Departure Card -->
+						<div class="bg-base-200 rounded-lg px-3 py-1.5">
+							<div class="flex items-center justify-between gap-2">
+								<div class="flex flex-col gap-0.5">
+									<span class="text-xs text-base-content/60">Departure</span>
+									<span class="text-sm font-semibold text-base-content">
+										{formatDateInTimezone(transportation.date, transportation.start_timezone)}
 									</span>
-								</span>
+								</div>
+								{#if shouldShowTzBadge(transportation.start_timezone)}
+									<div
+										class="tooltip"
+										data-tip={getTimezoneTip(transportation.start_timezone) ?? undefined}
+									>
+										<span class="badge badge-primary badge-sm">
+											{getTimezoneLabel(transportation.start_timezone)}
+										</span>
+									</div>
+								{/if}
+							</div>
+						</div>
+
+						<!-- Arrival Card -->
+						{#if transportation.end_date}
+							<div class="bg-base-200 rounded-lg px-3 py-1.5">
+								<div class="flex items-center justify-between gap-2">
+									<div class="flex flex-col gap-0.5">
+										<span class="text-xs text-base-content/60">Arrival</span>
+										<span class="text-sm font-semibold text-base-content">
+											{formatDateInTimezone(
+												transportation.end_date,
+												transportation.end_timezone ?? transportation.start_timezone
+											)}
+										</span>
+									</div>
+									{#if shouldShowTzBadge(transportation.end_timezone ?? transportation.start_timezone)}
+										<div
+											class="tooltip"
+											data-tip={getTimezoneTip(
+												transportation.end_timezone ?? transportation.start_timezone
+											) ?? undefined}
+										>
+											<span class="badge badge-primary badge-sm">
+												{getTimezoneLabel(
+													transportation.end_timezone ?? transportation.start_timezone
+												)}
+											</span>
+										</div>
+									{/if}
+								</div>
 							</div>
 						{/if}
-					{/if}
-				</div>
-			{/if}
+					</div>
+				{/if}
+			</div>
+		{/if}
 
+		<!-- Stats & Rating -->
+		<div class="flex flex-wrap items-center gap-2 text-sm">
 			{#if transportation.distance && !isNaN(+transportation.distance)}
-				<div class="badge badge-ghost badge-sm">
-					{user?.measurement_system === 'imperial'
+				<span class="badge badge-ghost badge-sm">
+					🌍 {user?.measurement_system === 'imperial'
 						? `${toMiles(transportation.distance)} mi`
 						: `${(+transportation.distance).toFixed(1)} km`}
-				</div>
+				</span>
 			{/if}
 
 			{#if travelDurationLabel}
-				<div class="badge badge-ghost badge-sm">
-					⏱️ {travelDurationLabel}
-				</div>
+				<span class="badge badge-ghost badge-sm">⏱️ {travelDurationLabel}</span>
 			{/if}
 
 			{#if transportation.rating}

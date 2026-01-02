@@ -148,7 +148,7 @@
 			</div>
 		{/if}
 	</div>
-	<div class="card-body p-4 space-y-3">
+	<div class="card-body p-4 space-y-3 min-w-0">
 		<!-- Header -->
 		<div class="flex items-start justify-between gap-3">
 			<a
@@ -209,49 +209,131 @@
 			</div>
 		</div>
 
-		<!-- Location Info (Compact) -->
+		<!-- Location -->
 		{#if lodging.location}
-			<div class="flex items-center gap-2 text-sm text-base-content/70">
-				<MapMarker class="w-4 h-4 text-primary" />
-				<span class="truncate max-w-[18rem]">{lodging.location}</span>
+			<div class="flex items-center gap-2 text-sm text-base-content/70 min-w-0">
+				<MapMarker class="w-4 h-4 text-primary flex-shrink-0" />
+				<span class="truncate">{lodging.location}</span>
 			</div>
 		{/if}
 
-		<!-- Inline Stats -->
-		<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70">
-			{#if lodging.check_in}
-				<div class="flex items-center gap-1">
-					<span class="font-medium">
-						{#if isAllDay(lodging.check_in)}
-							{formatAllDayDate(lodging.check_in)}
-						{:else}
-							{formatDateInTimezone(lodging.check_in, lodging.timezone)}
-						{/if}
-					</span>
-				</div>
-			{/if}
+		<!-- Check-in & Check-out Section -->
+		{#if lodging.check_in || lodging.check_out}
+			<div class="flex flex-col gap-1.5">
+				{#if lodging.check_in && lodging.check_out}
+					<!-- Both dates present -->
+					{#if isAllDay(lodging.check_in) && isAllDay(lodging.check_out)}
+						<!-- All-day dates -->
+						<div class="flex items-center gap-2 text-sm">
+							<span class="font-medium text-base-content">{formatAllDayDate(lodging.check_in)}</span
+							>
+							<span class="text-primary">→</span>
+							<span class="font-medium text-base-content"
+								>{formatAllDayDate(lodging.check_out)}</span
+							>
+						</div>
+					{:else}
+						<!-- Timed dates with mini cards -->
+						<div class="flex flex-col gap-1">
+							<!-- Check-in Card -->
+							<div class="bg-base-200 rounded-lg px-3 py-1.5">
+								<div class="flex items-center justify-between gap-2">
+									<div class="flex flex-col gap-0.5">
+										<span class="text-xs text-base-content/60">Check-in</span>
+										<span class="text-sm font-semibold text-base-content">
+											{#if isAllDay(lodging.check_in)}
+												{formatAllDayDate(lodging.check_in)}
+											{:else}
+												{formatDateInTimezone(lodging.check_in, lodging.timezone)}
+											{/if}
+										</span>
+									</div>
+									{#if hasTimePortion(lodging.check_in) && shouldShowTzBadge(lodging.timezone)}
+										<div class="tooltip" data-tip={getTimezoneTip(lodging.timezone) ?? undefined}>
+											<span class="badge badge-primary badge-sm">
+												{getTimezoneLabel(lodging.timezone)}
+											</span>
+										</div>
+									{/if}
+								</div>
+							</div>
 
-			{#if lodging.check_out && lodging.check_in}
-				<span class="text-base-content/40">→</span>
-				<div class="flex items-center gap-1">
-					<span class="font-medium">
-						{#if isAllDay(lodging.check_out)}
-							{formatAllDayDate(lodging.check_out)}
-						{:else}
-							{formatDateInTimezone(lodging.check_out, lodging.timezone)}
-						{/if}
-					</span>
-				</div>
-			{/if}
+							<!-- Check-out Card -->
+							<div class="bg-base-200 rounded-lg px-3 py-1.5">
+								<div class="flex items-center justify-between gap-2">
+									<div class="flex flex-col gap-0.5">
+										<span class="text-xs text-base-content/60">Check-out</span>
+										<span class="text-sm font-semibold text-base-content">
+											{#if isAllDay(lodging.check_out)}
+												{formatAllDayDate(lodging.check_out)}
+											{:else}
+												{formatDateInTimezone(lodging.check_out, lodging.timezone)}
+											{/if}
+										</span>
+									</div>
+									{#if hasTimePortion(lodging.check_out) && shouldShowTzBadge(lodging.timezone)}
+										<div class="tooltip" data-tip={getTimezoneTip(lodging.timezone) ?? undefined}>
+											<span class="badge badge-primary badge-sm">
+												{getTimezoneLabel(lodging.timezone)}
+											</span>
+										</div>
+									{/if}
+								</div>
+							</div>
+						</div>
+					{/if}
+				{:else if lodging.check_in}
+					<!-- Check-in only -->
+					<div class="bg-base-200 rounded-lg px-3 py-1.5">
+						<div class="flex items-center justify-between gap-2">
+							<div class="flex flex-col gap-0.5">
+								<span class="text-xs text-base-content/60">Check-in</span>
+								<span class="text-sm font-semibold text-base-content">
+									{#if isAllDay(lodging.check_in)}
+										{formatAllDayDate(lodging.check_in)}
+									{:else}
+										{formatDateInTimezone(lodging.check_in, lodging.timezone)}
+									{/if}
+								</span>
+							</div>
+							{#if hasTimePortion(lodging.check_in) && shouldShowTzBadge(lodging.timezone)}
+								<div class="tooltip" data-tip={getTimezoneTip(lodging.timezone) ?? undefined}>
+									<span class="badge badge-primary badge-sm">
+										{getTimezoneLabel(lodging.timezone)}
+									</span>
+								</div>
+							{/if}
+						</div>
+					</div>
+				{:else if lodging.check_out}
+					<!-- Check-out only -->
+					<div class="bg-base-200 rounded-lg px-3 py-1.5">
+						<div class="flex items-center justify-between gap-2">
+							<div class="flex flex-col gap-0.5">
+								<span class="text-xs text-base-content/60">Check-out</span>
+								<span class="text-sm font-semibold text-base-content">
+									{#if isAllDay(lodging.check_out)}
+										{formatAllDayDate(lodging.check_out)}
+									{:else}
+										{formatDateInTimezone(lodging.check_out, lodging.timezone)}
+									{/if}
+								</span>
+							</div>
+							{#if hasTimePortion(lodging.check_out) && shouldShowTzBadge(lodging.timezone)}
+								<div class="tooltip" data-tip={getTimezoneTip(lodging.timezone) ?? undefined}>
+									<span class="badge badge-primary badge-sm">
+										{getTimezoneLabel(lodging.timezone)}
+									</span>
+								</div>
+							{/if}
+						</div>
+					</div>
+				{/if}
+			</div>
+		{/if}
 
-			{#if (hasTimePortion(lodging.check_in) || hasTimePortion(lodging.check_out)) && shouldShowTzBadge(lodging.timezone)}
-				<span class="tooltip" data-tip={getTimezoneTip(lodging.timezone) ?? undefined}>
-					<span class="badge badge-ghost badge-xs">
-						{getTimezoneLabel(lodging.timezone)}
-					</span>
-				</span>
-			{/if}
-
+		<!-- Rating & Info Badges -->
+		<div class="flex flex-wrap items-center gap-2 text-sm">
 			{#if lodging.rating}
 				<div class="flex items-center gap-1">
 					<div class="flex -ml-1">
@@ -266,23 +348,18 @@
 					<span class="text-xs text-base-content/60">({lodging.rating}/5)</span>
 				</div>
 			{/if}
-		</div>
 
-		<!-- Additional Info (for owner only) -->
-		{#if lodging.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid))}
-			<div class="flex flex-wrap gap-2">
+			{#if lodging.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid))}
 				{#if lodging.reservation_number}
-					<div class="badge badge-ghost badge-sm">
+					<span class="badge badge-primary badge-sm font-medium">
 						{$t('adventures.reservation')}: {lodging.reservation_number}
-					</div>
+					</span>
 				{/if}
 				{#if lodging.price}
-					<div class="badge badge-ghost badge-sm">
-						{lodging.price}
-					</div>
+					<span class="badge badge-ghost badge-sm">💰 {lodging.price}</span>
 				{/if}
-			</div>
-		{/if}
+			{/if}
+		</div>
 	</div>
 </div>
 

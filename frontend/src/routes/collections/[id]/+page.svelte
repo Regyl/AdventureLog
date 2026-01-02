@@ -93,8 +93,20 @@
 	// Determine if this is a folder view (no dates) or itinerary view (has dates)
 	$: isFolderView = !collection?.start_date && !collection?.end_date;
 
-	// Gather all images from locations for the hero
-	$: heroImages = collection?.locations?.flatMap((loc) => loc.images || []) || [];
+	// Gather hero images with collection primary image first when available
+	$: heroImages = (() => {
+		const primary = collection?.primary_image ? [collection.primary_image] : [];
+		const locationImages = collection?.locations?.flatMap((loc) => loc.images || []) || [];
+		const seen = new Set<string>();
+
+		return [...primary, ...locationImages].filter((img) => {
+			if (!img || !img.image) return false;
+			const key = String(img.id ?? img.image);
+			if (seen.has(key)) return false;
+			seen.add(key);
+			return true;
+		});
+	})();
 
 	// Define available views based on collection type
 	$: availableViews = {

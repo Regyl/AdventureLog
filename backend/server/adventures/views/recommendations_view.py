@@ -507,22 +507,22 @@ class RecommendationsViewSet(viewsets.ViewSet):
             if getattr(settings, 'GOOGLE_MAPS_API_KEY', None):
                 try:
                     geocode_results = search_google(location_param)
-                except Exception as e:
-                    logger.warning(f"Google geocoding failed: {e}")
+                except Exception:
+                    logger.warning("Google geocoding failed; falling back to OSM")
                     geocode_results = None
 
             # Fallback to OSM Nominatim
             if not geocode_results:
                 try:
                     geocode_results = search_osm(location_param)
-                except Exception as e:
-                    logger.warning(f"OSM geocoding failed: {e}")
+                except Exception:
+                    logger.warning("OSM geocoding failed")
                     geocode_results = None
 
             # Validate geocode results
             if isinstance(geocode_results, dict) and geocode_results.get('error'):
-                # Log internal geocoding error details but do not expose them to the client
-                logger.warning("Geocoding helper returned an error: %s", geocode_results.get('error'))
+                # Log internal geocoding error but avoid exposing sensitive details
+                logger.warning("Geocoding helper returned an internal error")
                 return Response({"error": "Geocoding failed. Please try a different location or contact support."}, status=400)
 
             if not geocode_results:
@@ -669,8 +669,8 @@ class RecommendationsViewSet(viewsets.ViewSet):
         
         # If no results at all and user requested only OSM, return error status
         if len(final_results) == 0 and sources == 'osm' and osm_error:
-            # Log internal error details for investigation but do not expose them to clients
-            logger.debug("OSM query error (internal): %s", osm_error)
+            # Log internal error notice for investigation but do not expose details to clients
+            logger.debug("OSM query error (internal)")
             return Response({
                 "error": "OpenStreetMap service temporarily unavailable. Please try again later.",
                 "count": 0,
