@@ -173,8 +173,18 @@
 		isShowingCollectionModal = false;
 	}
 
-	function editCollection(event: CustomEvent<SlimCollection>) {
-		collectionToEdit = event.detail as unknown as Collection;
+	async function editCollection(event: CustomEvent<SlimCollection>) {
+		const slim = event.detail;
+		try {
+			const res = await fetch(`/api/collections/${slim.id}?nested=true`);
+			if (res.ok) {
+				collectionToEdit = (await res.json()) as Collection;
+			} else {
+				collectionToEdit = slim as unknown as Collection;
+			}
+		} catch (e) {
+			collectionToEdit = slim as unknown as Collection;
+		}
 		isShowingCollectionModal = true;
 	}
 

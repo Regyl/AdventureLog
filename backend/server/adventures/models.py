@@ -286,6 +286,13 @@ class Collection(models.Model):
     is_archived = models.BooleanField(default=False)
     shared_with = models.ManyToManyField(User, related_name='shared_with', blank=True)
     link = models.URLField(blank=True, null=True, max_length=2083)
+    primary_image = models.ForeignKey(
+        'ContentImage',
+        on_delete=models.SET_NULL,
+        related_name='primary_for_collections',
+        null=True,
+        blank=True,
+    )
 
     # if connected locations are private and collection is public, raise an error
     def clean(self):

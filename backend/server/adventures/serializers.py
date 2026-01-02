@@ -659,11 +659,41 @@ class CollectionSerializer(CustomModelSerializer):
     lodging = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
     days_until_start = serializers.SerializerMethodField()
+    primary_image = ContentImageSerializer(read_only=True)
+    primary_image_id = serializers.PrimaryKeyRelatedField(
+        queryset=ContentImage.objects.all(),
+        source='primary_image',
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
 
     class Meta:
         model = Collection
-        fields = ['id', 'description', 'user', 'name', 'is_public', 'locations', 'created_at', 'start_date', 'end_date', 'transportations', 'notes', 'updated_at', 'checklists', 'is_archived', 'shared_with', 'link', 'lodging', 'status', 'days_until_start']
-        read_only_fields = ['id', 'created_at', 'updated_at', 'user', 'shared_with', 'status', 'days_until_start']
+        fields = [
+            'id',
+            'description',
+            'user',
+            'name',
+            'is_public',
+            'locations',
+            'created_at',
+            'start_date',
+            'end_date',
+            'transportations',
+            'notes',
+            'updated_at',
+            'checklists',
+            'is_archived',
+            'shared_with',
+            'link',
+            'lodging',
+            'status',
+            'days_until_start',
+            'primary_image',
+            'primary_image_id',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'user', 'shared_with', 'status', 'days_until_start', 'primary_image']
 
     def get_locations(self, obj):
         if self.context.get('nested', False):
@@ -735,6 +765,37 @@ class CollectionSerializer(CustomModelSerializer):
         
         return None
 
+    def validate(self, attrs):
+        data = super().validate(attrs)
+
+        # Only validate primary image when explicitly provided
+        if 'primary_image' not in data:
+            return data
+
+        primary_image = data.get('primary_image')
+        if primary_image is None:
+            return data
+
+        request = self.context.get('request')
+        if request and primary_image.user != request.user:
+            raise serializers.ValidationError({
+                'primary_image_id': 'You can only choose cover images you own.'
+            })
+
+        if self.instance and not self._image_belongs_to_collection(primary_image, self.instance):
+            raise serializers.ValidationError({
+                'primary_image_id': 'Cover image must come from a location in this collection.'
+            })
+
+        return data
+
+    def _image_belongs_to_collection(self, image, collection):
+        if ContentImage.objects.filter(id=image.id, location__collections=collection).exists():
+            return True
+        if ContentImage.objects.filter(id=image.id, visit__location__collections=collection).exists():
+            return True
+        return False
+
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         
@@ -768,22 +829,33 @@ class UltraSlimCollectionSerializer(serializers.ModelSerializer):
     location_count = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
     days_until_start = serializers.SerializerMethodField()
+    primary_image = ContentImageSerializer(read_only=True)
     
     class Meta:
         model = Collection
         fields = [
             'id', 'user', 'name', 'description', 'is_public', 'start_date', 'end_date', 
             'is_archived', 'link', 'created_at', 'updated_at', 'location_images', 
-            'location_count', 'shared_with', 'status', 'days_until_start'
+            'location_count', 'shared_with', 'status', 'days_until_start', 'primary_image'
         ]
         read_only_fields = fields  # All fields are read-only for listing
 
     def get_location_images(self, obj):
         """Get primary images from locations in this collection, optimized with select_related"""
         # Filter first, then slice (removed slicing)
-        images = ContentImage.objects.filter(
-            location__collections=obj
-        ).select_related('user').prefetch_related('location')
+        images = list(
+            ContentImage.objects.filter(location__collections=obj)
+            .select_related('user')
+        )
+
+        def sort_key(image):
+            if obj.primary_image and image.id == obj.primary_image.id:
+                return (0, str(image.id))
+            if image.is_primary:
+                return (1, str(image.id))
+            return (2, str(image.id))
+
+        images.sort(key=sort_key)
 
         serializer = ContentImageSerializer(
             images,

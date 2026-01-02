@@ -77,6 +77,9 @@ class BackupViewSet(viewsets.ViewSet):
                 'icon': category.icon,
             })
         
+        # Track images so we can reference them for collection primary images
+        image_export_map = {}
+
         # Export Collections
         for idx, collection in enumerate(user.collection_set.all()):
             export_data['collections'].append({
@@ -177,7 +180,7 @@ class BackupViewSet(viewsets.ViewSet):
                 location_data['trails'].append(trail_data)
             
             # Add images
-            for image in location.images.all():
+            for image_index, image in enumerate(location.images.all()):
                 image_data = {
                     'immich_id': image.immich_id,
                     'is_primary': image.is_primary,
@@ -186,6 +189,13 @@ class BackupViewSet(viewsets.ViewSet):
                 if image.image:
                     image_data['filename'] = image.image.name.split('/')[-1]
                 location_data['images'].append(image_data)
+
+                image_export_map[image.id] = {
+                    'location_export_id': idx,
+                    'image_index': image_index,
+                    'immich_id': image.immich_id,
+                    'filename': image_data['filename'],
+                }
             
             # Add attachments
             for attachment in location.attachments.all():
@@ -198,6 +208,12 @@ class BackupViewSet(viewsets.ViewSet):
                 location_data['attachments'].append(attachment_data)
             
             export_data['locations'].append(location_data)
+
+        # Attach collection primary image references (if any)
+        for idx, collection in enumerate(user.collection_set.all()):
+            primary = collection.primary_image
+            if primary and primary.id in image_export_map:
+                export_data['collections'][idx]['primary_image'] = image_export_map[primary.id]
         
         # Export Transportation
         for idx, transport in enumerate(user.transportation_set.all()):
@@ -518,6 +534,9 @@ class BackupViewSet(viewsets.ViewSet):
             category_map[cat_data['name']] = category
             summary['categories'] += 1
         
+        pending_primary_images = []
+        location_images_map = {}
+
         # Import Collections
         for col_data in backup_data.get('collections', []):
             collection = Collection.objects.create(
@@ -541,6 +560,13 @@ class BackupViewSet(viewsets.ViewSet):
                         collection.shared_with.add(shared_user)
                 except User.DoesNotExist:
                     pass
+
+            # Defer primary image assignment until images are created
+            if col_data.get('primary_image'):
+                pending_primary_images.append({
+                    'collection_export_id': col_data['export_id'],
+                    'data': col_data['primary_image'],
+                })
         
         # Import Locations
         for adv_data in backup_data.get('locations', []):
@@ -584,6 +610,7 @@ class BackupViewSet(viewsets.ViewSet):
             )
             location.save(_skip_geocode=True)  # Skip geocoding for now
             location_map[adv_data['export_id']] = location
+            location_images_map.setdefault(adv_data['export_id'], [])
             
             # Add to collections using export_ids - MUST be done after save()
             for collection_export_id in adv_data.get('collection_export_ids', []):
@@ -681,13 +708,14 @@ class BackupViewSet(viewsets.ViewSet):
             for img_data in adv_data.get('images', []):
                 immich_id = img_data.get('immich_id')
                 if immich_id:
-                    ContentImage.objects.create(
+                    new_img = ContentImage.objects.create(
                         user=user,
                         immich_id=immich_id,
                         is_primary=img_data.get('is_primary', False),
                         content_type=content_type,
                         object_id=location.id
                     )
+                    location_images_map[adv_data['export_id']].append(new_img)
                     summary['images'] += 1
                 else:
                     filename = img_data.get('filename')
@@ -695,13 +723,14 @@ class BackupViewSet(viewsets.ViewSet):
                         try:
                             img_content = zip_file.read(f'images/{filename}')
                             img_file = ContentFile(img_content, name=filename)
-                            ContentImage.objects.create(
+                            new_img = ContentImage.objects.create(
                                 user=user,
                                 image=img_file,
                                 is_primary=img_data.get('is_primary', False),
                                 content_type=content_type,
                                 object_id=location.id
                             )
+                            location_images_map[adv_data['export_id']].append(new_img)
                             summary['images'] += 1
                         except KeyError:
                             pass
@@ -725,6 +754,23 @@ class BackupViewSet(viewsets.ViewSet):
                         pass
             
             summary['locations'] += 1
+
+        # Apply primary image selections now that images exist
+        for entry in pending_primary_images:
+            collection = collection_map.get(entry['collection_export_id'])
+            data = entry.get('data', {}) or {}
+            if not collection:
+                continue
+
+            loc_export_id = data.get('location_export_id')
+            img_index = data.get('image_index')
+            if loc_export_id is None or img_index is None:
+                continue
+
+            images_for_location = location_images_map.get(loc_export_id, [])
+            if 0 <= img_index < len(images_for_location):
+                collection.primary_image = images_for_location[img_index]
+                collection.save(update_fields=['primary_image'])
         
         # Import Transportation
         transportation_map = {}  # Map export_id to actual transportation object

@@ -105,7 +105,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
 
     def get_optimized_queryset_for_listing(self):
         """Get optimized queryset for list actions with prefetching"""
-        return self.get_base_queryset().select_related('user').prefetch_related(
+        return self.get_base_queryset().select_related('user', 'primary_image').prefetch_related(
             Prefetch(
                 'locations__images',
                 queryset=ContentImage.objects.filter(is_primary=True).select_related('user'),
@@ -116,34 +116,37 @@ class CollectionViewSet(viewsets.ModelViewSet):
     def get_base_queryset(self):
         """Base queryset logic extracted for reuse"""
         if self.action == 'destroy':
-            return Collection.objects.filter(user=self.request.user.id)
-        
-        if self.action in ['update', 'partial_update', 'leave']:
-            return Collection.objects.filter(
+            queryset = Collection.objects.filter(user=self.request.user.id)
+        elif self.action in ['update', 'partial_update', 'leave']:
+            queryset = Collection.objects.filter(
                 Q(user=self.request.user.id) | Q(shared_with=self.request.user)
             ).distinct()
-        
         # Allow access to collections with pending invites for accept/decline actions
-        if self.action in ['accept_invite', 'decline_invite']:
+        elif self.action in ['accept_invite', 'decline_invite']:
             if not self.request.user.is_authenticated:
-                return Collection.objects.none()
-            return Collection.objects.filter(
-                Q(user=self.request.user.id) | 
-                Q(shared_with=self.request.user) | 
-                Q(invites__invited_user=self.request.user)
-            ).distinct()
-        
-        if self.action == 'retrieve':
+                queryset = Collection.objects.none()
+            else:
+                queryset = Collection.objects.filter(
+                    Q(user=self.request.user.id)
+                    | Q(shared_with=self.request.user)
+                    | Q(invites__invited_user=self.request.user)
+                ).distinct()
+        elif self.action == 'retrieve':
             if not self.request.user.is_authenticated:
-                return Collection.objects.filter(is_public=True)
-            return Collection.objects.filter(
-                Q(is_public=True) | Q(user=self.request.user.id) | Q(shared_with=self.request.user)
+                queryset = Collection.objects.filter(is_public=True)
+            else:
+                queryset = Collection.objects.filter(
+                    Q(is_public=True)
+                    | Q(user=self.request.user.id)
+                    | Q(shared_with=self.request.user)
+                ).distinct()
+        else:
+            # For list action and default base queryset, return collections owned by the user (exclude shared)
+            queryset = Collection.objects.filter(
+                Q(user=self.request.user.id) & Q(is_archived=False)
             ).distinct()
-        
-        # For list action and default base queryset, return collections owned by the user (exclude shared)
-        return Collection.objects.filter(
-            Q(user=self.request.user.id) & Q(is_archived=False)
-        ).distinct()
+
+        return queryset.select_related('primary_image')
 
     def get_queryset(self):
         """Get queryset with optimizations for list actions"""
@@ -160,7 +163,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
         # via the `shared` action).
         queryset = Collection.objects.filter(
             Q(user=request.user.id) & Q(is_archived=False)
-        ).distinct().select_related('user').prefetch_related(
+        ).distinct().select_related('user', 'primary_image').prefetch_related(
             Prefetch(
                 'locations__images',
                 queryset=ContentImage.objects.filter(is_primary=True).select_related('user'),
@@ -179,7 +182,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
        
         queryset = Collection.objects.filter(
             Q(user=request.user)
-        ).select_related('user').prefetch_related(
+        ).select_related('user', 'primary_image').prefetch_related(
             Prefetch(
                 'locations__images',
                 queryset=ContentImage.objects.filter(is_primary=True).select_related('user'),
@@ -199,7 +202,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
        
         queryset = Collection.objects.filter(
             Q(user=request.user.id) & Q(is_archived=True)
-        ).select_related('user').prefetch_related(
+        ).select_related('user', 'primary_image').prefetch_related(
             Prefetch(
                 'locations__images',
                 queryset=ContentImage.objects.filter(is_primary=True).select_related('user'),

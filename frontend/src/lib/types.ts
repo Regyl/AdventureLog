@@ -126,6 +126,7 @@ export type Collection = {
 	is_public: boolean;
 	locations: Location[];
 	created_at?: string | null;
+	updated_at?: string | null;
 	start_date: string | null;
 	end_date: string | null;
 	transportations?: Transportation[];
@@ -135,6 +136,8 @@ export type Collection = {
 	is_archived?: boolean;
 	shared_with: string[] | undefined;
 	link?: string | null;
+	primary_image?: ContentImage | null;
+	primary_image_id?: string | null;
 	itinerary: CollectionItineraryItem[];
 	status: 'folder' | 'upcoming' | 'in_progress' | 'completed';
 	days_until_start: number | null;
@@ -155,6 +158,7 @@ export type SlimCollection = {
 	location_images: ContentImage[];
 	location_count: number;
 	shared_with: string[];
+	primary_image?: ContentImage | null;
 	status: 'folder' | 'upcoming' | 'in_progress' | 'completed';
 	days_until_start: number | null;
 };

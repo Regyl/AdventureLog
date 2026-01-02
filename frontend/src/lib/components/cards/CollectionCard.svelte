@@ -75,18 +75,29 @@
 	export let collection: Collection | SlimCollection;
 
 	let location_images: ContentImage[] = [];
-	if ('location_images' in collection) {
-		location_images = collection.location_images;
-	} else {
-		location_images = collection.locations.flatMap((location: Location) => location.images);
+	$: {
+		let images: ContentImage[] = [];
+		if ('location_images' in collection) {
+			images = collection.location_images;
+		} else {
+			images = collection.locations.flatMap((location: Location) => location.images);
+		}
+
+		const primaryImage = 'primary_image' in collection ? collection.primary_image : null;
+		if (primaryImage) {
+			const coverImage = { ...primaryImage, is_primary: true };
+			const remainingImages = images
+				.filter((img) => img.id !== primaryImage.id)
+				.map((img) => ({ ...img, is_primary: false }));
+			location_images = [coverImage, ...remainingImages];
+		} else {
+			location_images = images;
+		}
 	}
 
 	let locationLength: number = 0;
-	if ('location_count' in collection) {
-		locationLength = collection.location_count;
-	} else {
-		locationLength = collection.locations.length;
-	}
+	$: locationLength =
+		'location_count' in collection ? collection.location_count : collection.locations.length;
 
 	async function deleteCollection() {
 		let res = await fetch(`/api/collections/${collection.id}`, {

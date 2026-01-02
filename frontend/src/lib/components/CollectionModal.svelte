@@ -1,13 +1,10 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
-	import type { Collection, Transportation } from '$lib/types';
-	const dispatch = createEventDispatcher();
 	import { onMount } from 'svelte';
-	import { addToast } from '$lib/toasts';
-	let modal: HTMLDialogElement;
 	import { t } from 'svelte-i18n';
-
 	import MarkdownEditor from './MarkdownEditor.svelte';
+	import { addToast } from '$lib/toasts';
+	import type { Collection, ContentImage, SlimCollection } from '$lib/types';
 
 	// Icons
 	import CollectionIcon from '~icons/mdi/folder-multiple';
@@ -16,6 +13,10 @@
 	import LinkIcon from '~icons/mdi/link';
 	import SaveIcon from '~icons/mdi/content-save';
 	import CloseIcon from '~icons/mdi/close';
+	import ImageIcon from '~icons/mdi/image-multiple';
+
+	const dispatch = createEventDispatcher();
+	let modal: HTMLDialogElement;
 
 	export let collectionToEdit: Collection | null = null;
 
@@ -29,19 +30,96 @@
 		is_public: collectionToEdit?.is_public || false,
 		locations: collectionToEdit?.locations || [],
 		link: collectionToEdit?.link || '',
-		shared_with: undefined,
-		itinerary: [],
-		status: 'folder',
-		days_until_start: null
+		shared_with: collectionToEdit?.shared_with || [],
+		itinerary: collectionToEdit?.itinerary || [],
+		status: collectionToEdit?.status || 'folder',
+		days_until_start: collectionToEdit?.days_until_start ?? null,
+		primary_image: collectionToEdit?.primary_image ?? null,
+		primary_image_id: collectionToEdit?.primary_image_id ?? null
 	};
 
-	console.log(collection);
+	let availableImages: ContentImage[] = [];
+	let coverImageId: string | null = collection.primary_image?.id || null;
+
+	function setImagesFromCollection(col: Collection) {
+		const seen = new Map<string, ContentImage>();
+		(col.locations || []).forEach((loc) => {
+			(loc.images || []).forEach((img) => {
+				if (!seen.has(img.id)) {
+					seen.set(img.id, img);
+				}
+			});
+		});
+
+		const deduped = Array.from(seen.values());
+		deduped.sort((a, b) => {
+			if (coverImageId && a.id === coverImageId) return -1;
+			if (coverImageId && b.id === coverImageId) return 1;
+			if (a.is_primary && !b.is_primary) return -1;
+			if (!a.is_primary && b.is_primary) return 1;
+			return a.id.localeCompare(b.id);
+		});
+
+		availableImages = deduped;
+	}
+
+	function selectCover(imageId: string | null) {
+		coverImageId = imageId;
+		collection.primary_image_id = imageId;
+		setImagesFromCollection(collection);
+	}
+
+	function toSlimCollection(col: Collection): SlimCollection {
+		return {
+			id: col.id,
+			user: col.user,
+			name: col.name,
+			description: col.description,
+			is_public: col.is_public,
+			start_date: col.start_date,
+			end_date: col.end_date,
+			is_archived: col.is_archived ?? false,
+			link: col.link ?? null,
+			created_at: col.created_at ?? '',
+			updated_at: col.updated_at ?? '',
+			location_images: (col.locations || []).flatMap((loc) => loc.images || []),
+			location_count: (col.locations || []).length,
+			shared_with: col.shared_with || [],
+			status: col.status ?? 'folder',
+			days_until_start: col.days_until_start ?? null,
+			primary_image: col.primary_image ?? null
+		};
+	}
+
+	async function loadCollectionDetails() {
+		if (!collectionToEdit?.id) {
+			setImagesFromCollection(collection);
+			return;
+		}
+
+		try {
+			const res = await fetch(`/api/collections/${collectionToEdit.id}?nested=true`);
+			if (res.ok) {
+				const data = (await res.json()) as Collection;
+				collection = { ...collection, ...data };
+				coverImageId = data.primary_image?.id ?? coverImageId;
+				collection.primary_image_id = coverImageId;
+				setImagesFromCollection(collection);
+				return;
+			}
+		} catch (err) {
+			console.error(err);
+		}
+
+		setImagesFromCollection(collection);
+	}
 
 	onMount(async () => {
 		modal = document.getElementById('my_modal_1') as HTMLDialogElement;
 		if (modal) {
 			modal.showModal();
 		}
+		await loadCollectionDetails();
 	});
 
 	function close() {
@@ -56,7 +134,6 @@
 
 	async function handleSubmit(event: Event) {
 		event.preventDefault();
-		console.log(collection);
 
 		if (collection.start_date && !collection.end_date) {
 			collection.end_date = collection.start_date;
@@ -80,19 +157,32 @@
 			collection.end_date = null;
 		}
 
+		const payload = {
+			name: collection.name,
+			description: collection.description,
+			start_date: collection.start_date,
+			end_date: collection.end_date,
+			is_public: collection.is_public,
+			link: collection.link,
+			primary_image_id: coverImageId
+		};
+
 		if (collection.id === '') {
 			let res = await fetch('/api/collections', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify(collection)
+				body: JSON.stringify(payload)
 			});
 			let data = await res.json();
 			if (data.id) {
 				collection = data as Collection;
+				coverImageId = collection.primary_image?.id ?? null;
+				collection.primary_image_id = coverImageId;
+				setImagesFromCollection(collection);
 				addToast('success', $t('collection.collection_created'));
-				dispatch('save', collection);
+				dispatch('save', toSlimCollection(collection));
 			} else {
 				console.error(data);
 				addToast('error', $t('collection.error_creating_collection'));
@@ -103,13 +193,16 @@
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify(collection)
+				body: JSON.stringify(payload)
 			});
 			let data = await res.json();
 			if (data.id) {
 				collection = data as Collection;
+				coverImageId = collection.primary_image?.id ?? null;
+				collection.primary_image_id = coverImageId;
+				setImagesFromCollection(collection);
 				addToast('success', $t('collection.collection_edit_success'));
-				dispatch('save', collection);
+				dispatch('save', toSlimCollection(collection));
 			} else {
 				addToast('error', $t('collection.error_editing_collection'));
 			}
@@ -325,6 +418,80 @@
 						</div>
 					</div>
 				{/if}
+
+				<!-- Cover Image Selection -->
+				<div class="card bg-base-100 border border-base-300 shadow-lg">
+					<div class="card-body p-6 space-y-4">
+						<div class="flex items-center gap-3">
+							<div class="p-2 bg-primary/10 rounded-lg">
+								<ImageIcon class="w-5 h-5 text-primary" />
+							</div>
+							<div>
+								<h3 class="text-lg font-semibold">
+									{$t('collection.cover_image') ?? 'Cover image'}
+								</h3>
+								<p class="text-sm text-base-content/60">
+									{$t('collection.cover_image_hint') ??
+										'Choose a cover from images in this collection.'}
+								</p>
+							</div>
+						</div>
+
+						{#if availableImages.length === 0}
+							<div class="alert alert-info shadow-sm">
+								<span>
+									{$t('collection.no_images_available') ??
+										'No images available from linked adventures yet.'}
+								</span>
+							</div>
+						{:else}
+							<div class="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+								{#each availableImages as image (image.id)}
+									<button
+										type="button"
+										class="relative group rounded-xl overflow-hidden border border-base-300 bg-base-200/30 hover:border-primary transition shadow-sm {coverImageId ===
+										image.id
+											? 'ring-2 ring-primary ring-offset-2 ring-offset-base-100'
+											: ''}"
+										on:click={() => selectCover(image.id)}
+										aria-pressed={coverImageId === image.id}
+									>
+										<img src={image.image} alt="Cover candidate" class="w-full h-32 object-cover" />
+										<div
+											class="absolute inset-0 bg-gradient-to-t from-base-300/60 to-transparent opacity-0 group-hover:opacity-100 transition"
+										/>
+										{#if coverImageId === image.id}
+											<div class="absolute top-2 left-2 badge badge-primary gap-2 shadow">
+												{$t('collection.cover') ?? 'Cover'}
+											</div>
+										{:else if image.is_primary}
+											<div class="absolute top-2 left-2 badge badge-ghost shadow">
+												{$t('collection.location_primary') ?? 'Location cover'}
+											</div>
+										{/if}
+										<div
+											class="absolute bottom-2 right-2 btn btn-xs btn-ghost bg-base-100/90 shadow"
+										>
+											{coverImageId === image.id
+												? ($t('collection.cover') ?? 'Cover')
+												: ($t('collection.set_cover') ?? 'Set cover')}
+										</div>
+									</button>
+								{/each}
+							</div>
+							<div class="flex justify-end">
+								<button
+									type="button"
+									class="btn btn-ghost btn-sm"
+									on:click={() => selectCover(null)}
+								>
+									<CloseIcon class="w-4 h-4" />
+									<span>{$t('collection.clear_cover') ?? 'Clear cover'}</span>
+								</button>
+							</div>
+						{/if}
+					</div>
+				</div>
 
 				<!-- Action Buttons -->
 				<div class="flex gap-3 justify-end pt-4">
