@@ -1030,7 +1030,9 @@
     "total_events": "Total Events",
     "calendar_overview": "Calendar Overview",
     "filtered_results": "Filtered Results",
-    "all_day_event": "All Day Event"
+    "all_day_event": "All Day Event",
+    "event timezone": "Event timezone",
+    "your timezone": "Your timezone"
   },
   "locations": {
     "location": "Location",

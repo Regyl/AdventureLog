@@ -47,6 +47,8 @@
 	let modalInitialIndex: number = 0;
 	let isImageModalOpen: boolean = false;
 	let isEditModalOpen: boolean = false;
+	let localStayWindow: string | null = null;
+	let showLocalStayTime: boolean = false;
 
 	function getLodgingIcon(type: string) {
 		if (type in LODGING_TYPES_ICONS) {
@@ -63,6 +65,43 @@
 		}
 		return stars;
 	}
+
+	const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
+	const getTimezoneLabel = (zone?: string | null) => zone ?? localTimeZone;
+	const getTimezoneTip = (zone?: string | null) => {
+		const label = getTimezoneLabel(zone);
+		return label === localTimeZone
+			? null
+			: `${$t('adventures.trip_timezone') ?? 'Trip TZ'}: ${label}. ${
+					$t('adventures.your_time') ?? 'Your time'
+				}: ${localTimeZone}.`;
+	};
+	const shouldShowStayBadge = (zone?: string | null) =>
+		!!zone && getTimezoneLabel(zone) !== localTimeZone;
+
+	function formatLocalStayWindow(
+		checkIn: string | null,
+		checkOut: string | null,
+		timezone: string | null
+	): string | null {
+		if (!checkIn && !checkOut) return null;
+
+		const formatLocal = (dateStr: string | null) => {
+			if (!dateStr || isAllDay(dateStr)) return null;
+			const dt = DateTime.fromISO(dateStr, { zone: timezone ?? 'UTC' });
+			if (!dt.isValid) return null;
+			return dt.setZone(localTimeZone).toLocaleString(DateTime.DATETIME_MED);
+		};
+
+		const inLocal = formatLocal(checkIn);
+		const outLocal = formatLocal(checkOut);
+
+		if (!inLocal && !outLocal) return null;
+		if (inLocal && outLocal) return `${inLocal} → ${outLocal}`;
+		return inLocal ?? outLocal ?? null;
+	}
+
+	const primaryStayTimezone = (timezone: string | null) => timezone;
 
 	onMount(async () => {
 		if (data.props.lodging) {
@@ -94,32 +133,6 @@
 		isImageModalOpen = true;
 	}
 
-	function formatCheckInOut(
-		checkIn: string | null,
-		checkOut: string | null,
-		timezone: string | null
-	) {
-		if (!checkIn && !checkOut) return null;
-
-		const formatDate = (date: string | null) => {
-			if (!date) return '';
-			if (isAllDay(date)) {
-				return formatAllDayDate(date);
-			} else {
-				return formatDateInTimezone(date, timezone);
-			}
-		};
-
-		if (checkIn && checkOut) {
-			return `${formatDate(checkIn)} → ${formatDate(checkOut)}`;
-		} else if (checkIn) {
-			return `Check-in: ${formatDate(checkIn)}`;
-		} else if (checkOut) {
-			return `Check-out: ${formatDate(checkOut)}`;
-		}
-		return null;
-	}
-
 	function calculateNights(checkIn: string | null, checkOut: string | null): number | null {
 		if (!checkIn || !checkOut) return null;
 
@@ -130,6 +143,14 @@
 
 		return Math.ceil(end.diff(start, 'days').days);
 	}
+
+	$: localStayWindow = lodging
+		? formatLocalStayWindow(lodging.check_in, lodging.check_out, lodging.timezone)
+		: null;
+
+	$: showLocalStayTime = Boolean(
+		localStayWindow && primaryStayTimezone(lodging?.timezone ?? null) !== localTimeZone
+	);
 </script>
 
 {#if notFound}
@@ -406,13 +427,75 @@
 							{#if lodging.check_in || lodging.check_out}
 								<div class="flex items-start gap-3">
 									<CalendarRange class="w-5 h-5 text-primary mt-1 flex-shrink-0" />
-									<div>
-										<p class="font-semibold text-sm opacity-70">{$t('adventures.stay_dates')}</p>
-										<p class="text-base">
-											{formatCheckInOut(lodging.check_in, lodging.check_out, lodging.timezone)}
-										</p>
+									<div class="w-full space-y-3">
+										{#if lodging.check_in}
+											<div class="flex items-start justify-between gap-3 text-sm">
+												<div class="space-y-1">
+													<p class="text-xs uppercase tracking-wide opacity-60">
+														{$t('adventures.check_in') ?? 'Check-in'}
+													</p>
+													<p class="text-base font-semibold">
+														{#if isAllDay(lodging.check_in)}
+															{formatAllDayDate(lodging.check_in)}
+														{:else}
+															{formatDateInTimezone(lodging.check_in, lodging.timezone)}
+														{/if}
+													</p>
+												</div>
+												{#if lodging.check_in && !isAllDay(lodging.check_in)}
+													<span
+														class="badge badge-ghost badge-xs"
+														class:tooltip={Boolean(getTimezoneTip(lodging.timezone))}
+														data-tip={getTimezoneTip(lodging.timezone) ?? undefined}
+													>
+														{#if shouldShowStayBadge(lodging.timezone)}
+															{getTimezoneLabel(lodging.timezone)}
+														{:else}
+															{$t('adventures.local') ?? 'Local'}
+														{/if}
+													</span>
+												{/if}
+											</div>
+										{/if}
+
+										{#if lodging.check_out}
+											<div class="flex items-start justify-between gap-3 text-sm">
+												<div class="space-y-1">
+													<p class="text-xs uppercase tracking-wide opacity-60">
+														{$t('adventures.check_out') ?? 'Check-out'}
+													</p>
+													<p class="text-base font-semibold">
+														{#if isAllDay(lodging.check_out)}
+															{formatAllDayDate(lodging.check_out)}
+														{:else}
+															{formatDateInTimezone(lodging.check_out, lodging.timezone)}
+														{/if}
+													</p>
+												</div>
+												{#if lodging.check_out && !isAllDay(lodging.check_out)}
+													<span
+														class="badge badge-ghost badge-xs"
+														class:tooltip={Boolean(getTimezoneTip(lodging.timezone))}
+														data-tip={getTimezoneTip(lodging.timezone) ?? undefined}
+													>
+														{#if shouldShowStayBadge(lodging.timezone)}
+															{getTimezoneLabel(lodging.timezone)}
+														{:else}
+															{$t('adventures.local') ?? 'Local'}
+														{/if}
+													</span>
+												{/if}
+											</div>
+										{/if}
+
+										{#if showLocalStayTime}
+											<p class="text-sm text-base-content/70">
+												{$t('adventures.local_time') ?? 'Local time'}: {localStayWindow}
+											</p>
+										{/if}
+
 										{#if calculateNights(lodging.check_in, lodging.check_out)}
-											<p class="text-sm opacity-70 mt-1">
+											<p class="text-sm opacity-70">
 												{calculateNights(lodging.check_in, lodging.check_out)}
 												{$t('adventures.nights')}
 											</p>

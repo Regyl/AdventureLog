@@ -41,6 +41,23 @@
 
 	const dispatch = createEventDispatcher();
 
+	const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
+
+	const getTimezoneLabel = (zone?: string | null) => zone ?? localTimeZone;
+	const getTimezoneTip = (zone?: string | null) => {
+		const label = getTimezoneLabel(zone);
+		return label === localTimeZone
+			? null
+			: `${$t('adventures.trip_timezone') ?? 'Trip TZ'}: ${label}. ${
+					$t('adventures.your_time') ?? 'Your time'
+				}: ${localTimeZone}.`;
+	};
+
+	const shouldShowTzBadge = (zone?: string | null) => {
+		if (!zone) return false;
+		return getTimezoneLabel(zone) !== localTimeZone;
+	};
+
 	export let transportation: Transportation;
 	export let user: User | null = null;
 	export let collection: Collection | null = null;
@@ -257,14 +274,61 @@
 			{/if}
 
 			{#if transportation.date}
-				<div class="flex items-center gap-1">
-					<span class="font-medium">
-						{#if isAllDay(transportation.date) && (!transportation.end_date || isAllDay(transportation.end_date))}
-							{formatAllDayDate(transportation.date)}
-						{:else}
-							{formatDateInTimezone(transportation.date, transportation.start_timezone)}
+				<div class="flex flex-wrap items-center gap-2">
+					{#if isAllDay(transportation.date) && (!transportation.end_date || isAllDay(transportation.end_date))}
+						<span class="font-medium">{formatAllDayDate(transportation.date)}</span>
+						{#if transportation.end_date && transportation.end_date !== transportation.date}
+							<span class="text-base-content/40">→</span>
+							<span class="font-medium">{formatAllDayDate(transportation.end_date)}</span>
 						{/if}
-					</span>
+					{:else}
+						<div class="flex items-center gap-1">
+							<span class="font-medium">
+								{formatDateInTimezone(transportation.date, transportation.start_timezone)}
+							</span>
+							<span
+								class="tooltip"
+								data-tip={shouldShowTzBadge(transportation.start_timezone)
+									? (getTimezoneTip(transportation.start_timezone) ?? undefined)
+									: ($t('adventures.local_time') ?? 'Local time')}
+							>
+								<span class="badge badge-ghost badge-xs">
+									{transportation.start_timezone
+										? getTimezoneLabel(transportation.start_timezone)
+										: ($t('adventures.local') ?? 'Local')}
+								</span>
+							</span>
+						</div>
+						{#if transportation.end_date}
+							<span class="text-base-content/40">→</span>
+							<div class="flex items-center gap-1">
+								<span class="font-medium">
+									{formatDateInTimezone(
+										transportation.end_date,
+										transportation.end_timezone ?? transportation.start_timezone
+									)}
+								</span>
+								<span
+									class="tooltip"
+									data-tip={shouldShowTzBadge(
+										transportation.end_timezone ?? transportation.start_timezone
+									)
+										? (getTimezoneTip(
+												transportation.end_timezone ?? transportation.start_timezone
+											) ?? undefined)
+										: ($t('adventures.local_time') ?? 'Local time')}
+								>
+									<span class="badge badge-ghost badge-xs">
+										{(transportation.end_timezone ?? transportation.start_timezone)
+											? getTimezoneLabel(
+													transportation.end_timezone ?? transportation.start_timezone
+												)
+											: ($t('adventures.local') ?? 'Local')}
+									</span>
+								</span>
+							</div>
+						{/if}
+					{/if}
 				</div>
 			{/if}
 

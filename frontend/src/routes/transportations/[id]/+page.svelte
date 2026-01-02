@@ -45,6 +45,8 @@
 	let modalInitialIndex: number = 0;
 	let isImageModalOpen: boolean = false;
 	let isEditModalOpen: boolean = false;
+	let localTravelWindow: string | null = null;
+	let showLocalTripTime: boolean = false;
 
 	function getTransportationIcon(type: string) {
 		if (type in TRANSPORTATION_TYPES_ICONS) {
@@ -223,6 +225,68 @@
 			features
 		};
 	}
+
+	const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
+	const getTimezoneLabel = (zone?: string | null) => zone ?? localTimeZone;
+	const getTimezoneTip = (zone?: string | null) => {
+		const label = getTimezoneLabel(zone);
+		return label === localTimeZone
+			? null
+			: `${$t('adventures.trip_timezone') ?? 'Trip TZ'}: ${label}. ${
+					$t('adventures.your_time') ?? 'Your time'
+				}: ${localTimeZone}.`;
+	};
+	const shouldShowTzBadge = (zone?: string | null) =>
+		!!zone && getTimezoneLabel(zone) !== localTimeZone;
+
+	function formatLocalTravelWindow(
+		start: string | null,
+		end: string | null,
+		startTimezone: string | null,
+		endTimezone: string | null
+	): string | null {
+		if (!start && !end) return null;
+
+		const formatLocal = (dateStr: string | null, zone: string | null) => {
+			if (!dateStr || isAllDay(dateStr)) return null;
+			const dt = DateTime.fromISO(dateStr, { zone: zone ?? 'UTC' });
+			if (!dt.isValid) return null;
+			return dt.setZone(localTimeZone).toLocaleString(DateTime.DATETIME_MED);
+		};
+
+		const startLocal = formatLocal(start, startTimezone);
+		const endLocal = formatLocal(end, endTimezone ?? startTimezone);
+
+		if (!startLocal && !endLocal) return null;
+		if (startLocal && endLocal) return `${startLocal} → ${endLocal}`;
+		return startLocal ?? endLocal ?? null;
+	}
+
+	const primaryTripTimezone = (startTimezone: string | null, endTimezone: string | null) =>
+		startTimezone ?? endTimezone ?? null;
+
+	function shouldShowTripTimezone(startTimezone: string | null, endTimezone: string | null) {
+		const tz = primaryTripTimezone(startTimezone, endTimezone);
+		if (!tz) return false;
+		return tz !== localTimeZone;
+	}
+
+	$: localTravelWindow = transportation
+		? formatLocalTravelWindow(
+				transportation.date,
+				transportation.end_date,
+				transportation.start_timezone,
+				transportation.end_timezone
+			)
+		: null;
+
+	$: showLocalTripTime = Boolean(
+		localTravelWindow &&
+			primaryTripTimezone(
+				transportation?.start_timezone ?? null,
+				transportation?.end_timezone ?? null
+			) !== localTimeZone
+	);
 </script>
 
 {#if notFound}
@@ -570,18 +634,91 @@
 							{#if transportation.date || transportation.end_date}
 								<div class="flex items-start gap-3">
 									<CalendarRange class="w-5 h-5 text-primary mt-1 flex-shrink-0" />
-									<div>
+									<div class="w-full space-y-2">
 										<p class="font-semibold text-sm opacity-70">{$t('adventures.dates')}</p>
-										<p class="text-base">
-											{formatTravelWindow(
-												transportation.date,
-												transportation.end_date,
-												transportation.start_timezone,
-												transportation.end_timezone
-											)}
-										</p>
+										<div class="space-y-2">
+											{#if transportation.date}
+												<div class="flex items-start justify-between gap-3 text-sm">
+													<div class="space-y-1">
+														<p class="text-xs uppercase tracking-wide opacity-60">
+															{$t('adventures.start') ?? 'Start'}
+														</p>
+														<p class="text-base font-semibold">
+															{#if isAllDay(transportation.date)}
+																{formatAllDayDate(transportation.date)}
+															{:else}
+																{formatDateInTimezone(
+																	transportation.date,
+																	transportation.start_timezone
+																)}
+															{/if}
+														</p>
+													</div>
+													{#if transportation.date && !isAllDay(transportation.date)}
+														<span
+															class="badge badge-ghost badge-xs"
+															class:tooltip={Boolean(getTimezoneTip(transportation.start_timezone))}
+															data-tip={getTimezoneTip(transportation.start_timezone) ?? undefined}
+														>
+															{#if shouldShowTzBadge(transportation.start_timezone)}
+																{getTimezoneLabel(transportation.start_timezone)}
+															{:else}
+																{$t('adventures.local') ?? 'Local'}
+															{/if}
+														</span>
+													{/if}
+												</div>
+											{/if}
+
+											{#if transportation.end_date}
+												<div class="flex items-start justify-between gap-3 text-sm">
+													<div class="space-y-1">
+														<p class="text-xs uppercase tracking-wide opacity-60">
+															{$t('adventures.end') ?? 'End'}
+														</p>
+														<p class="text-base font-semibold">
+															{#if isAllDay(transportation.end_date)}
+																{formatAllDayDate(transportation.end_date)}
+															{:else}
+																{formatDateInTimezone(
+																	transportation.end_date,
+																	transportation.end_timezone ?? transportation.start_timezone
+																)}
+															{/if}
+														</p>
+													</div>
+													{#if transportation.end_date && !isAllDay(transportation.end_date)}
+														<span
+															class="badge badge-ghost badge-xs"
+															class:tooltip={Boolean(
+																getTimezoneTip(
+																	transportation.end_timezone ?? transportation.start_timezone
+																)
+															)}
+															data-tip={getTimezoneTip(
+																transportation.end_timezone ?? transportation.start_timezone
+															) ?? undefined}
+														>
+															{#if shouldShowTzBadge(transportation.end_timezone ?? transportation.start_timezone)}
+																{getTimezoneLabel(
+																	transportation.end_timezone ?? transportation.start_timezone
+																)}
+															{:else}
+																{$t('adventures.local') ?? 'Local'}
+															{/if}
+														</span>
+													{/if}
+												</div>
+											{/if}
+
+											{#if showLocalTripTime}
+												<p class="text-sm text-base-content/70">
+													{$t('adventures.local_time') ?? 'Local time'}: {localTravelWindow}
+												</p>
+											{/if}
+										</div>
 										{#if calculateDuration(transportation.date, transportation.end_date, transportation.start_timezone, transportation.end_timezone)}
-											<p class="text-sm opacity-70 mt-1">
+											<p class="text-sm opacity-70">
 												{calculateDuration(
 													transportation.date,
 													transportation.end_date,

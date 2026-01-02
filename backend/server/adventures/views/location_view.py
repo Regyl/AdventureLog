@@ -1,16 +1,16 @@
 from django.utils import timezone
 from django.db import transaction
 from django.core.exceptions import PermissionDenied
-from django.db.models import Q, Max
+from django.db.models import Q, Max, Prefetch
 from django.db.models.functions import Lower
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 import requests
-from adventures.models import Location, Category, CollectionItineraryItem
+from adventures.models import Location, Category, CollectionItineraryItem, Visit
 from django.contrib.contenttypes.models import ContentType
 from adventures.permissions import IsOwnerOrSharedWithFullAccess
-from adventures.serializers import LocationSerializer, MapPinSerializer
+from adventures.serializers import LocationSerializer, MapPinSerializer, CalendarLocationSerializer
 from adventures.utils import pagination
 
 class LocationViewSet(viewsets.ModelViewSet):
@@ -207,6 +207,29 @@ class LocationViewSet(viewsets.ModelViewSet):
 
         queryset = self.apply_sorting(queryset)
         serializer = self.get_serializer(queryset, many=True, context={'nested': nested, 'allowed_nested_fields': allowedNestedFields})
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def calendar(self, request):
+        """Return a lightweight payload for calendar rendering."""
+        if not request.user.is_authenticated:
+            return Response({"error": "User is not authenticated"}, status=400)
+
+        queryset = (
+            self.get_queryset()
+            .filter(visits__isnull=False)
+            .select_related('category')
+            .prefetch_related(
+                Prefetch(
+                    'visits',
+                    queryset=Visit.objects.only('id', 'start_date', 'end_date', 'timezone')
+                )
+            )
+            .only('id', 'name', 'location', 'category__name', 'category__icon')
+            .distinct()
+        )
+
+        serializer = CalendarLocationSerializer(queryset, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=['get'], url_path='additional-info')

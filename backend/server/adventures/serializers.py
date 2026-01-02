@@ -206,6 +206,31 @@ class VisitSerializer(serializers.ModelSerializer):
         if not validated_data.get('end_date') and validated_data.get('start_date'):
             validated_data['end_date'] = validated_data['start_date']
         return super().create(validated_data)
+
+
+class CalendarVisitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Visit
+        fields = ['id', 'start_date', 'end_date', 'timezone']
+
+
+class CalendarLocationSerializer(serializers.ModelSerializer):
+    visits = CalendarVisitSerializer(many=True, read_only=True)
+    category = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Location
+        fields = ['id', 'name', 'location', 'category', 'visits']
+
+    def get_category(self, obj):
+        if not obj.category:
+            return None
+
+        return {
+            "name": obj.category.name,
+            "icon": obj.category.icon,
+        }
+
                                    
 class LocationSerializer(CustomModelSerializer):
     images = serializers.SerializerMethodField()

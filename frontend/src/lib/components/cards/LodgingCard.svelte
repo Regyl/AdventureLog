@@ -40,6 +40,23 @@
 		return stars;
 	}
 
+	const hasTimePortion = (date: string | null) => !!date && !isAllDay(date);
+
+	const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
+	const getTimezoneLabel = (zone?: string | null) => zone ?? localTimeZone;
+	const getTimezoneTip = (zone?: string | null) => {
+		const label = getTimezoneLabel(zone);
+		return label === localTimeZone
+			? null
+			: `${$t('adventures.trip_timezone') ?? 'Trip TZ'}: ${label}. ${
+					$t('adventures.your_time') ?? 'Your time'
+				}: ${localTimeZone}.`;
+	};
+	const shouldShowTzBadge = (zone?: string | null) => {
+		if (!zone) return false;
+		return getTimezoneLabel(zone) !== localTimeZone;
+	};
+
 	export let lodging: Lodging;
 	export let user: User | null = null;
 	export let collection: Collection | null = null;
@@ -225,6 +242,14 @@
 						{/if}
 					</span>
 				</div>
+			{/if}
+
+			{#if (hasTimePortion(lodging.check_in) || hasTimePortion(lodging.check_out)) && shouldShowTzBadge(lodging.timezone)}
+				<span class="tooltip" data-tip={getTimezoneTip(lodging.timezone) ?? undefined}>
+					<span class="badge badge-ghost badge-xs">
+						{getTimezoneLabel(lodging.timezone)}
+					</span>
+				</span>
 			{/if}
 
 			{#if lodging.rating}

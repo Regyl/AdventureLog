@@ -64,8 +64,9 @@
 		collection: collection?.id,
 		is_public: true
 	};
-
-	let selectedTimezone: string = Intl.DateTimeFormat().resolvedOptions().timeZone;
+	const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+	let selectedStartTimezone: string = browserTimezone;
+	let selectedEndTimezone: string = browserTimezone;
 	let localStartDate: string = '';
 	let localEndDate: string = '';
 	let allDay: boolean = true;
@@ -91,8 +92,10 @@
 	}
 	// Only assign timezones when this is a timed transportation. Keep timezones null for all-day entries.
 	$: {
-		transportation.start_timezone = allDay ? null : selectedTimezone;
-		transportation.end_timezone = allDay ? null : selectedTimezone;
+		const departureZone = selectedStartTimezone || browserTimezone;
+		const arrivalZone = selectedEndTimezone || departureZone;
+		transportation.start_timezone = allDay ? null : departureZone;
+		transportation.end_timezone = allDay ? null : arrivalZone;
 	}
 
 	function handleStartCodeInput(value: string) {
@@ -184,8 +187,9 @@
 			localStartDate = localStartDate ? `${localStartDate}T00:00` : '';
 			localEndDate = localEndDate ? `${localEndDate}T23:59` : '';
 			// Restore selected timezones when switching back to timed
-			transportation.start_timezone = selectedTimezone;
-			transportation.end_timezone = selectedTimezone;
+			selectedEndTimezone = selectedEndTimezone || selectedStartTimezone;
+			transportation.start_timezone = selectedStartTimezone;
+			transportation.end_timezone = selectedEndTimezone;
 		}
 
 		syncAndValidateDates(false);
@@ -198,6 +202,9 @@
 	function syncAndValidateDates(autoFillEnd: boolean): boolean {
 		dateError = '';
 
+		const departureZone = selectedStartTimezone || browserTimezone;
+		const arrivalZone = selectedEndTimezone || departureZone;
+
 		if (localEndDate && !localStartDate) {
 			dateError = 'Start date is required when end date is provided';
 			localEndDate = '';
@@ -205,16 +212,16 @@
 		}
 
 		transportation.date = localStartDate
-			? updateUTCDate({ localDate: localStartDate, timezone: selectedTimezone, allDay }).utcDate
+			? updateUTCDate({ localDate: localStartDate, timezone: departureZone, allDay }).utcDate
 			: null;
 		transportation.end_date = localEndDate
-			? updateUTCDate({ localDate: localEndDate, timezone: selectedTimezone, allDay }).utcDate
+			? updateUTCDate({ localDate: localEndDate, timezone: arrivalZone, allDay }).utcDate
 			: null;
 
 		if (!localEndDate && localStartDate && autoFillEnd) {
 			const start = allDay
 				? DateTime.fromISO(localStartDate, { zone: 'UTC' })
-				: DateTime.fromISO(localStartDate, { zone: selectedTimezone });
+				: DateTime.fromISO(localStartDate, { zone: departureZone });
 			if (start.isValid) {
 				if (allDay) {
 					const defaultEnd = start.plus({ days: 1 }).toISODate();
@@ -222,12 +229,13 @@
 						localEndDate = defaultEnd;
 						transportation.end_date = updateUTCDate({
 							localDate: defaultEnd,
-							timezone: selectedTimezone,
+							timezone: arrivalZone,
 							allDay
 						}).utcDate;
 					}
 				} else {
 					const defaultEnd = start
+						.setZone(arrivalZone)
 						.plus({ days: 1 })
 						.set({ hour: 9, minute: 0, second: 0, millisecond: 0 });
 					const defaultEndLocal = defaultEnd.toISO({
@@ -239,7 +247,7 @@
 						localEndDate = defaultEndLocal.slice(0, 16);
 						transportation.end_date = updateUTCDate({
 							localDate: localEndDate,
-							timezone: selectedTimezone,
+							timezone: arrivalZone,
 							allDay
 						}).utcDate;
 					}
@@ -293,9 +301,12 @@
 			return;
 		}
 
+		const departureZone = selectedStartTimezone || browserTimezone;
+		const arrivalZone = selectedEndTimezone || departureZone;
+
 		// Ensure timezones are only persisted for timed transportation
-		transportation.start_timezone = allDay ? null : selectedTimezone;
-		transportation.end_timezone = allDay ? null : selectedTimezone;
+		transportation.start_timezone = allDay ? null : departureZone;
+		transportation.end_timezone = allDay ? null : arrivalZone;
 
 		// Normalize codes before sending
 		transportation.start_code = normalizeCode(startCodeField || transportation.start_code);
@@ -388,9 +399,14 @@
 	}
 
 	onMount(() => {
-		// Prefer transportation start_timezone if present, otherwise keep current selection
+		// Prefer transportation-specific timezones if present, otherwise keep current selection
 		if (initialTransportation?.start_timezone) {
-			selectedTimezone = initialTransportation.start_timezone;
+			selectedStartTimezone = initialTransportation.start_timezone;
+		}
+		if (initialTransportation?.end_timezone) {
+			selectedEndTimezone = initialTransportation.end_timezone;
+		} else if (initialTransportation?.start_timezone) {
+			selectedEndTimezone = initialTransportation.start_timezone;
 		}
 
 		// Determine if existing dates are all-day using shared helper
@@ -398,9 +414,12 @@
 			allDay = isAllDay(initialTransportation.date);
 		}
 
-		// Keep transportation timezones null for all-day entries, otherwise use selectedTimezone
-		transportation.start_timezone = allDay ? null : selectedTimezone;
-		transportation.end_timezone = allDay ? null : selectedTimezone;
+		const departureZone = selectedStartTimezone || browserTimezone;
+		const arrivalZone = selectedEndTimezone || departureZone;
+
+		// Keep transportation timezones null for all-day entries, otherwise use selected values
+		transportation.start_timezone = allDay ? null : departureZone;
+		transportation.end_timezone = allDay ? null : arrivalZone;
 
 		// Convert UTC dates to local display, respecting all-day formatting
 		if (initialTransportation?.date) {
@@ -409,7 +428,7 @@
 			} else {
 				const result = updateLocalDate({
 					utcDate: initialTransportation.date,
-					timezone: selectedTimezone
+					timezone: departureZone
 				});
 				localStartDate = result.localDate;
 			}
@@ -420,7 +439,7 @@
 			} else {
 				const result = updateLocalDate({
 					utcDate: initialTransportation.end_date,
-					timezone: selectedTimezone
+					timezone: arrivalZone
 				});
 				localEndDate = result.localDate;
 			}
@@ -758,7 +777,7 @@
 						</div>
 					{/if}
 
-					<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+					<div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
 						<!-- Departure Date -->
 						<div class="form-control">
 							<label class="label" for="departure-date">
@@ -817,7 +836,14 @@
 
 						<!-- Timezone Selector (only for timed transportation) -->
 						{#if !allDay}
-							<TimezoneSelector bind:selectedTimezone />
+							<TimezoneSelector
+								bind:selectedTimezone={selectedStartTimezone}
+								label={$t('transportation.departure_timezone') ?? 'Departure timezone'}
+							/>
+							<TimezoneSelector
+								bind:selectedTimezone={selectedEndTimezone}
+								label={$t('transportation.arrival_timezone') ?? 'Arrival timezone'}
+							/>
 						{/if}
 					</div>
 				</div>
