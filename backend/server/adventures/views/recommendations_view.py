@@ -521,7 +521,9 @@ class RecommendationsViewSet(viewsets.ViewSet):
 
             # Validate geocode results
             if isinstance(geocode_results, dict) and geocode_results.get('error'):
-                return Response({"error": f"Geocoding failed: {geocode_results.get('error')}"}, status=400)
+                # Log internal geocoding error details but do not expose them to the client
+                logger.warning("Geocoding helper returned an error: %s", geocode_results.get('error'))
+                return Response({"error": "Geocoding failed. Please try a different location or contact support."}, status=400)
 
             if not geocode_results:
                 return Response({"error": "Could not geocode provided location."}, status=400)
@@ -667,8 +669,10 @@ class RecommendationsViewSet(viewsets.ViewSet):
         
         # If no results at all and user requested only OSM, return error status
         if len(final_results) == 0 and sources == 'osm' and osm_error:
+            # Log internal error details for investigation but do not expose them to clients
+            logger.debug("OSM query error (internal): %s", osm_error)
             return Response({
-                "error": osm_error,
+                "error": "OpenStreetMap service temporarily unavailable. Please try again later.",
                 "count": 0,
                 "results": [],
                 "sources_used": response_data["sources_used"]
