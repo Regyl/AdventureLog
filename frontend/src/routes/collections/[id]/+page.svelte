@@ -311,6 +311,7 @@
 		}}
 		note={noteToEdit}
 		{collection}
+		user={data.user}
 		on:save={(e) => {
 			upsertCollectionItem('notes', e.detail);
 			noteToEdit = null;

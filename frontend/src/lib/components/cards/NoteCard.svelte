@@ -27,6 +27,12 @@
 	export let itineraryItem: CollectionItineraryItem | null = null;
 
 	let isWarningModalOpen: boolean = false;
+	let isDetailsOpen: boolean = false;
+
+	$: canEdit =
+		!readOnly &&
+		(note.user == user?.uuid ||
+			(collection && user && collection.shared_with?.includes(user.uuid)));
 
 	function editNote() {
 		dispatch('edit', note);
@@ -70,6 +76,64 @@
 	/>
 {/if}
 
+{#if isDetailsOpen}
+	<dialog class="modal modal-open" open>
+		<div class="modal-box max-w-3xl space-y-4">
+			<h3 class="text-xl font-semibold">{note.name}</h3>
+			<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70">
+				<div class="badge badge-primary badge-sm">{$t('adventures.note')}</div>
+				{#if note.date && note.date !== ''}
+					<div class="flex items-center gap-2">
+						<Calendar class="w-4 h-4 text-primary" />
+						<span>{new Date(note.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span>
+					</div>
+				{/if}
+				{#if note.links && note.links?.length > 0}
+					<div class="badge badge-ghost badge-sm">
+						<LinkVariant class="w-3 h-3 mr-1" />
+						{note.links.length}
+						{note.links.length > 1 ? $t('adventures.links') : $t('adventures.link')}
+					</div>
+				{/if}
+			</div>
+
+			{#if note.content && note.content?.length > 0}
+				<article class="prose max-w-none text-base-content">
+					{@html renderMarkdown(note.content || '')}
+				</article>
+			{:else}
+				<p class="text-sm text-base-content/70">No content available.</p>
+			{/if}
+
+			{#if note.links && note.links?.length > 0}
+				<div class="space-y-2">
+					<p class="text-sm font-semibold text-base-content">{$t('adventures.links')}</p>
+					<div class="flex flex-wrap gap-2">
+						{#each note.links as link}
+							<a
+								class="badge badge-outline gap-1"
+								href={link}
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								<LinkVariant class="w-3 h-3" />
+								<span class="break-all text-left">{link}</span>
+							</a>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			<div class="modal-action">
+				<button class="btn" on:click={() => (isDetailsOpen = false)}>Close</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button aria-label="close" on:click={() => (isDetailsOpen = false)}>Close</button>
+		</form>
+	</dialog>
+{/if}
+
 <div
 	class="card w-full max-w-md bg-base-300 shadow hover:shadow-md transition-all duration-200 border border-base-300 group"
 	aria-label="note-card"
@@ -84,7 +148,7 @@
 				</div>
 			</div>
 
-			{#if !readOnly && (note.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid)))}
+			{#if canEdit}
 				<details class="dropdown dropdown-end relative z-50">
 					<summary class="btn btn-square btn-sm p-1 text-base-content">
 						<DotsHorizontal class="w-5 h-5" />
@@ -122,6 +186,14 @@
 						</li>
 					</ul>
 				</details>
+			{:else}
+				<button
+					class="btn btn-neutral-200 btn-sm px-3 text-base-content"
+					on:click={() => (isDetailsOpen = true)}
+					type="button"
+				>
+					{$t('adventures.view')}
+				</button>
 			{/if}
 		</div>
 

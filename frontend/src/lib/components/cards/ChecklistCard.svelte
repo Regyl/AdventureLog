@@ -23,6 +23,13 @@
 	export let itineraryItem: CollectionItineraryItem | null = null;
 
 	let isWarningModalOpen: boolean = false;
+	let isDetailsOpen: boolean = false;
+	let updatingItemId: string | null = null;
+
+	$: canEdit =
+		!readOnly &&
+		(checklist.user == user?.uuid ||
+			(collection && user && collection.shared_with?.includes(user.uuid)));
 
 	function editChecklist() {
 		dispatch('edit', checklist);
@@ -53,6 +60,51 @@
 			addToast('error', $t('itinerary.item_remove_error'));
 		}
 	}
+
+	async function toggleItemStatus(itemId: string) {
+		if (!canEdit || !itemId) return;
+
+		const previousItems = checklist.items.map((item) => ({ ...item }));
+		const updatedItems = checklist.items.map((item) =>
+			item.id === itemId ? { ...item, is_checked: !item.is_checked } : item
+		);
+
+		updatingItemId = itemId;
+		checklist = { ...checklist, items: updatedItems };
+
+		try {
+			const res = await fetch(`/api/checklists/${checklist.id}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					name: checklist.name,
+					date: checklist.date || null,
+					items: updatedItems,
+					collection: checklist.collection,
+					is_public: checklist.is_public
+				})
+			});
+
+			if (res.ok) {
+				const data = await res.json();
+				if (data) {
+					checklist = data;
+					dispatch('update', data);
+				}
+			} else {
+				checklist = { ...checklist, items: previousItems };
+				addToast('error', 'Unable to update checklist item');
+			}
+		} catch (error) {
+			checklist = { ...checklist, items: previousItems };
+			addToast('error', 'Unable to update checklist item');
+			console.error(error);
+		} finally {
+			updatingItemId = null;
+		}
+	}
 </script>
 
 {#if isWarningModalOpen}
@@ -64,6 +116,65 @@
 		on:close={() => (isWarningModalOpen = false)}
 		on:confirm={deleteChecklist}
 	/>
+{/if}
+
+{#if isDetailsOpen}
+	<dialog class="modal modal-open" open>
+		<div class="modal-box max-w-3xl space-y-4">
+			<div class="flex items-center gap-2">
+				<h3 class="text-xl font-semibold leading-tight">{checklist.name}</h3>
+				<div class="badge badge-primary badge-sm">{$t('adventures.checklist')}</div>
+			</div>
+
+			<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70">
+				{#if checklist.date && checklist.date !== ''}
+					<div class="flex items-center gap-2">
+						<Calendar class="w-4 h-4 text-primary" />
+						<span
+							>{new Date(checklist.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span
+						>
+					</div>
+				{/if}
+				{#if checklist.items.length > 0}
+					{@const completedCount = checklist.items.filter((item) => item.is_checked).length}
+					<div class="badge badge-ghost badge-sm">
+						{completedCount}/{checklist.items.length}
+						{$t('checklist.completed')}
+					</div>
+				{/if}
+			</div>
+
+			{#if checklist.items.length > 0}
+				<div class="space-y-2 max-h-96 overflow-y-auto pr-1">
+					{#each checklist.items as item}
+						<div class="flex items-center gap-3 rounded-lg bg-base-200/60 p-2">
+							{#if item.is_checked}
+								<CheckCircle class="w-5 h-5 text-success flex-shrink-0" />
+							{:else}
+								<CheckboxBlankCircleOutline class="w-5 h-5 flex-shrink-0" />
+							{/if}
+							<span
+								class="flex-1 text-sm"
+								class:line-through={item.is_checked}
+								class:opacity-60={item.is_checked}
+							>
+								{item.name}
+							</span>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<p class="text-sm text-base-content/70">No items added yet.</p>
+			{/if}
+
+			<div class="modal-action">
+				<button class="btn" on:click={() => (isDetailsOpen = false)}>Close</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button aria-label="close" on:click={() => (isDetailsOpen = false)}>Close</button>
+		</form>
+	</dialog>
 {/if}
 <div
 	class="card w-full max-w-md bg-base-300 shadow hover:shadow-md transition-all duration-200 border border-base-300 group"
@@ -79,7 +190,7 @@
 				</div>
 			</div>
 
-			{#if !readOnly && (checklist.user == user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid)))}
+			{#if canEdit}
 				<details class="dropdown dropdown-end relative z-50">
 					<summary class="btn btn-square btn-sm p-1 text-base-content">
 						<DotsHorizontal class="w-5 h-5" />
@@ -117,27 +228,59 @@
 						</li>
 					</ul>
 				</details>
+			{:else}
+				<button
+					class="btn btn-neutral-200 btn-sm px-3 text-base-content"
+					on:click={() => (isDetailsOpen = true)}
+					type="button"
+				>
+					{$t('adventures.view')}
+				</button>
 			{/if}
 		</div>
 
 		<!-- Checklist Items Preview -->
 		{#if checklist.items.length > 0}
-			<div class="space-y-2">
+			<div class="space-y-1.5">
 				{#each checklist.items.slice(0, 3) as item}
-					<div class="flex items-center gap-2 text-sm text-base-content/70">
-						{#if item.is_checked}
-							<CheckCircle class="w-4 h-4 text-success flex-shrink-0" />
-						{:else}
-							<CheckboxBlankCircleOutline class="w-4 h-4 flex-shrink-0" />
-						{/if}
-						<span
-							class="truncate"
-							class:line-through={item.is_checked}
-							class:opacity-60={item.is_checked}
+					{#if canEdit}
+						<button
+							type="button"
+							on:click={() => toggleItemStatus(item.id)}
+							disabled={updatingItemId === item.id}
+							class="flex w-full items-center gap-1.5 rounded-lg px-2 py-0.5 text-left text-sm text-base-content/80 transition-colors hover:bg-base-200/80 disabled:opacity-60"
 						>
-							{item.name}
-						</span>
-					</div>
+							{#if updatingItemId === item.id}
+								<span class="loading loading-spinner loading-xs text-primary"></span>
+							{:else if item.is_checked}
+								<CheckCircle class="w-4 h-4 text-success flex-shrink-0" />
+							{:else}
+								<CheckboxBlankCircleOutline class="w-4 h-4 flex-shrink-0" />
+							{/if}
+							<span
+								class="truncate"
+								class:line-through={item.is_checked}
+								class:opacity-60={item.is_checked}
+							>
+								{item.name}
+							</span>
+						</button>
+					{:else}
+						<div class="flex items-center gap-1.5 text-sm text-base-content/70">
+							{#if item.is_checked}
+								<CheckCircle class="w-4 h-4 text-success flex-shrink-0" />
+							{:else}
+								<CheckboxBlankCircleOutline class="w-4 h-4 flex-shrink-0" />
+							{/if}
+							<span
+								class="truncate"
+								class:line-through={item.is_checked}
+								class:opacity-60={item.is_checked}
+							>
+								{item.name}
+							</span>
+						</div>
+					{/if}
 				{/each}
 				{#if checklist.items.length > 3}
 					<div class="text-sm text-base-content/60 pl-6">

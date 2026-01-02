@@ -496,7 +496,8 @@
     "my_locations": "My Locations",
     "no_linkable_locations": "No locations found that can be linked to this collection.",
     "all_locations_already_linked": "All locations are already linked to this collection.",
-    "transportation_gpx_tip": "Upload GPX files here to have them displayed on the map"
+    "transportation_gpx_tip": "Upload GPX files here to have them displayed on the map",
+    "view": "View"
   },
   "worldtravel": {
     "country_list": "Country List",
