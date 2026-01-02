@@ -135,6 +135,18 @@
 		isTransportationModalOpen = true;
 	}
 
+	function handleEditNote(event: CustomEvent<Note>) {
+		noteToEdit = event.detail;
+		isNoteModalOpen = true;
+		pendingAddDate = null;
+	}
+
+	function handleEditChecklist(event: CustomEvent<Checklist>) {
+		checklistToEdit = event.detail;
+		isChecklistModalOpen = true;
+		pendingAddDate = null;
+	}
+
 	function handleItemDelete(event: CustomEvent<CollectionItineraryItem | string | number>) {
 		const payload = event.detail;
 
@@ -208,6 +220,9 @@
 	let isChecklistModalOpen = false;
 	let isItineraryLinkModalOpen = false;
 
+	let noteToEdit: Note | null = null;
+	let checklistToEdit: Checklist | null = null;
+
 	// Store the target date and display date for the link modal
 	let linkModalTargetDate: string = '';
 	let linkModalDisplayDate: string = '';
@@ -220,6 +235,77 @@
 	let pendingAddDate: string | null = null;
 	// Track if we've already added this location to the itinerary
 	let addedToItinerary: Set<string> = new Set();
+
+	function normalizeDateOnly(value: string | null | undefined): string | null {
+		if (!value) return null;
+		return value.includes('T') ? value.split('T')[0] : value;
+	}
+
+	function upsertNote(note: Note) {
+		const notes = collection.notes ? [...collection.notes] : [];
+		const idx = notes.findIndex((n) => n.id === note.id);
+		if (idx >= 0) {
+			notes[idx] = note;
+		} else {
+			notes.push(note);
+		}
+		collection = { ...collection, notes };
+	}
+
+	function upsertChecklist(checklist: Checklist) {
+		const checklists = collection.checklists ? [...collection.checklists] : [];
+		const idx = checklists.findIndex((c) => c.id === checklist.id);
+		if (idx >= 0) {
+			checklists[idx] = checklist;
+		} else {
+			checklists.push(checklist);
+		}
+		collection = { ...collection, checklists };
+	}
+
+	async function handleNoteUpsert(note: Note) {
+		upsertNote(note);
+
+		const noteDate = normalizeDateOnly(note.date);
+		const targetDate = noteDate || pendingAddDate;
+		const isAlreadyScheduled = collection.itinerary?.some(
+			(it) => it.item?.type === 'note' && it.object_id === note.id && it.date === targetDate
+		);
+
+		try {
+			if (targetDate && !isAlreadyScheduled) {
+				await addItineraryItemForObject('note', note.id, targetDate, !noteDate && !!pendingAddDate);
+			}
+		} finally {
+			pendingAddDate = null;
+			isNoteModalOpen = false;
+		}
+	}
+
+	async function handleChecklistUpsert(checklist: Checklist) {
+		upsertChecklist(checklist);
+
+		const checklistDate = normalizeDateOnly(checklist.date);
+		const targetDate = checklistDate || pendingAddDate;
+		const isAlreadyScheduled = collection.itinerary?.some(
+			(it) =>
+				it.item?.type === 'checklist' && it.object_id === checklist.id && it.date === targetDate
+		);
+
+		try {
+			if (targetDate && !isAlreadyScheduled) {
+				await addItineraryItemForObject(
+					'checklist',
+					checklist.id,
+					targetDate,
+					!checklistDate && !!pendingAddDate
+				);
+			}
+		} finally {
+			pendingAddDate = null;
+			isChecklistModalOpen = false;
+		}
+	}
 
 	// Sync the
 	//  with the collection.locations array
@@ -887,33 +973,33 @@
 
 {#if isNoteModalOpen}
 	<NoteModal
-		on:close={() => (isNoteModalOpen = false)}
-		{collection}
-		on:save={(e) => {
-			const note = e.detail;
-			collection.notes = [...(collection.notes || []), note];
-			if (pendingAddDate) {
-				addItineraryItemForObject('note', note.id, pendingAddDate);
-				pendingAddDate = null;
-			}
+		on:close={() => {
+			pendingAddDate = null;
+			noteToEdit = null;
 			isNoteModalOpen = false;
 		}}
+		{collection}
+		{user}
+		note={noteToEdit}
+		on:create={(e) => void handleNoteUpsert(e.detail)}
+		on:save={(e) => void handleNoteUpsert(e.detail)}
+		initialVisitDate={pendingAddDate}
 	/>
 {/if}
 
 {#if isChecklistModalOpen}
 	<ChecklistModal
-		on:close={() => (isChecklistModalOpen = false)}
-		{collection}
-		on:save={(e) => {
-			const checklist = e.detail;
-			collection.checklists = [...(collection.checklists || []), checklist];
-			if (pendingAddDate) {
-				addItineraryItemForObject('checklist', checklist.id, pendingAddDate);
-				pendingAddDate = null;
-			}
+		on:close={() => {
+			pendingAddDate = null;
+			checklistToEdit = null;
 			isChecklistModalOpen = false;
 		}}
+		{collection}
+		{user}
+		checklist={checklistToEdit}
+		on:create={(e) => void handleChecklistUpsert(e.detail)}
+		on:save={(e) => void handleChecklistUpsert(e.detail)}
+		initialVisitDate={pendingAddDate}
 	/>
 {/if}
 
@@ -1290,6 +1376,7 @@
 														on:delete={handleItemDelete}
 														itineraryItem={item}
 														on:removeFromItinerary={handleRemoveItineraryItem}
+														on:edit={handleEditNote}
 													/>
 												{:else if objectType === 'checklist'}
 													<!-- @ts-ignore - TypeScript can't narrow union type properly -->
@@ -1300,6 +1387,7 @@
 														on:delete={handleItemDelete}
 														itineraryItem={item}
 														on:removeFromItinerary={handleRemoveItineraryItem}
+														on:edit={handleEditChecklist}
 													/>
 												{/if}
 											</div>
