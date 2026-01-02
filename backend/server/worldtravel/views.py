@@ -99,7 +99,6 @@ def globespin(request):
     
     return Response(data)
 
-@method_decorator(cache_page(CACHE_TTL), name='list')
 class CountryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Country.objects.all().order_by('name')
     serializer_class = CountrySerializer
