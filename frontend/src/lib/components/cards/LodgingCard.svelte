@@ -40,8 +40,6 @@
 		return stars;
 	}
 
-	const hasTimePortion = (date: string | null) => !!date && !isAllDay(date);
-
 	const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
 	const getTimezoneLabel = (zone?: string | null) => zone ?? localTimeZone;
 	const getTimezoneTip = (zone?: string | null) => {
@@ -56,6 +54,14 @@
 		if (!zone) return false;
 		return getTimezoneLabel(zone) !== localTimeZone;
 	};
+	const hasTimePortion = (date: string | null) => !!date && !isAllDay(date);
+	const isTimedStay = (date: string | null) => hasTimePortion(date);
+
+	let showMoreDetails = false;
+	$: hasExpandableDetails = Boolean(
+		lodging.check_out && (isTimedStay(lodging.check_out) || isTimedStay(lodging.check_in))
+	);
+	$: if (!hasExpandableDetails) showMoreDetails = false;
 
 	export let lodging: Lodging;
 	export let user: User | null = null;
@@ -233,12 +239,12 @@
 							>
 						</div>
 					{:else}
-						<!-- Timed dates with mini cards -->
-						<div class="flex flex-col gap-1">
-							<!-- Check-in Card -->
-							<div class="bg-base-200 rounded-lg px-3 py-1.5">
-								<div class="flex items-center justify-between gap-2">
-									<div class="flex flex-col gap-0.5">
+						<!-- Timed dates with tidy mini cards and toggle -->
+						<div class="flex flex-col gap-2">
+							<!-- Check-in Card (always shown) -->
+							<div class="bg-base-200 rounded-lg px-3 py-2 flex flex-col gap-2">
+								<div class="flex items-start justify-between gap-2">
+									<div class="flex flex-col gap-0.5 min-w-0">
 										<span class="text-xs text-base-content/60">Check-in</span>
 										<span class="text-sm font-semibold text-base-content">
 											{#if isAllDay(lodging.check_in)}
@@ -248,44 +254,67 @@
 											{/if}
 										</span>
 									</div>
-									{#if hasTimePortion(lodging.check_in) && shouldShowTzBadge(lodging.timezone)}
+								</div>
+
+								{#if hasTimePortion(lodging.check_in) && shouldShowTzBadge(lodging.timezone)}
+									<div class="flex items-center gap-2 text-xs text-base-content/70">
 										<div class="tooltip" data-tip={getTimezoneTip(lodging.timezone) ?? undefined}>
-											<span class="badge badge-primary badge-sm">
+											<span class="badge badge-ghost badge-sm">
 												{getTimezoneLabel(lodging.timezone)}
 											</span>
 										</div>
-									{/if}
-								</div>
+									</div>
+								{/if}
 							</div>
 
-							<!-- Check-out Card -->
-							<div class="bg-base-200 rounded-lg px-3 py-1.5">
-								<div class="flex items-center justify-between gap-2">
-									<div class="flex flex-col gap-0.5">
-										<span class="text-xs text-base-content/60">Check-out</span>
-										<span class="text-sm font-semibold text-base-content">
-											{#if isAllDay(lodging.check_out)}
-												{formatAllDayDate(lodging.check_out)}
-											{:else}
-												{formatDateInTimezone(lodging.check_out, lodging.timezone)}
-											{/if}
-										</span>
-									</div>
-									{#if hasTimePortion(lodging.check_out) && shouldShowTzBadge(lodging.timezone)}
-										<div class="tooltip" data-tip={getTimezoneTip(lodging.timezone) ?? undefined}>
-											<span class="badge badge-primary badge-sm">
-												{getTimezoneLabel(lodging.timezone)}
+							{#if hasExpandableDetails}
+								<div class="flex justify-end">
+									<button
+										class="btn btn-neutral-200 btn-xs"
+										aria-expanded={showMoreDetails}
+										on:click={() => (showMoreDetails = !showMoreDetails)}
+										type="button"
+									>
+										{showMoreDetails
+											? ($t('common.show_less') ?? 'Hide details')
+											: ($t('common.show_more') ?? 'Show more')}
+									</button>
+								</div>
+							{/if}
+
+							{#if showMoreDetails && hasExpandableDetails}
+								<!-- Check-out Card (expandable) -->
+								<div class="bg-base-200 rounded-lg px-3 py-2 flex flex-col gap-2">
+									<div class="flex items-start justify-between gap-2">
+										<div class="flex flex-col gap-0.5 min-w-0">
+											<span class="text-xs text-base-content/60">Check-out</span>
+											<span class="text-sm font-semibold text-base-content">
+												{#if isAllDay(lodging.check_out)}
+													{formatAllDayDate(lodging.check_out)}
+												{:else}
+													{formatDateInTimezone(lodging.check_out, lodging.timezone)}
+												{/if}
 											</span>
+										</div>
+									</div>
+
+									{#if hasTimePortion(lodging.check_out) && shouldShowTzBadge(lodging.timezone)}
+										<div class="flex items-center gap-2 text-xs text-base-content/70">
+											<div class="tooltip" data-tip={getTimezoneTip(lodging.timezone) ?? undefined}>
+												<span class="badge badge-ghost badge-sm">
+													{getTimezoneLabel(lodging.timezone)}
+												</span>
+											</div>
 										</div>
 									{/if}
 								</div>
-							</div>
+							{/if}
 						</div>
 					{/if}
 				{:else if lodging.check_in}
 					<!-- Check-in only -->
-					<div class="bg-base-200 rounded-lg px-3 py-1.5">
-						<div class="flex items-center justify-between gap-2">
+					<div class="bg-base-200 rounded-lg px-3 py-2 flex flex-col gap-2">
+						<div class="flex items-start justify-between gap-2">
 							<div class="flex flex-col gap-0.5">
 								<span class="text-xs text-base-content/60">Check-in</span>
 								<span class="text-sm font-semibold text-base-content">
@@ -296,19 +325,22 @@
 									{/if}
 								</span>
 							</div>
-							{#if hasTimePortion(lodging.check_in) && shouldShowTzBadge(lodging.timezone)}
+						</div>
+
+						{#if hasTimePortion(lodging.check_in) && shouldShowTzBadge(lodging.timezone)}
+							<div class="flex items-center gap-2 text-xs text-base-content/70">
 								<div class="tooltip" data-tip={getTimezoneTip(lodging.timezone) ?? undefined}>
-									<span class="badge badge-primary badge-sm">
+									<span class="badge badge-ghost badge-sm">
 										{getTimezoneLabel(lodging.timezone)}
 									</span>
 								</div>
-							{/if}
-						</div>
+							</div>
+						{/if}
 					</div>
 				{:else if lodging.check_out}
 					<!-- Check-out only -->
-					<div class="bg-base-200 rounded-lg px-3 py-1.5">
-						<div class="flex items-center justify-between gap-2">
+					<div class="bg-base-200 rounded-lg px-3 py-2 flex flex-col gap-2">
+						<div class="flex items-start justify-between gap-2">
 							<div class="flex flex-col gap-0.5">
 								<span class="text-xs text-base-content/60">Check-out</span>
 								<span class="text-sm font-semibold text-base-content">
@@ -319,14 +351,17 @@
 									{/if}
 								</span>
 							</div>
-							{#if hasTimePortion(lodging.check_out) && shouldShowTzBadge(lodging.timezone)}
+						</div>
+
+						{#if hasTimePortion(lodging.check_out) && shouldShowTzBadge(lodging.timezone)}
+							<div class="flex items-center gap-2 text-xs text-base-content/70">
 								<div class="tooltip" data-tip={getTimezoneTip(lodging.timezone) ?? undefined}>
-									<span class="badge badge-primary badge-sm">
+									<span class="badge badge-ghost badge-sm">
 										{getTimezoneLabel(lodging.timezone)}
 									</span>
 								</div>
-							{/if}
-						</div>
+							</div>
+						{/if}
 					</div>
 				{/if}
 			</div>

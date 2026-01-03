@@ -133,60 +133,109 @@ def search_osm(query):
 # -----------------
 
 def extractIsoCode(user, data):
-        """
-        Extract the ISO code from the response data.
-        Returns a dictionary containing the region name, country name, and ISO code if found.
-        """
-        iso_code = None
-        town_city_or_county = None
-        display_name = None
-        country_code = None
-        city = None
-        visited_city = None
-        location_name = None
+    """
+    Extract the ISO code from the response data.
+    Returns a dictionary containing the region name, country name, and ISO code if found.
+    """
+    iso_code = None
+    display_name = None
+    country_code = None
+    city = None
+    visited_city = None
+    location_name = None
 
-        # town = None
-        # city = None
-        # county = None
+    if 'name' in data.keys():
+        location_name = data['name']
 
-        if 'name' in data.keys():
-            location_name = data['name']
-        
-        if 'address' in data.keys():
-            keys = data['address'].keys()
-            for key in keys:
-                if key.find("ISO") != -1:
-                    iso_code = data['address'][key]
+    address = data.get('address', {}) or {}
 
-        if not iso_code:
-            return {"error": "No region found"}
-        
+    # Prefer the most specific ISO 3166-2 code available before falling back to country-level.
+    preferred_iso_keys = [
+        "ISO3166-2-lvl6",
+        "ISO3166-2-lvl5",
+        "ISO3166-2-lvl4",
+        "ISO3166-2-lvl3",
+        "ISO3166-2-lvl2",
+        "ISO3166-2-lvl1",
+        "ISO3166-2",
+    ]
+    for key in preferred_iso_keys:
+        if key in address and address[key]:
+            iso_code = address[key]
+            break
+
+    # If no region-level code, fall back to country code only as a last resort.
+    if not iso_code and "ISO3166-1" in address:
+        iso_code = address.get("ISO3166-1")
+
+    # Capture country code early for matching by name if needed.
+    country_code = address.get("ISO3166-1")
+    state_name = address.get("state")
+
+    region = None
+    if iso_code and len(str(iso_code)) > 2:
         region = Region.objects.filter(id=iso_code).first()
-        visited_region = VisitedRegion.objects.filter(region=region, user=user).first()
-        
-        region_visited = False
-        city_visited = False
-        country_code = iso_code[:2]
-        
-        if region:
-            if 'city' in keys:
-                city = City.objects.filter(name__contains=data['address']['city'], region=region).first()
-            if 'county' in keys and not city:
-                city = City.objects.filter(name__contains=data['address']['county'], region=region).first()
-            if 'town' in keys and not city:
-                city = City.objects.filter(name__contains=data['address']['town'], region=region).first()
 
-            if city:
-                display_name = f"{city.name}, {region.name}, {country_code}"
-                visited_city = VisitedCity.objects.filter(city=city, user=user).first()
-
-        if visited_region:
-            region_visited = True
-        if visited_city:
-            city_visited = True
+    # Fallback: attempt to resolve region by name and country code when no ISO match.
+    if not region and state_name:
+        region_queryset = Region.objects.filter(name__iexact=state_name)
+        if country_code:
+            region_queryset = region_queryset.filter(country__country_code=country_code)
+        region = region_queryset.first()
         if region:
-            return {"region_id": iso_code, "region": region.name, "country": region.country.name, "country_id": region.country.country_code, "region_visited": region_visited, "display_name": display_name, "city": city.name if city else None, "city_id": city.id if city else None, "city_visited": city_visited, 'location_name': location_name}
+            iso_code = region.id
+            if not country_code:
+                country_code = region.country.country_code
+
+    if not region:
         return {"error": "No region found"}
+
+    visited_region = VisitedRegion.objects.filter(region=region, user=user).first()
+    region_visited = bool(visited_region)
+    city_visited = False
+
+    # ordered preference for best-effort locality matching
+    locality_keys = [
+        'suburb',
+        'city',
+        'town',
+        'village',
+        'hamlet',
+        'neighbourhood',
+        'neighborhood',  # alternate spelling
+        'locality',
+        'county',
+        'municipality',
+    ]
+
+    def match_locality(key_name):
+        value = address.get(key_name)
+        if not value:
+            return None
+        return City.objects.filter(name__icontains=value, region=region).first()
+
+    for key_name in locality_keys:
+        city = match_locality(key_name)
+        if city:
+            break
+
+    if city:
+        display_name = f"{city.name}, {region.name}, {country_code or region.country.country_code}"
+        visited_city = VisitedCity.objects.filter(city=city, user=user).first()
+        city_visited = bool(visited_city)
+
+    return {
+        "region_id": iso_code,
+        "region": region.name,
+        "country": region.country.name,
+        "country_id": region.country.country_code,
+        "region_visited": region_visited,
+        "display_name": display_name,
+        "city": city.name if city else None,
+        "city_id": city.id if city else None,
+        "city_visited": city_visited,
+        'location_name': location_name,
+    }
 
 def is_host_resolvable(hostname: str) -> bool:
     try:
@@ -266,12 +315,22 @@ def _parse_google_address_components(components):
             state_code = short_name
         if "administrative_area_level_2" in types:
             parsed["county"] = long_name
+        if "administrative_area_level_3" in types:
+            parsed["municipality"] = long_name
         if "locality" in types:
             parsed["city"] = long_name
+        if "postal_town" in types:
+            parsed.setdefault("city", long_name)
         if "sublocality" in types:
             parsed["town"] = long_name
+        if "neighborhood" in types:
+            parsed["neighbourhood"] = long_name
+        if "route" in types:
+            parsed["road"] = long_name
+        if "street_address" in types:
+            parsed["address"] = long_name
 
-    # Build composite ISO 3166-2 code like US-ME
+    # Build composite ISO 3166-2 code like US-ME (matches Region.id in DB)
     if country_code and state_code:
         parsed["ISO3166-2-lvl1"] = f"{country_code}-{state_code}"
 

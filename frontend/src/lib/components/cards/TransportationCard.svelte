@@ -52,11 +52,6 @@
 				}: ${localTimeZone}.`;
 	};
 
-	const shouldShowTzBadge = (zone?: string | null) => {
-		if (!zone) return false;
-		return getTimezoneLabel(zone) !== localTimeZone;
-	};
-
 	export let transportation: Transportation;
 	export let user: User | null = null;
 	export let collection: Collection | null = null;
@@ -78,6 +73,18 @@
 
 	let travelDurationLabel: string | null = null;
 	$: travelDurationLabel = formatTravelDuration(transportation?.travel_duration_minutes ?? null);
+
+	let showMoreDetails = false;
+
+	$: hasCodePair = Boolean(transportation?.start_code && transportation?.end_code);
+	$: routeFromLabel = hasCodePair
+		? transportation.start_code
+		: (transportation.from_location ?? transportation.start_code ?? null);
+	$: routeToLabel = hasCodePair
+		? transportation.end_code
+		: (transportation.to_location ?? transportation.end_code ?? null);
+	$: hasExpandableDetails = Boolean(transportation?.end_date || travelDurationLabel);
+	$: if (!hasExpandableDetails) showMoreDetails = false;
 
 	$: routeGeojson =
 		transportation?.attachments?.find((attachment) => attachment?.geojson)?.geojson ?? null;
@@ -242,30 +249,26 @@
 		</div>
 
 		<!-- Route & Flight Info -->
-		{#if (transportation.start_code && transportation.end_code) || transportation.from_location || transportation.to_location}
+		{#if routeFromLabel || routeToLabel}
 			<div class="flex items-center gap-2 min-w-0">
-				{#if transportation.start_code && transportation.end_code}
-					<span class="text-base font-semibold text-base-content">{transportation.start_code}</span>
+				{#if routeFromLabel}
+					<span class="text-base font-semibold text-base-content truncate max-w-[10rem]"
+						>{routeFromLabel}</span
+					>
+				{/if}
+				{#if routeFromLabel && routeToLabel}
 					<span class="text-primary text-lg">→</span>
-					<span class="text-base font-semibold text-base-content">{transportation.end_code}</span>
-					{#if transportation.type === 'plane' && transportation.flight_number}
-						<div class="divider divider-horizontal mx-1"></div>
-						<span class="badge badge-primary badge-sm font-medium"
-							>{transportation.flight_number}</span
-						>
-					{/if}
-				{:else if transportation.from_location && transportation.to_location}
-					<span class="truncate max-w-[10rem] text-sm text-base-content/80"
-						>{transportation.from_location}</span
+				{/if}
+				{#if routeToLabel}
+					<span class="text-base font-semibold text-base-content truncate max-w-[10rem]"
+						>{routeToLabel}</span
 					>
-					<span class="text-primary">→</span>
-					<span class="truncate max-w-[10rem] text-sm text-base-content/80"
-						>{transportation.to_location}</span
+				{/if}
+				{#if hasCodePair && transportation.type === 'plane' && transportation.flight_number}
+					<div class="divider divider-horizontal mx-1"></div>
+					<span class="badge badge-primary badge-sm font-medium"
+						>{transportation.flight_number}</span
 					>
-				{:else if transportation.from_location}
-					<span class="truncate text-sm text-base-content/80">{transportation.from_location}</span>
-				{:else}
-					<span class="truncate text-sm text-base-content/80">{transportation.to_location}</span>
 				{/if}
 			</div>
 		{/if}
@@ -287,61 +290,89 @@
 						{/if}
 					</div>
 				{:else}
-					<!-- Timed events with mini cards -->
-					<div class="flex flex-col gap-1">
-						<!-- Departure Card -->
-						<div class="bg-base-200 rounded-lg px-3 py-1.5">
-							<div class="flex items-center justify-between gap-2">
-								<div class="flex flex-col gap-0.5">
-									<span class="text-xs text-base-content/60">Departure</span>
-									<span class="text-sm font-semibold text-base-content">
-										{formatDateInTimezone(transportation.date, transportation.start_timezone)}
-									</span>
-								</div>
-								{#if shouldShowTzBadge(transportation.start_timezone)}
-									<div
-										class="tooltip"
-										data-tip={getTimezoneTip(transportation.start_timezone) ?? undefined}
-									>
-										<span class="badge badge-primary badge-sm">
-											{getTimezoneLabel(transportation.start_timezone)}
-										</span>
-									</div>
-								{/if}
+					<!-- Compact departure card with tidy layout -->
+					<div class="bg-base-200 rounded-lg px-3 py-2 flex flex-col gap-2">
+						<div class="flex items-start justify-between gap-2">
+							<div class="flex flex-col gap-0.5 min-w-0">
+								<span class="text-xs text-base-content/60">Departure</span>
+								<span class="text-sm font-semibold text-base-content">
+									{formatDateInTimezone(transportation.date, transportation.start_timezone)}
+								</span>
 							</div>
+							{#if hasCodePair}
+								<span class="badge badge-outline badge-sm font-medium whitespace-nowrap">
+									{transportation.start_code} → {transportation.end_code}
+								</span>
+							{/if}
 						</div>
 
-						<!-- Arrival Card -->
-						{#if transportation.end_date}
-							<div class="bg-base-200 rounded-lg px-3 py-1.5">
-								<div class="flex items-center justify-between gap-2">
-									<div class="flex flex-col gap-0.5">
-										<span class="text-xs text-base-content/60">Arrival</span>
-										<span class="text-sm font-semibold text-base-content">
-											{formatDateInTimezone(
-												transportation.end_date,
-												transportation.end_timezone ?? transportation.start_timezone
-											)}
-										</span>
+						<div class="flex items-center gap-2 text-xs text-base-content/70">
+							<div
+								class="tooltip"
+								data-tip={getTimezoneTip(transportation.start_timezone) ?? undefined}
+							>
+								<span class="badge badge-ghost badge-sm">
+									{getTimezoneLabel(transportation.start_timezone)}
+								</span>
+							</div>
+						</div>
+					</div>
+
+					{#if hasExpandableDetails}
+						<div class="flex justify-end">
+							<button
+								class="btn btn-neutral-200 btn-xs"
+								aria-expanded={showMoreDetails}
+								on:click={() => (showMoreDetails = !showMoreDetails)}
+								type="button"
+							>
+								{showMoreDetails
+									? ($t('common.show_less') ?? 'Hide details')
+									: ($t('common.show_more') ?? 'Show more')}
+							</button>
+						</div>
+					{/if}
+
+					{#if showMoreDetails && hasExpandableDetails}
+						<div class="flex flex-col gap-1">
+							{#if transportation.end_date}
+								<div class="bg-base-200 rounded-lg px-3 py-2 flex flex-col gap-2">
+									<div class="flex items-center justify-between gap-2">
+										<div class="flex flex-col gap-0.5 min-w-0">
+											<span class="text-xs text-base-content/60">Arrival</span>
+											<span class="text-sm font-semibold text-base-content">
+												{formatDateInTimezone(
+													transportation.end_date,
+													transportation.end_timezone ?? transportation.start_timezone
+												)}
+											</span>
+										</div>
 									</div>
-									{#if shouldShowTzBadge(transportation.end_timezone ?? transportation.start_timezone)}
+
+									<div class="flex items-center gap-2 text-xs text-base-content/70">
 										<div
 											class="tooltip"
 											data-tip={getTimezoneTip(
 												transportation.end_timezone ?? transportation.start_timezone
 											) ?? undefined}
 										>
-											<span class="badge badge-primary badge-sm">
+											<span class="badge badge-ghost badge-sm">
 												{getTimezoneLabel(
 													transportation.end_timezone ?? transportation.start_timezone
 												)}
 											</span>
 										</div>
-									{/if}
+									</div>
 								</div>
-							</div>
-						{/if}
-					</div>
+							{/if}
+
+							{#if travelDurationLabel}
+								<div class="flex items-center gap-2 text-xs text-base-content/70">
+									<span class="badge badge-ghost badge-xs">⏱️ {travelDurationLabel}</span>
+								</div>
+							{/if}
+						</div>
+					{/if}
 				{/if}
 			</div>
 		{/if}

@@ -1077,5 +1077,9 @@
     "remove_from_itinerary": "Remove from Day",
     "item_remove_success": "Item removed from itinerary",
     "item_remove_error": "Error removing item from itinerary"
+  },
+  "common": {
+    "show_less": "Hide details",
+    "show_more": "Show more"
   }
 }
