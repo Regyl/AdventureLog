@@ -2,7 +2,7 @@
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { t } from 'svelte-i18n';
 	import { updateLocalDate, updateUTCDate, validateDateRange } from '$lib/dateUtils';
-	import type { Collection, Lodging } from '$lib/types';
+	import type { Collection, Lodging, MoneyValue } from '$lib/types';
 	import LocationSearchMap from '../shared/LocationSearchMap.svelte';
 
 	// Icons
@@ -15,6 +15,8 @@
 	import type { Category, User } from '$lib/types';
 	import MarkdownEditor from '../MarkdownEditor.svelte';
 	import TimezoneSelector from '../TimezoneSelector.svelte';
+	import MoneyInput from '../shared/MoneyInput.svelte';
+	import { DEFAULT_CURRENCY, normalizeMoneyPayload, toMoneyValue } from '$lib/money';
 	// @ts-ignore
 	import { DateTime } from 'luxon';
 	import { isAllDay } from '$lib';
@@ -50,6 +52,7 @@
 		timezone: string | null;
 		reservation_number: string | null;
 		price: number | null;
+		price_currency: string | null;
 		latitude: number | null;
 		longitude: number | null;
 		location: string;
@@ -67,6 +70,7 @@
 		timezone: null,
 		reservation_number: null,
 		price: null,
+		price_currency: DEFAULT_CURRENCY,
 		latitude: null,
 		longitude: null,
 		location: '',
@@ -89,11 +93,25 @@
 	let isGeneratingDesc = false;
 	let ownerUser: User | null = null;
 	let dateError = '';
+	let moneyValue: MoneyValue = { amount: null, currency: DEFAULT_CURRENCY };
+	let preferredCurrency: string = DEFAULT_CURRENCY;
 
 	$: user = currentUser;
 	$: lodgingToEdit = editingLodging;
 	// Only assign a timezone when this is a timed stay. Keep timezone null for all-day entries.
 	$: lodging.timezone = allDay ? null : selectedTimezone;
+	$: preferredCurrency = user?.default_currency || DEFAULT_CURRENCY;
+	$: {
+		const isNewLodging = !(initialLodging && initialLodging.id);
+		const isEditing = Boolean(editingLodging && editingLodging.id);
+		if (isNewLodging && !isEditing && lodging.price_currency === DEFAULT_CURRENCY) {
+			lodging.price_currency = preferredCurrency;
+		}
+	}
+	$: moneyValue =
+		lodging.price === null
+			? { amount: null, currency: lodging.price_currency || null }
+			: toMoneyValue(lodging.price, lodging.price_currency, preferredCurrency);
 	$: initialSelection =
 		initialLodging && initialLodging.latitude && initialLodging.longitude
 			? {
@@ -269,7 +287,15 @@
 		}
 
 		// Build payload and avoid sending an empty `collection` array when editing
-		const payload: any = { ...lodging };
+		let payload: any = { ...lodging };
+
+		// Normalize price and currency consistently, but send explicit nulls when cleared
+		if (lodging.price === null) {
+			payload.price = null;
+			payload.price_currency = null;
+		} else {
+			payload = normalizeMoneyPayload(payload, 'price', 'price_currency', preferredCurrency);
+		}
 
 		// Remove empty link to avoid URL validation errors
 		if (!payload.link || payload.link.trim() === '') {
@@ -374,7 +400,13 @@
 			lodging.rating = initialLodging.rating ?? NaN;
 			lodging.is_public = initialLodging.is_public ?? true;
 			lodging.reservation_number = initialLodging.reservation_number || null;
-			lodging.price = initialLodging.price ?? null;
+			const money = toMoneyValue(
+				initialLodging.price,
+				initialLodging.price_currency,
+				preferredCurrency
+			);
+			lodging.price = money.amount;
+			lodging.price_currency = money.currency || preferredCurrency;
 
 			if (initialLodging.location) {
 				lodging.location = initialLodging.location;
@@ -558,21 +590,15 @@
 							/>
 						</div>
 
-						<!-- Price Field -->
-						<div class="form-control">
-							<label class="label" for="price">
-								<span class="label-text font-medium">{$t('adventures.price')}</span>
-							</label>
-							<input
-								type="number"
-								id="price"
-								min="0"
-								step="0.01"
-								bind:value={lodging.price}
-								class="input input-bordered bg-base-100/80 focus:bg-base-100"
-								placeholder="0.00"
-							/>
-						</div>
+						<MoneyInput
+							label={$t('adventures.price')}
+							value={moneyValue}
+							on:change={(event) => {
+								lodging.price = event.detail.amount;
+								lodging.price_currency =
+									event.detail.amount === null ? null : event.detail.currency || preferredCurrency;
+							}}
+						/>
 
 						<!-- Description Field -->
 						<div class="form-control">

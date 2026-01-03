@@ -27,6 +27,7 @@
 	import CardCarousel from '$lib/components/CardCarousel.svelte';
 	import { formatDateInTimezone, formatAllDayDate } from '$lib/dateUtils';
 	import LodgingModal from '$lib/components/lodging/LodgingModal.svelte';
+	import { DEFAULT_CURRENCY, formatMoney, toMoneyValue } from '$lib/money';
 
 	const renderMarkdown = (markdown: string) => {
 		return marked(markdown) as string;
@@ -49,6 +50,16 @@
 	let isEditModalOpen: boolean = false;
 	let localStayWindow: string | null = null;
 	let showLocalStayTime: boolean = false;
+
+	$: lodgingPriceLabel = lodging
+		? formatMoney(
+				toMoneyValue(
+					lodging.price,
+					lodging.price_currency,
+					data.user?.default_currency || DEFAULT_CURRENCY
+				)
+			)
+		: null;
 
 	function getLodgingIcon(type: string) {
 		if (type in LODGING_TYPES_ICONS) {
@@ -525,12 +536,12 @@
 							{/if}
 
 							<!-- Price -->
-							{#if lodging.price}
+							{#if lodgingPriceLabel}
 								<div class="flex items-start gap-3">
 									<CashMultiple class="w-5 h-5 text-primary mt-1 flex-shrink-0" />
 									<div>
 										<p class="font-semibold text-sm opacity-70">{$t('adventures.price')}</p>
-										<p class="text-base">{lodging.price}</p>
+										<p class="text-base font-semibold">{lodgingPriceLabel}</p>
 									</div>
 								</div>
 							{/if}

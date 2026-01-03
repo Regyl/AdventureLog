@@ -9,6 +9,7 @@
 	import { TRANSPORTATION_TYPES_ICONS } from '$lib';
 	import { formatAllDayDate, formatDateInTimezone } from '$lib/dateUtils';
 	import { isAllDay } from '$lib';
+	import { DEFAULT_CURRENCY, formatMoney, toMoneyValue } from '$lib/money';
 	import CardCarousel from '../CardCarousel.svelte';
 	import TransportationRoutePreview from './TransportationRoutePreview.svelte';
 
@@ -85,6 +86,9 @@
 		: (transportation.to_location ?? transportation.end_code ?? null);
 	$: hasExpandableDetails = Boolean(transportation?.end_date || travelDurationLabel);
 	$: if (!hasExpandableDetails) showMoreDetails = false;
+	$: transportationPriceLabel = formatMoney(
+		toMoneyValue(transportation.price, transportation.price_currency, DEFAULT_CURRENCY)
+	);
 
 	$: routeGeojson =
 		transportation?.attachments?.find((attachment) => attachment?.geojson)?.geojson ?? null;
@@ -379,6 +383,9 @@
 
 		<!-- Stats & Rating -->
 		<div class="flex flex-wrap items-center gap-2 text-sm">
+			{#if transportationPriceLabel}
+				<span class="badge badge-ghost badge-sm">💰 {transportationPriceLabel}</span>
+			{/if}
 			{#if transportation.distance && !isNaN(+transportation.distance)}
 				<span class="badge badge-ghost badge-sm">
 					🌍 {user?.measurement_system === 'imperial'

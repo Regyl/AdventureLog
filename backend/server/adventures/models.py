@@ -1,4 +1,3 @@
-from django.core.exceptions import ValidationError
 import os
 import uuid
 from django.db import models
@@ -7,8 +6,8 @@ from adventures.managers import LocationManager
 import threading
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
-from django.forms import ValidationError
 from django_resized import ResizedImageField
+from djmoney.models.fields import MoneyField
 from worldtravel.models import City, Country, Region, VisitedCity, VisitedRegion
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -159,6 +158,7 @@ class Location(models.Model):
     tags = ArrayField(models.CharField(max_length=100), blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     rating = models.FloatField(blank=True, null=True)
+    price = MoneyField(max_digits=12, decimal_places=2, default_currency='USD', null=True, blank=True)
     link = models.URLField(blank=True, null=True, max_length=2083)
     is_public = models.BooleanField(default=False)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
@@ -312,6 +312,7 @@ class Transportation(models.Model):
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
     rating = models.FloatField(blank=True, null=True)
+    price = MoneyField(max_digits=12, decimal_places=2, default_currency='USD', null=True, blank=True)
     link = models.URLField(blank=True, null=True, max_length=2083)
     date = models.DateTimeField(blank=True, null=True)
     end_date = models.DateTimeField(blank=True, null=True)
@@ -560,7 +561,7 @@ class Lodging(models.Model):
     check_out = models.DateTimeField(blank=True, null=True)
     timezone = models.CharField(max_length=50, choices=[(tz, tz) for tz in TIMEZONES], null=True, blank=True)
     reservation_number = models.CharField(max_length=100, blank=True, null=True)
-    price = models.DecimalField(max_digits=9, decimal_places=2, blank=True, null=True)
+    price = MoneyField(max_digits=12, decimal_places=2, default_currency='USD', null=True, blank=True)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     location = models.CharField(max_length=200, blank=True, null=True)

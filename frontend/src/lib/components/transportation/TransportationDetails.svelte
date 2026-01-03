@@ -2,7 +2,7 @@
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { t } from 'svelte-i18n';
 	import { updateLocalDate, updateUTCDate, validateDateRange } from '$lib/dateUtils';
-	import type { Collection, Lodging, Transportation } from '$lib/types';
+	import type { Collection, Lodging, Transportation, MoneyValue } from '$lib/types';
 	import LocationSearchMap from '../shared/LocationSearchMap.svelte';
 
 	// Icons
@@ -16,6 +16,8 @@
 	import { TRANSPORTATION_TYPES_ICONS } from '$lib';
 	import MarkdownEditor from '../MarkdownEditor.svelte';
 	import TimezoneSelector from '../TimezoneSelector.svelte';
+	import MoneyInput from '../shared/MoneyInput.svelte';
+	import { DEFAULT_CURRENCY, normalizeMoneyPayload, toMoneyValue } from '$lib/money';
 	// @ts-ignore
 	import { DateTime } from 'luxon';
 	import { isAllDay } from '$lib';
@@ -62,7 +64,9 @@
 		end_code: null,
 		distance: null,
 		collection: collection?.id,
-		is_public: true
+		is_public: true,
+		price: null,
+		price_currency: DEFAULT_CURRENCY
 	};
 	const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 	let selectedStartTimezone: string = browserTimezone;
@@ -82,6 +86,8 @@
 	let isGeneratingDesc = false;
 	let ownerUser: User | null = null;
 	let dateError = '';
+	let moneyValue: MoneyValue = { amount: null, currency: DEFAULT_CURRENCY };
+	let preferredCurrency: string = DEFAULT_CURRENCY;
 
 	$: user = currentUser;
 	$: transportationToEdit = editingTransportation;
@@ -96,6 +102,16 @@
 		const arrivalZone = selectedEndTimezone || departureZone;
 		transportation.start_timezone = allDay ? null : departureZone;
 		transportation.end_timezone = allDay ? null : arrivalZone;
+		preferredCurrency = user?.default_currency || DEFAULT_CURRENCY;
+		const isNewTransportation = !(initialTransportation && initialTransportation.id);
+		const isEditing = Boolean(editingTransportation && editingTransportation.id);
+		if (isNewTransportation && !isEditing && transportation.price_currency === DEFAULT_CURRENCY) {
+			transportation.price_currency = preferredCurrency;
+		}
+		moneyValue =
+			transportation.price === null
+				? { amount: null, currency: transportation.price_currency || null }
+				: toMoneyValue(transportation.price, transportation.price_currency, preferredCurrency);
 	}
 
 	function handleStartCodeInput(value: string) {
@@ -350,7 +366,16 @@
 		}
 
 		// Build payload and avoid sending an empty `collection` array when editing
-		const payload: any = { ...transportation };
+		let payload: any = { ...transportation };
+
+		// Normalize price and currency
+		// Normalize price and currency consistently, but send explicit nulls when cleared
+		if (transportation.price === null) {
+			payload.price = null;
+			payload.price_currency = null;
+		} else {
+			payload = normalizeMoneyPayload(payload, 'price', 'price_currency', preferredCurrency);
+		}
 
 		// Remove empty link to avoid URL validation errors
 		if (!payload.link || payload.link.trim() === '') {
@@ -457,6 +482,15 @@
 			transportation.start_code = initialTransportation.start_code || null;
 			transportation.end_code = initialTransportation.end_code || null;
 			transportation.distance = initialTransportation.distance || null;
+			transportation.price = initialTransportation.price
+				? Number(initialTransportation.price)
+				: null;
+			transportation.price_currency = initialTransportation.price_currency || preferredCurrency;
+			moneyValue = toMoneyValue(
+				transportation.price,
+				transportation.price_currency,
+				preferredCurrency
+			);
 
 			// Populate origin/destination data
 			transportation.from_location = initialTransportation.from_location || null;
@@ -693,6 +727,16 @@
 								placeholder="https://example.com"
 							/>
 						</div>
+
+						<MoneyInput
+							label={$t('adventures.price')}
+							value={moneyValue}
+							on:change={(event) => {
+								transportation.price = event.detail.amount;
+								transportation.price_currency =
+									event.detail.amount === null ? null : event.detail.currency || preferredCurrency;
+							}}
+						/>
 
 						<!-- Description Field -->
 						<div class="form-control">

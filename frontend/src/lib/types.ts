@@ -1,5 +1,10 @@
 import { VALID_TIMEZONES } from './dateUtils';
 
+export type MoneyValue = {
+	amount: number | null;
+	currency: string | null;
+};
+
 export type User = {
 	pk: number;
 	username: string;
@@ -13,6 +18,7 @@ export type User = {
 	has_password: boolean;
 	disable_password: boolean;
 	measurement_system: 'metric' | 'imperial';
+	default_currency: string;
 };
 
 export type ContentImage = {
@@ -29,6 +35,8 @@ export type Location = {
 	tags?: string[] | null;
 	description?: string | null;
 	rating?: number | null;
+	price?: number | null;
+	price_currency?: string | null;
 	link?: string | null;
 	images: ContentImage[];
 	visits: Visit[];
@@ -61,7 +69,6 @@ export type Country = {
 	id: number;
 	name: string;
 	country_code: string;
-	subregion: string;
 	flag_url: string;
 	capital: string;
 	num_regions: number;
@@ -181,6 +188,8 @@ export type Transportation = {
 	name: string;
 	description: string | null;
 	rating: number | null;
+	price: number | null;
+	price_currency: string | null;
 	link: string | null;
 	date: string | null; // ISO 8601 date string
 	end_date: string | null; // ISO 8601 date string
@@ -324,6 +333,7 @@ export type Lodging = {
 	timezone: string | null;
 	reservation_number: string | null;
 	price: number | null;
+	price_currency: string | null;
 	latitude: number | null;
 	longitude: number | null;
 	location: string | null;

@@ -10,6 +10,7 @@
 	import { formatDateInTimezone } from '$lib/dateUtils';
 	import { formatAllDayDate } from '$lib/dateUtils';
 	import { isAllDay } from '$lib';
+	import { DEFAULT_CURRENCY, formatMoney, toMoneyValue } from '$lib/money';
 	import CardCarousel from '../CardCarousel.svelte';
 	import Eye from '~icons/mdi/eye';
 	import EyeOff from '~icons/mdi/eye-off';
@@ -56,6 +57,9 @@
 	};
 	const hasTimePortion = (date: string | null) => !!date && !isAllDay(date);
 	const isTimedStay = (date: string | null) => hasTimePortion(date);
+	$: lodgingPriceLabel = formatMoney(
+		toMoneyValue(lodging.price, lodging.price_currency, DEFAULT_CURRENCY)
+	);
 
 	let showMoreDetails = false;
 	$: hasExpandableDetails = Boolean(
@@ -390,8 +394,8 @@
 						{$t('adventures.reservation')}: {lodging.reservation_number}
 					</span>
 				{/if}
-				{#if lodging.price}
-					<span class="badge badge-ghost badge-sm">💰 {lodging.price}</span>
+				{#if lodgingPriceLabel}
+					<span class="badge badge-ghost badge-sm">💰 {lodgingPriceLabel}</span>
 				{/if}
 			{/if}
 		</div>

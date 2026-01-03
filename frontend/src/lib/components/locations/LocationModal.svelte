@@ -54,6 +54,8 @@
 		description: null,
 		tags: [],
 		rating: NaN,
+		price: null,
+		price_currency: null,
 		is_public: false,
 		latitude: NaN,
 		longitude: NaN,
@@ -80,6 +82,8 @@
 		description: locationToEdit?.description || null,
 		tags: locationToEdit?.tags || [],
 		rating: locationToEdit?.rating || NaN,
+		price: locationToEdit?.price ?? null,
+		price_currency: locationToEdit?.price_currency ?? null,
 		is_public: locationToEdit?.is_public || false,
 		latitude: locationToEdit?.latitude || NaN,
 		longitude: locationToEdit?.longitude || NaN,
@@ -99,6 +103,7 @@
 		trails: locationToEdit?.trails || [],
 		attachments: locationToEdit?.attachments || []
 	};
+
 	onMount(async () => {
 		modal = document.getElementById('my_modal_1') as HTMLDialogElement;
 		modal.showModal();
@@ -300,6 +305,8 @@
 					location.tags = e.detail.tags;
 					location.user = e.detail.user;
 					location.id = e.detail.id;
+					location.price = e.detail.price;
+					location.price_currency = e.detail.price_currency;
 
 					// Mark that a save occurred so close() will notify parent
 					didSave = true;

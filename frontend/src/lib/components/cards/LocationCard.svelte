@@ -27,6 +27,7 @@
 	import EyeOff from '~icons/mdi/eye-off';
 	import CollectionItineraryPlanner from '../collections/CollectionItineraryPlanner.svelte';
 	import CalendarRemove from '~icons/mdi/calendar-remove';
+	import { DEFAULT_CURRENCY, formatMoney, toMoneyValue } from '$lib/money';
 
 	export let type: string | null = null;
 	export let user: User | null;
@@ -53,6 +54,11 @@
 	export let adventure: Location;
 	let displayActivityTypes: string[] = [];
 	let remainingCount = 0;
+
+	// Price formatting
+	$: adventurePriceLabel = formatMoney(
+		toMoneyValue(adventure?.price, adventure?.price_currency, DEFAULT_CURRENCY)
+	);
 
 	// Process activity types for display
 	$: {
@@ -427,6 +433,10 @@
 					</div>
 					<span class="text-xs text-base-content/60">({adventure.rating}/5)</span>
 				</div>
+			{/if}
+
+			{#if adventurePriceLabel}
+				<span class="badge badge-ghost badge-sm whitespace-nowrap">💰 {adventurePriceLabel}</span>
 			{/if}
 		</div>
 

@@ -2,24 +2,25 @@
 	import { createEventDispatcher, onMount } from 'svelte';
 	import { t } from 'svelte-i18n';
 	import CategoryDropdown from '../CategoryDropdown.svelte';
-	import type { Collection, Location } from '$lib/types';
 	import LocationSearchMap from '../shared/LocationSearchMap.svelte';
+	import MoneyInput from '../shared/MoneyInput.svelte';
+	import MarkdownEditor from '../MarkdownEditor.svelte';
+	import TagComplete from '../TagComplete.svelte';
+	import { DEFAULT_CURRENCY, normalizeMoneyPayload, toMoneyValue } from '$lib/money';
+	import type { Category, Collection, Location, MoneyValue, User } from '$lib/types';
 	import MapIcon from '~icons/mdi/map';
-
-	// Icons
 	import InfoIcon from '~icons/mdi/information';
 	import CategoryIcon from '~icons/mdi/tag';
 	import GenerateIcon from '~icons/mdi/lightning-bolt';
 	import ArrowLeftIcon from '~icons/mdi/arrow-left';
 	import SaveIcon from '~icons/mdi/content-save';
-	import type { Category, User } from '$lib/types';
-	import MarkdownEditor from '../MarkdownEditor.svelte';
-	import TagComplete from '../TagComplete.svelte';
 	import ClearIcon from '~icons/mdi/close-circle';
 
 	const dispatch = createEventDispatcher();
 
 	let isReverseGeocoding = false;
+	let defaultCurrency = DEFAULT_CURRENCY;
+	let moneyValue: MoneyValue = { amount: null, currency: DEFAULT_CURRENCY };
 
 	let initialSelection: {
 		name: string;
@@ -29,11 +30,12 @@
 		category?: any;
 	} | null = null;
 
-	// Form data properties
 	let location: {
 		name: string;
 		category: Category | null;
 		rating: number;
+		price: number | null;
+		price_currency: string | null;
 		is_public: boolean;
 		link: string;
 		description: string;
@@ -46,6 +48,8 @@
 		name: '',
 		category: null,
 		rating: NaN,
+		price: null,
+		price_currency: DEFAULT_CURRENCY,
 		is_public: false,
 		link: '',
 		description: '',
@@ -62,7 +66,6 @@
 	let isGeneratingDesc = false;
 	let ownerUser: User | null = null;
 
-	// Props (would be passed in from parent component)
 	export let initialLocation: any = null;
 	export let currentUser: any = null;
 	export let editingLocation: any = null;
@@ -70,6 +73,16 @@
 
 	$: user = currentUser;
 	$: locationToEdit = editingLocation;
+	$: defaultCurrency = (user && user.default_currency) || DEFAULT_CURRENCY;
+	$: moneyValue =
+		location.price === null
+			? { amount: null, currency: location.price_currency || null }
+			: toMoneyValue(location.price, location.price_currency, defaultCurrency);
+	$: {
+		if (location.price !== null && !location.price_currency) {
+			location.price_currency = defaultCurrency;
+		}
+	}
 	$: initialSelection =
 		initialLocation && initialLocation.latitude && initialLocation.longitude
 			? {
@@ -103,7 +116,6 @@
 		wikiError = '';
 
 		try {
-			// Mock Wikipedia API call - replace with actual implementation
 			const response = await fetch(`/api/generate/desc/?name=${encodeURIComponent(location.name)}`);
 			if (response.ok) {
 				const data = await response.json();
@@ -123,7 +135,6 @@
 			return;
 		}
 
-		// round latitude and longitude to 6 decimal places
 		if (location.latitude !== null && typeof location.latitude === 'number') {
 			location.latitude = parseFloat(location.latitude.toFixed(6));
 		}
@@ -134,12 +145,14 @@
 			location.collections = [collection.id];
 		}
 
-		// Build payload and avoid sending an empty `collections` array when editing
-		const payload: any = { ...location };
+		let payload: any = { ...location };
+		if (location.price === null) {
+			payload.price = null;
+			payload.price_currency = null;
+		} else {
+			payload = normalizeMoneyPayload(payload, 'price', 'price_currency', defaultCurrency);
+		}
 
-		// If we're editing and the original location had collections, but the form's collections
-		// is empty (i.e. user didn't modify collections), omit collections from payload so the
-		// server doesn't clear them unintentionally.
 		if (locationToEdit && locationToEdit.id) {
 			if (
 				(!payload.collections || payload.collections.length === 0) &&
@@ -149,25 +162,23 @@
 				delete payload.collections;
 			}
 
-			let res = await fetch(`/api/locations/${locationToEdit.id}`, {
+			const res = await fetch(`/api/locations/${locationToEdit.id}`, {
 				method: 'PATCH',
 				headers: {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify(payload)
 			});
-			let updatedLocation = await res.json();
-			location = updatedLocation;
+			location = await res.json();
 		} else {
-			let res = await fetch(`/api/locations`, {
+			const res = await fetch(`/api/locations`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify(payload)
 			});
-			let newLocation = await res.json();
-			location = newLocation;
+			location = await res.json();
 		}
 
 		dispatch('save', {
@@ -180,7 +191,7 @@
 	}
 
 	onMount(() => {
-		if (initialLocation.latitude && initialLocation.longitude) {
+		if (initialLocation && initialLocation.latitude && initialLocation.longitude) {
 			location.latitude = initialLocation.latitude;
 			location.longitude = initialLocation.longitude;
 			if (!location.name) location.name = initialLocation.name || '';
@@ -190,15 +201,21 @@
 
 	onMount(() => {
 		if (initialLocation && typeof initialLocation === 'object') {
-			// Only update location properties if they don't already have values
-			// This prevents overwriting user selections
 			if (!location.name) location.name = initialLocation.name || '';
 			if (!location.link) location.link = initialLocation.link || '';
 			if (!location.description) location.description = initialLocation.description || '';
 			if (Number.isNaN(location.rating)) location.rating = initialLocation.rating || NaN;
+			if (location.price === null || location.price === undefined) {
+				const money = toMoneyValue(
+					initialLocation.price,
+					initialLocation.price_currency,
+					defaultCurrency
+				);
+				location.price = money.amount;
+				location.price_currency = money.currency;
+			}
 			if (location.is_public === false) location.is_public = initialLocation.is_public || false;
 
-			// Only set category if location doesn't have one or if initialLocation has a valid category
 			if (!location.category || !location.category.id) {
 				if (initialLocation.category && initialLocation.category.id) {
 					location.category = initialLocation.category;
@@ -209,7 +226,6 @@
 				location.tags = initialLocation.tags;
 			}
 
-			// Preserve existing collections when editing so we don't accidentally send an empty array
 			if (initialLocation.collections && Array.isArray(initialLocation.collections)) {
 				location.collections = initialLocation.collections.map((c: any) =>
 					typeof c === 'string' ? c : c.id
@@ -293,6 +309,16 @@
 								</div>
 							{/if}
 						</div>
+
+						<MoneyInput
+							label={$t('adventures.price')}
+							value={moneyValue}
+							on:change={(event) => {
+								location.price = event.detail.amount;
+								location.price_currency =
+									event.detail.amount === null ? null : event.detail.currency || defaultCurrency;
+							}}
+						/>
 
 						<!-- Rating Field -->
 						<div class="form-control">
@@ -414,7 +440,6 @@
 					<h2 class="text-xl font-bold">{$t('adventures.tags')} ({location.tags?.length || 0})</h2>
 				</div>
 				<div class="space-y-4">
-					<!-- Hidden input for form submission (same as old version) -->
 					<input
 						type="text"
 						id="tags"
@@ -423,7 +448,6 @@
 						bind:value={location.tags}
 						class="input input-bordered w-full"
 					/>
-					<!-- Use the same ActivityComplete component as the old version -->
 					<TagComplete bind:tags={location.tags} />
 				</div>
 			</div>

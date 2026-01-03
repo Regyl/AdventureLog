@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { page } from '$app/stores';
 	import { addToast } from '$lib/toasts';
+	import { CURRENCY_LABELS, CURRENCY_OPTIONS } from '$lib/money';
 	import type { ImmichIntegration, User } from '$lib/types.js';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
@@ -567,6 +568,30 @@
 												</p>
 											</div>
 										</label>
+									</div>
+
+									<div class="form-control">
+										<label class="label" for="default_currency">
+											<span class="label-text font-medium">Preferred currency</span>
+										</label>
+										<select
+											id="default_currency"
+											name="default_currency"
+											class="select select-bordered select-primary w-full"
+											bind:value={user.default_currency}
+										>
+											{#each CURRENCY_OPTIONS as code}
+												<option value={code}>
+													{code}
+													{#if CURRENCY_LABELS[code]}
+														{' '}-{' '}{CURRENCY_LABELS[code]}
+													{/if}
+												</option>
+											{/each}
+										</select>
+										<p class="text-sm text-base-content/60 mt-1">
+											This currency pre-fills money fields when adding new items.
+										</p>
 									</div>
 								</div>
 

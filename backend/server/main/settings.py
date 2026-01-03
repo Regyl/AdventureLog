@@ -62,6 +62,7 @@ INSTALLED_APPS = (
     'allauth.socialaccount.providers.github',
     'allauth.socialaccount.providers.openid_connect',
     'drf_yasg',
+    'djmoney',
     'corsheaders',
     'adventures',
     'worldtravel',

@@ -253,7 +253,8 @@ class LocationSerializer(CustomModelSerializer):
         fields = [
             'id', 'name', 'description', 'rating', 'tags', 'location', 
             'is_public', 'collections', 'created_at', 'updated_at', 'images', 'link', 'longitude', 
-            'latitude', 'visits', 'is_visited', 'category', 'attachments', 'user', 'city', 'country', 'region', 'trails'
+            'latitude', 'visits', 'is_visited', 'category', 'attachments', 'user', 'city', 'country', 'region', 'trails',
+            'price', 'price_currency'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'user', 'is_visited']
 
@@ -455,7 +456,7 @@ class TransportationSerializer(CustomModelSerializer):
     class Meta:
         model = Transportation
         fields = [
-            'id', 'user', 'type', 'name', 'description', 'rating', 
+            'id', 'user', 'type', 'name', 'description', 'rating', 'price', 'price_currency',
             'link', 'date', 'flight_number', 'from_location', 'to_location', 
             'is_public', 'collection', 'created_at', 'updated_at', 'end_date',
             'origin_latitude', 'origin_longitude', 'destination_latitude', 'destination_longitude',
@@ -561,7 +562,7 @@ class LodgingSerializer(CustomModelSerializer):
         model = Lodging
         fields = [
             'id', 'user', 'name', 'description', 'rating', 'link', 'check_in', 'check_out', 
-            'reservation_number', 'price', 'latitude', 'longitude', 'location', 'is_public',
+            'reservation_number', 'price', 'price_currency', 'latitude', 'longitude', 'location', 'is_public',
             'collection', 'created_at', 'updated_at', 'type', 'timezone', 'images', 'attachments'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'user']

@@ -24,6 +24,8 @@
 	import CardAccountDetails from '~icons/mdi/card-account-details';
 	import { formatDateInTimezone, formatAllDayDate } from '$lib/dateUtils';
 	import TransportationModal from '$lib/components/transportation/TransportationModal.svelte';
+	import CashMultiple from '~icons/mdi/cash-multiple';
+	import { DEFAULT_CURRENCY, formatMoney, toMoneyValue } from '$lib/money';
 
 	const renderMarkdown = (markdown: string) => {
 		return marked(markdown) as string;
@@ -47,6 +49,16 @@
 	let isEditModalOpen: boolean = false;
 	let localTravelWindow: string | null = null;
 	let showLocalTripTime: boolean = false;
+
+	$: transportationPriceLabel = transportation
+		? formatMoney(
+				toMoneyValue(
+					transportation.price,
+					transportation.price_currency,
+					data.user?.default_currency || DEFAULT_CURRENCY
+				)
+			)
+		: null;
 
 	function getTransportationIcon(type: string) {
 		if (type in TRANSPORTATION_TYPES_ICONS) {
@@ -777,6 +789,17 @@
 											{$t('adventures.distance') ?? 'Distance'}
 										</p>
 										<p class="text-base">{formatDistance(transportation.distance)}</p>
+									</div>
+								</div>
+							{/if}
+
+							<!-- Price -->
+							{#if transportationPriceLabel}
+								<div class="flex items-start gap-3">
+									<CashMultiple class="w-5 h-5 text-primary mt-1 flex-shrink-0" />
+									<div>
+										<p class="font-semibold text-sm opacity-70">{$t('adventures.price')}</p>
+										<p class="text-base font-semibold">{transportationPriceLabel}</p>
 									</div>
 								</div>
 							{/if}

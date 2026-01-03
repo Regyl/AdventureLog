@@ -23,6 +23,7 @@
 	import CollectionMap from '$lib/components/collections/CollectionMap.svelte';
 	import LocationLink from '$lib/components/LocationLink.svelte';
 	import { getBasemapUrl } from '$lib';
+	import { formatMoney, toMoneyValue, DEFAULT_CURRENCY } from '$lib/money';
 	import FolderMultiple from '~icons/mdi/folder-multiple';
 	import FormatListBulleted from '~icons/mdi/format-list-bulleted';
 	import Timeline from '~icons/mdi/timeline';
@@ -84,6 +85,7 @@
 		(collection as any)[key] = exists
 			? items.map((entry: any) => (String(entry.id) === String(item.id) ? item : entry))
 			: [...items, item];
+		collection = { ...collection }; // trigger reactivity so cost summary & UI refresh immediately
 	}
 
 	// View state from URL params
@@ -178,6 +180,46 @@
 	let calendarInitialDate: string | null = null;
 
 	const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+	const numberLocale = Intl.DateTimeFormat().resolvedOptions().locale;
+
+	type CostCategory = 'lodging' | 'transportation' | 'location';
+
+	type CostEntry = {
+		currency: string;
+		amount: number;
+		category: CostCategory;
+	};
+
+	type CurrencyBreakdown = {
+		currency: string;
+		total: number;
+		formattedTotal: string;
+		categories: Array<{
+			category: CostCategory;
+			label: string;
+			total: number;
+			count: number;
+			formattedTotal: string;
+		}>;
+	};
+
+	const costCategoryLabels: Record<CostCategory, string> = {
+		lodging: 'Lodging',
+		transportation: 'Transportation',
+		location: 'Locations'
+	};
+
+	let preferredCurrency: string = DEFAULT_CURRENCY;
+	let costEntries: CostEntry[] = [];
+	let costSummary: CurrencyBreakdown[] = [];
+	let pricedItemCount = 0;
+	let currencyCount = 0;
+
+	$: preferredCurrency = (data.user as any)?.default_currency || DEFAULT_CURRENCY;
+	$: costEntries = buildCostEntries(collection, preferredCurrency);
+	$: costSummary = summarizeCostEntries(costEntries, numberLocale);
+	$: pricedItemCount = costEntries.length;
+	$: currencyCount = costSummary.length;
 
 	$: collectionEvents = buildCollectionEvents(timezoneMode);
 
@@ -388,6 +430,93 @@
 			return '🚢';
 
 		return '🛣️';
+	}
+
+	function buildCostEntries(current: Collection | null, fallbackCurrency: string): CostEntry[] {
+		if (!current) return [];
+		const entries: CostEntry[] = [];
+		const fallback = fallbackCurrency || DEFAULT_CURRENCY;
+
+		(current.locations || []).forEach((item) => {
+			const moneyValue = toMoneyValue(item.price, item.price_currency, fallback);
+			if (moneyValue.amount === null || moneyValue.amount === undefined) return;
+			entries.push({
+				currency: moneyValue.currency || fallback,
+				amount: moneyValue.amount,
+				category: 'location'
+			});
+		});
+
+		(current.transportations || []).forEach((item) => {
+			const moneyValue = toMoneyValue(item.price, item.price_currency, fallback);
+			if (moneyValue.amount === null || moneyValue.amount === undefined) return;
+			entries.push({
+				currency: moneyValue.currency || fallback,
+				amount: moneyValue.amount,
+				category: 'transportation'
+			});
+		});
+
+		(current.lodging || []).forEach((item) => {
+			const moneyValue = toMoneyValue(item.price, item.price_currency, fallback);
+			if (moneyValue.amount === null || moneyValue.amount === undefined) return;
+			entries.push({
+				currency: moneyValue.currency || fallback,
+				amount: moneyValue.amount,
+				category: 'lodging'
+			});
+		});
+
+		return entries;
+	}
+
+	function summarizeCostEntries(entries: CostEntry[], locale: string): CurrencyBreakdown[] {
+		const currencyBuckets: Record<
+			string,
+			{ total: number; categories: Record<CostCategory, { total: number; count: number }> }
+		> = {};
+
+		entries.forEach(({ currency, amount, category }) => {
+			if (amount === null || amount === undefined || Number.isNaN(amount)) return;
+			const safeCurrency = currency || DEFAULT_CURRENCY;
+			if (!currencyBuckets[safeCurrency]) {
+				currencyBuckets[safeCurrency] = {
+					total: 0,
+					categories: {} as Record<CostCategory, { total: number; count: number }>
+				};
+			}
+
+			const bucket = currencyBuckets[safeCurrency];
+			bucket.total += amount;
+			bucket.categories[category] = bucket.categories[category] || { total: 0, count: 0 };
+			bucket.categories[category].total += amount;
+			bucket.categories[category].count += 1;
+		});
+
+		const format = (value: number, currency: string) =>
+			formatMoney({ amount: value, currency }, locale) || `${currency} ${value}`;
+
+		return Object.entries(currencyBuckets)
+			.map(([currency, data]) => {
+				const categories = Object.entries(data.categories).map(([categoryKey, info]) => {
+					const category = categoryKey as CostCategory;
+					return {
+						category,
+						label: costCategoryLabels[category],
+						total: info.total,
+						count: info.count,
+						formattedTotal: format(info.total, currency)
+					};
+				});
+
+				return {
+					currency,
+					total: data.total,
+					formattedTotal: format(data.total, currency),
+					categories
+				};
+			})
+			.sort((a, b) => a.currency.localeCompare(b.currency));
 	}
 
 	function handleCalendarEventClick(event: any) {
@@ -1060,6 +1189,49 @@
 								</div>
 							{/if}
 						</div>
+					</div>
+				</div>
+
+				<!-- Cost Summary Card -->
+				<div class="card bg-base-200 shadow-xl">
+					<div class="card-body space-y-4">
+						<div class="flex items-center justify-between">
+							<h3 class="card-title text-lg">💰 Trip Costs</h3>
+							{#if currencyCount > 0}
+								<span class="badge badge-primary badge-sm">
+									{currencyCount}
+									{currencyCount === 1 ? 'currency' : 'currencies'}
+								</span>
+							{/if}
+						</div>
+
+						{#if pricedItemCount === 0}
+							<p class="text-sm opacity-70">
+								Add prices to locations, lodging, or transportation to see trip totals by currency.
+							</p>
+						{:else}
+							<div class="space-y-3">
+								{#each costSummary as summary}
+									<div class="bg-base-300 rounded-lg p-3 space-y-2">
+										<div class="flex items-center justify-between">
+											<div class="flex items-center gap-2">
+												<span class="badge badge-outline badge-sm">{summary.currency}</span>
+												<span class="text-xs opacity-70">Total</span>
+											</div>
+											<span class="text-lg font-bold">{summary.formattedTotal}</span>
+										</div>
+										<div class="grid grid-cols-1 gap-1 text-sm">
+											{#each summary.categories as category}
+												<div class="flex items-center justify-between">
+													<span class="opacity-70">{category.label} ({category.count})</span>
+													<span class="font-semibold">{category.formattedTotal}</span>
+												</div>
+											{/each}
+										</div>
+									</div>
+								{/each}
+							</div>
+						{/if}
 					</div>
 				</div>
 
