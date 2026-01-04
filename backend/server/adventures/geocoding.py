@@ -159,6 +159,9 @@ def extractIsoCode(user, data):
     # France gets lvl4 (regions) first for city matching, then lvl6 (departments) as a fallback.
     preferred_iso_keys = (
         [
+            "ISO3166-2-lvl10",
+            "ISO3166-2-lvl9",
+            "ISO3166-2-lvl8",
             "ISO3166-2-lvl4",
             "ISO3166-2-lvl6",
             "ISO3166-2-lvl7",
@@ -170,10 +173,13 @@ def extractIsoCode(user, data):
         ]
         if country_code == "FR"
         else [
+            "ISO3166-2-lvl10",
+            "ISO3166-2-lvl9",
+            "ISO3166-2-lvl8",
+            "ISO3166-2-lvl4",
             "ISO3166-2-lvl7",
             "ISO3166-2-lvl6",
             "ISO3166-2-lvl5",
-            "ISO3166-2-lvl4",
             "ISO3166-2-lvl3",
             "ISO3166-2-lvl2",
             "ISO3166-2-lvl1",
