@@ -266,6 +266,10 @@ export default defineConfig({
         collapsed: false,
         items: [
           {
+            text: "Development Timeline",
+            link: "/docs/changelogs/development_timeline",
+          },
+          {
             text: "v0.11.0",
             link: "/docs/changelogs/v0-11-0",
           },
