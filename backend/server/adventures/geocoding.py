@@ -1,6 +1,8 @@
 import requests
 import time
 import socket
+import re
+import unicodedata
 from worldtravel.models import Region, City, VisitedRegion, VisitedCity
 from django.conf import settings
 
@@ -226,17 +228,22 @@ def extractIsoCode(user, data):
     # ordered preference for best-effort locality matching
     locality_keys = [
         'suburb',
+        'neighbourhood',
+        'neighborhood',  # alternate spelling
         'city',
         'city_district',
         'town',
         'village',
         'hamlet',
-        'neighbourhood',
-        'neighborhood',  # alternate spelling
         'locality',
         'municipality',
         'county',
     ]
+
+    def _normalize_name(value):
+        normalized = unicodedata.normalize("NFKD", value)
+        ascii_only = normalized.encode("ascii", "ignore").decode("ascii")
+        return re.sub(r"[^a-z0-9]", "", ascii_only.lower())
 
     def match_locality(key_name, target_region):
         value = address.get(key_name)
@@ -248,6 +255,12 @@ def extractIsoCode(user, data):
         exact_match = qs.filter(name__iexact=value).first()
         if exact_match:
             return exact_match
+
+        normalized_value = _normalize_name(value)
+        for candidate in qs.values_list('id', 'name'):
+            candidate_id, candidate_name = candidate
+            if _normalize_name(candidate_name) == normalized_value:
+                return qs.filter(id=candidate_id).first()
 
         # Allow partial matching for most locality fields but keep county strict.
         if key_name == 'county':
@@ -373,8 +386,8 @@ def _parse_google_address_components(components):
             parsed["city"] = long_name
         if "postal_town" in types:
             parsed.setdefault("city", long_name)
-        if "sublocality" in types:
-            parsed["town"] = long_name
+        if "sublocality" in types or any(t.startswith("sublocality_level_") for t in types):
+            parsed["suburb"] = long_name
         if "neighborhood" in types:
             parsed["neighbourhood"] = long_name
         if "route" in types:
