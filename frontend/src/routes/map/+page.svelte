@@ -19,6 +19,7 @@
 	import LocationIcon from '~icons/mdi/crosshairs-gps';
 	import NewLocationModal from '$lib/components/locations/LocationModal.svelte';
 	import ActivityIcon from '~icons/mdi/run-fast';
+	import SearchIcon from '~icons/mdi/magnify';
 	import FullMap from '$lib/components/map/FullMap.svelte';
 
 	export let data;
@@ -47,6 +48,7 @@
 
 	let showVisited: boolean = true;
 	let showPlanned: boolean = true;
+	let searchQuery: string = '';
 
 	let newMarker: { lngLat: any } | null = null;
 	let newLongitude: number | null = null;
@@ -161,11 +163,27 @@
 	// Get unique categories for filtering
 	$: categories = [...new Set(pins.map((pin) => pin.category?.display_name).filter(Boolean))];
 
-	// Updates the filtered pins based on the checkboxes
+	// Updates the filtered pins based on the checkboxes and search query
 	$: {
-		filteredPins = pins.filter(
-			(pin) => (showVisited && pin.is_visited === true) || (showPlanned && pin.is_visited !== true)
-		);
+		const query = searchQuery.toLowerCase().trim();
+		filteredPins = pins.filter((pin) => {
+			// Filter by visited/planned status
+			const statusMatch =
+				(showVisited && pin.is_visited === true) || (showPlanned && pin.is_visited !== true);
+			if (!statusMatch) return false;
+
+			// Filter by search query
+			if (!query) return true;
+			return (
+				pin.name?.toLowerCase().includes(query) ||
+				pin.category?.display_name?.toLowerCase().includes(query)
+			);
+		});
+
+		// Auto-zoom to search results when search query changes
+		if (query && filteredPins.length > 0 && typeof window !== 'undefined') {
+			zoomToFilteredPins();
+		}
 	}
 
 	// Reset the longitude and latitude when the newMarker is set to null
@@ -356,6 +374,49 @@
 		newMarker = null;
 	}
 
+	function zoomToFilteredPins() {
+		if (filteredPins.length === 0) return;
+
+		const lngs = filteredPins
+			.map((pin) => parseCoordinate(pin.longitude))
+			.filter((lng): lng is number => lng !== null);
+		const lats = filteredPins
+			.map((pin) => parseCoordinate(pin.latitude))
+			.filter((lat): lat is number => lat !== null);
+
+		if (lngs.length === 0 || lats.length === 0) return;
+
+		const minLng = Math.min(...lngs);
+		const maxLng = Math.max(...lngs);
+		const minLat = Math.min(...lats);
+		const maxLat = Math.max(...lats);
+
+		if (filteredPins.length === 1) {
+			// Single pin - center on it with a nice zoom level
+			mapCenter = [lngs[0], lats[0]];
+			mapZoom = 12;
+		} else {
+			// Multiple pins - fit bounds with padding
+			const centerLng = (minLng + maxLng) / 2;
+			const centerLat = (minLat + maxLat) / 2;
+			mapCenter = [centerLng, centerLat];
+
+			// Calculate appropriate zoom level based on bounds
+			const lngDiff = maxLng - minLng;
+			const latDiff = maxLat - minLat;
+			const maxDiff = Math.max(lngDiff, latDiff);
+
+			if (maxDiff > 50) mapZoom = 3;
+			else if (maxDiff > 20) mapZoom = 4;
+			else if (maxDiff > 10) mapZoom = 5;
+			else if (maxDiff > 5) mapZoom = 6;
+			else if (maxDiff > 2) mapZoom = 7;
+			else if (maxDiff > 1) mapZoom = 8;
+			else if (maxDiff > 0.5) mapZoom = 9;
+			else mapZoom = 10;
+		}
+	}
+
 	function updateUrlParams(lat: number, lng: number, zoom: number) {
 		if (updateUrlTimeout) clearTimeout(updateUrlTimeout);
 		updateUrlTimeout = setTimeout(() => {
@@ -470,6 +531,27 @@
 
 					<!-- Controls -->
 					<div class="mt-4 flex flex-wrap items-center gap-4">
+						<!-- Search Bar -->
+						<label class="input input-bordered input-sm flex items-center gap-2 flex-1 max-w-md">
+							<SearchIcon class="h-4 w-4 opacity-70" />
+							<input
+								type="text"
+								class="grow"
+								placeholder={$t('map.search_locations')}
+								bind:value={searchQuery}
+							/>
+							{#if searchQuery}
+								<button
+									type="button"
+									class="btn btn-ghost btn-xs btn-circle"
+									on:click={() => (searchQuery = '')}
+									aria-label="Clear search"
+								>
+									✕
+								</button>
+							{/if}
+						</label>
+
 						<!-- Action Buttons -->
 						<div class="flex items-center gap-2">
 							{#if newMarker}

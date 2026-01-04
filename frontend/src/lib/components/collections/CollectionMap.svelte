@@ -3,30 +3,199 @@
 	import { GeoJSON, LineLayer, Marker } from 'svelte-maplibre';
 	import { goto } from '$app/navigation';
 	import { getActivityColor } from '$lib';
+	import SearchIcon from '~icons/mdi/magnify';
 	import type { Collection } from '$lib/types';
-	import { onMount } from 'svelte';
 
 	export let collection: Collection;
 	// Allow disabling/enabling clustering for markers
 	export let clusterEnabled: boolean = false;
 	export let clusterOptions: any = { radius: 300, maxZoom: 8, minPoints: 2 };
 
-	// Build marker features from collection.locations
-	function locationToFeature(loc: any) {
-		const lat = loc?.latitude !== undefined && loc?.latitude !== null ? Number(loc.latitude) : null;
-		const lon =
-			loc?.longitude !== undefined && loc?.longitude !== null ? Number(loc.longitude) : null;
+	type MarkerType = 'location' | 'lodging' | 'transportation';
+	type VisitStatus = 'visited' | 'planned';
+
+	type MarkerProperties = {
+		id: string;
+		name: string;
+		visitStatus?: VisitStatus;
+		categoryIcon?: string;
+		categoryName?: string | null;
+		type: MarkerType;
+		date?: string | null;
+		transportRole?: 'origin' | 'destination';
+	};
+
+	type MarkerFeature = {
+		type: 'Feature';
+		geometry: { type: 'Point'; coordinates: [number, number] };
+		properties: MarkerProperties;
+	};
+
+	type MarkerFeatureCollection = {
+		type: 'FeatureCollection';
+		features: MarkerFeature[];
+	};
+
+	// Filter state
+	let showFilters = false;
+	let showLocations = true;
+	let showLodging = true;
+	let showTransportation = true;
+	let showVisited = true;
+	let showPlanned = true;
+	let startDateFilter = '';
+	let endDateFilter = '';
+	let selectedCategories: Set<string> = new Set();
+	let searchQuery = '';
+
+	// Map state for zoom control
+	let mapZoom = 8;
+	let mapCenterCoords: [number, number] = [0, 0];
+
+	const defaultClusterOptions = { radius: 300, maxZoom: 8, minPoints: 2 };
+	$: resolvedClusterOptions = clusterOptions || defaultClusterOptions;
+
+	// Helper functions
+	function parseNumber(value: unknown): number | null {
+		if (value === null || value === undefined) return null;
+		const num = typeof value === 'number' ? value : Number(value);
+		return Number.isFinite(num) ? num : null;
+	}
+
+	function parseDate(value: string | null | undefined): number | null {
+		if (!value) return null;
+		const ts = Date.parse(value);
+		return Number.isFinite(ts) ? ts : null;
+	}
+
+	function formatShortDate(value: string | null | undefined): string {
+		if (!value) return '';
+		const parsed = parseDate(value);
+		if (!parsed) return '';
+		return new Date(parsed).toISOString().split('T')[0];
+	}
+
+	type FilterConfig = {
+		showLocations: boolean;
+		showLodging: boolean;
+		showTransportation: boolean;
+		showVisited: boolean;
+		showPlanned: boolean;
+		startDate: string;
+		endDate: string;
+		categories: Set<string>;
+	};
+
+	function isWithinDateRange(
+		value: string | null | undefined,
+		startDate: string,
+		endDate: string
+	): boolean {
+		const hasRange = Boolean(startDate || endDate);
+		if (!hasRange) return true;
+		const ts = parseDate(value ?? null);
+		if (!ts) return false;
+		const startTs = startDate ? Date.parse(startDate) : -Infinity;
+		const endTs = endDate ? Date.parse(endDate) + 24 * 60 * 60 * 1000 - 1 : Infinity;
+		return ts >= startTs && ts <= endTs;
+	}
+
+	function getLocationPrimaryDate(loc: any): string | null {
+		if (Array.isArray(loc?.visits) && loc.visits.length) {
+			const dates = loc.visits
+				.map((v: any) => v?.start_date || v?.end_date)
+				.filter((d: string | null | undefined) => Boolean(d))
+				.sort();
+			return dates[0] || null;
+		}
+		return null;
+	}
+
+	function getTransportationDate(t: any): string | null {
+		return t?.date || t?.start_date || t?.end_date || null;
+	}
+
+	function getTransportIcon(type?: string | null): string {
+		if (!type) return '✈️';
+		const normalized = String(type).toLowerCase();
+		if (normalized.includes('flight') || normalized.includes('plane') || normalized.includes('air'))
+			return '✈️';
+		if (normalized.includes('train')) return '🚆';
+		if (normalized.includes('bus')) return '🚌';
+		if (normalized.includes('car') || normalized.includes('drive') || normalized.includes('taxi'))
+			return '🚗';
+		if (normalized.includes('boat') || normalized.includes('ferry')) return '⛴️';
+		return '🚐';
+	}
+
+	function locationToFeature(loc: any): MarkerFeature | null {
+		const lat = parseNumber(loc?.latitude);
+		const lon = parseNumber(loc?.longitude);
 		if (lat === null || lon === null) return null;
 		return {
-			type: 'Feature' as const,
-			geometry: { type: 'Point' as const, coordinates: [lon, lat] as [number, number] },
+			type: 'Feature',
+			geometry: { type: 'Point', coordinates: [lon, lat] },
 			properties: {
-				id: loc.id,
+				id: String(loc.id),
 				name: loc.name,
 				visitStatus: loc.is_visited ? 'visited' : 'planned',
-				categoryIcon: loc.category?.icon || '📍'
+				categoryIcon: loc.category?.icon || '📍',
+				categoryName: loc.category?.display_name || null,
+				type: 'location',
+				date: getLocationPrimaryDate(loc)
 			}
 		};
+	}
+
+	function lodgingToFeature(l: any): MarkerFeature | null {
+		const lat = parseNumber(l?.latitude);
+		const lon = parseNumber(l?.longitude);
+		if (lat === null || lon === null) return null;
+		return {
+			type: 'Feature',
+			geometry: { type: 'Point', coordinates: [lon, lat] },
+			properties: {
+				id: String(l.id),
+				name: l.name || 'Lodging',
+				categoryIcon: '🏨',
+				categoryName: l.type || 'Lodging',
+				type: 'lodging',
+				date: l.check_in || l.check_out || null
+			}
+		};
+	}
+
+	function transportationToFeatures(t: any): MarkerFeature[] {
+		const features: MarkerFeature[] = [];
+		const icon = getTransportIcon(t?.type || t?.name);
+		const date = getTransportationDate(t);
+		const baseName = t?.name || t?.type || 'Transportation';
+
+		const pushPoint = (lat: number | null, lon: number | null, role: 'origin' | 'destination') => {
+			if (lat === null || lon === null) return;
+			features.push({
+				type: 'Feature',
+				geometry: { type: 'Point', coordinates: [lon, lat] },
+				properties: {
+					id: `${t.id}:${role}`,
+					name: `${baseName} ${role === 'origin' ? 'Start' : 'End'}`,
+					categoryIcon: icon,
+					categoryName: t?.type || 'Transportation',
+					type: 'transportation',
+					date,
+					transportRole: role
+				}
+			});
+		};
+
+		pushPoint(parseNumber(t?.origin_latitude), parseNumber(t?.origin_longitude), 'origin');
+		pushPoint(
+			parseNumber(t?.destination_latitude),
+			parseNumber(t?.destination_longitude),
+			'destination'
+		);
+
+		return features;
 	}
 
 	// Merge attachments/activity geojson into a single feature collection
@@ -107,118 +276,468 @@
 		return { type: 'FeatureCollection', features };
 	}
 
-	// Marker GeoJSON for FullMap
+	// Build features and apply filters
+	$: categoryOptions = Array.from(
+		new Set(
+			(collection?.locations || [])
+				.map((loc: any) => loc?.category?.display_name)
+				.filter((name: string | null | undefined) => Boolean(name))
+		)
+	).sort();
+
+	$: locationFeatures = (collection?.locations || [])
+		.map(locationToFeature)
+		.filter(Boolean) as MarkerFeature[];
+
+	$: lodgingFeatures = (collection?.lodging || [])
+		.map(lodgingToFeature)
+		.filter(Boolean) as MarkerFeature[];
+
+	$: transportationFeatures = (collection?.transportations || [])
+		.flatMap(transportationToFeatures)
+		.filter(Boolean) as MarkerFeature[];
+
+	$: allFeatures = [...locationFeatures, ...lodgingFeatures, ...transportationFeatures];
+
+	function matchesFilters(
+		feature: MarkerFeature,
+		filters: FilterConfig & { search: string }
+	): boolean {
+		const props = feature.properties;
+
+		// Search filter
+		if (filters.search) {
+			const query = filters.search.toLowerCase();
+			const nameMatch = props.name?.toLowerCase().includes(query);
+			const categoryMatch = props.categoryName?.toLowerCase().includes(query);
+			if (!nameMatch && !categoryMatch) return false;
+		}
+
+		if (props.type === 'location') {
+			if (!filters.showLocations) return false;
+			if (props.visitStatus === 'visited' && !filters.showVisited) return false;
+			if (props.visitStatus === 'planned' && !filters.showPlanned) return false;
+			if (filters.categories.size) {
+				if (!props.categoryName || !filters.categories.has(props.categoryName)) return false;
+			}
+		} else if (props.type === 'lodging') {
+			if (!filters.showLodging) return false;
+		} else if (props.type === 'transportation') {
+			if (!filters.showTransportation) return false;
+		}
+
+		if (!isWithinDateRange(props.date ?? null, filters.startDate, filters.endDate)) return false;
+		return true;
+	}
+
+	$: filteredFeatures = allFeatures.filter((feature) =>
+		matchesFilters(feature, {
+			showLocations,
+			showLodging,
+			showTransportation,
+			showVisited,
+			showPlanned,
+			startDate: startDateFilter,
+			endDate: endDateFilter,
+			categories: selectedCategories,
+			search: searchQuery.trim()
+		})
+	);
+
+	// Auto-zoom when search results change
+	$: if (searchQuery.trim() && filteredFeatures.length > 0) {
+		zoomToFilteredFeatures();
+	}
+
 	$: markerGeoJson = {
-		type: 'FeatureCollection' as const,
-		features: (collection?.locations || []).map(locationToFeature).filter((f) => f !== null)
-	} as FullMapFeatureCollection;
+		type: 'FeatureCollection',
+		features: filteredFeatures
+	} as MarkerFeatureCollection;
 
-	$: linesGeoJson = collectLinesGeojson(collection) as {
-		type: 'FeatureCollection';
-		features: any[];
-	} | null;
+	// Stats
+	$: visiblePinCount = filteredFeatures.length;
+	$: totalPinCount = allFeatures.length;
+	$: totalLocations = locationFeatures.length;
+	$: visitedCount = locationFeatures.filter((f) => f.properties.visitStatus === 'visited').length;
+	$: plannedCount = locationFeatures.filter((f) => f.properties.visitStatus === 'planned').length;
+	$: filteredVisitedCount = filteredFeatures.filter(
+		(f) => f.properties.type === 'location' && f.properties.visitStatus === 'visited'
+	).length;
+	$: filteredPlannedCount = filteredFeatures.filter(
+		(f) => f.properties.type === 'location' && f.properties.visitStatus === 'planned'
+	).length;
+	$: hasActiveCategoryFilter = selectedCategories.size > 0;
+	$: hasActiveDateFilter = Boolean(startDateFilter || endDateFilter);
+	$: hasActiveSearchFilter = Boolean(searchQuery.trim());
+	$: filtersPristine =
+		showLocations &&
+		showLodging &&
+		showTransportation &&
+		showVisited &&
+		showPlanned &&
+		!hasActiveCategoryFilter &&
+		!hasActiveDateFilter &&
+		!hasActiveSearchFilter;
 
-	// Return gradient classes matching map page markers for visit status
-	function getVisitStatusClass(status: string | null | undefined) {
-		if (!status) return 'bg-gray-200';
-		if (status === 'visited') return 'bg-gradient-to-br from-emerald-400 to-emerald-600';
-		if (status === 'planned') return 'bg-gradient-to-br from-blue-400 to-blue-600';
+	function zoomToFilteredFeatures() {
+		if (filteredFeatures.length === 0) return;
+
+		const coords = filteredFeatures.map((f) => f.geometry.coordinates);
+		const lngs = coords.map((c) => c[0]);
+		const lats = coords.map((c) => c[1]);
+
+		const minLng = Math.min(...lngs);
+		const maxLng = Math.max(...lngs);
+		const minLat = Math.min(...lats);
+		const maxLat = Math.max(...lats);
+
+		if (filteredFeatures.length === 1) {
+			// Single marker - center on it with a nice zoom level
+			mapCenterCoords = [lngs[0], lats[0]];
+			mapZoom = 12;
+		} else {
+			// Multiple markers - fit bounds with padding
+			const centerLng = (minLng + maxLng) / 2;
+			const centerLat = (minLat + maxLat) / 2;
+			mapCenterCoords = [centerLng, centerLat];
+
+			// Calculate appropriate zoom level based on bounds
+			const lngDiff = maxLng - minLng;
+			const latDiff = maxLat - minLat;
+			const maxDiff = Math.max(lngDiff, latDiff);
+
+			if (maxDiff > 50) mapZoom = 3;
+			else if (maxDiff > 20) mapZoom = 4;
+			else if (maxDiff > 10) mapZoom = 5;
+			else if (maxDiff > 5) mapZoom = 6;
+			else if (maxDiff > 2) mapZoom = 7;
+			else if (maxDiff > 1) mapZoom = 8;
+			else if (maxDiff > 0.5) mapZoom = 9;
+			else mapZoom = 10;
+		}
+	}
+	$: mapKey = `${visiblePinCount}-${startDateFilter}-${endDateFilter}-${showLocations}-${showLodging}-${showTransportation}-${showVisited}-${showPlanned}-${Array.from(
+		selectedCategories
+	)
+		.sort()
+		.join('|')}`;
+	$: mapCenter =
+		mapCenterCoords[0] !== 0 || mapCenterCoords[1] !== 0
+			? mapCenterCoords
+			: markerGeoJson.features.length
+				? markerGeoJson.features[0].geometry.coordinates
+				: ([0, 0] as [number, number]);
+
+	function toggleCategory(name: string) {
+		const next = new Set(selectedCategories);
+		if (next.has(name)) {
+			next.delete(name);
+		} else {
+			next.add(name);
+		}
+		selectedCategories = next;
+	}
+
+	function resetFilters() {
+		showLocations = true;
+		showLodging = true;
+		showTransportation = true;
+		showVisited = true;
+		showPlanned = true;
+		startDateFilter = '';
+		endDateFilter = '';
+		selectedCategories = new Set();
+		searchQuery = '';
+	}
+
+	function getMarkerColorClass(props: MarkerProperties) {
+		if (props.type === 'lodging') return 'bg-gradient-to-br from-purple-400 to-purple-600';
+		if (props.type === 'transportation') return 'bg-gradient-to-br from-amber-400 to-amber-600';
+		if (props.visitStatus === 'visited') return 'bg-gradient-to-br from-emerald-400 to-emerald-600';
+		if (props.visitStatus === 'planned') return 'bg-gradient-to-br from-blue-400 to-blue-600';
 		return 'bg-gray-200';
 	}
 
-	// Compute bounds from geojson features
-	function computeBoundsFromGeoJSON(geo: any) {
-		if (!geo || !geo.features || !geo.features.length) return null;
-		let minLon = Infinity,
-			minLat = Infinity,
-			maxLon = -Infinity,
-			maxLat = -Infinity;
-		const pushPoint = (c: number[]) => {
-			if (!Array.isArray(c) || c.length < 2) return;
-			const lon = Number(c[0]);
-			const lat = Number(c[1]);
-			if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
-			if (lon < minLon) minLon = lon;
-			if (lon > maxLon) maxLon = lon;
-			if (lat < minLat) minLat = lat;
-			if (lat > maxLat) maxLat = lat;
-		};
-
-		for (const feat of geo.features) {
-			const geom = feat.geometry;
-			if (!geom) continue;
-			const type = geom.type;
-			const coords = geom.coordinates;
-			if (!coords) continue;
-			if (type === 'Point') pushPoint(coords as number[]);
-			else if (type === 'LineString' || type === 'MultiPoint') {
-				for (const c of coords as any[]) pushPoint(c);
-			} else if (type === 'MultiLineString' || type === 'Polygon') {
-				for (const part of coords as any[]) {
-					for (const c of part) pushPoint(c);
-				}
-			} else if (type === 'MultiPolygon') {
-				for (const poly of coords as any[])
-					for (const ring of poly) for (const c of ring) pushPoint(c);
-			}
+	function getTypeLabel(props: MarkerProperties) {
+		if (props.type === 'lodging') return 'Lodging';
+		if (props.type === 'transportation') {
+			return props.transportRole === 'origin'
+				? 'Transport • Start'
+				: props.transportRole === 'destination'
+					? 'Transport • End'
+					: 'Transport';
 		}
-
-		if (minLon === Infinity) return null;
-		return [
-			[minLon, minLat],
-			[maxLon, maxLat]
-		];
+		return props.visitStatus === 'visited' ? 'Visited' : 'Planned';
 	}
 
-	// Fit bounds when map and lines are available
-	let mapRef: any = null;
-	$: if (mapRef && linesGeoJson) {
-		const b = computeBoundsFromGeoJSON(linesGeoJson);
-		if (b) {
-			try {
-				mapRef.fitBounds(b, { padding: 40 });
-			} catch (e) {
-				// ignore
-			}
+	function canNavigate(props: MarkerProperties) {
+		return true;
+	}
+
+	function getNavigationUrl(props: MarkerProperties): string {
+		if (props.type === 'location') {
+			return `/locations/${props.id}`;
+		} else if (props.type === 'lodging') {
+			return `/lodging/${props.id}`;
+		} else if (props.type === 'transportation') {
+			// Extract the base ID (remove the :origin or :destination suffix)
+			const baseId = props.id.split(':')[0];
+			return `/transportations/${baseId}`;
 		}
+		return '#';
 	}
 </script>
 
+<!-- Filter Header -->
+<div class="card bg-base-100 shadow-lg mb-4">
+	<div class="card-body p-4">
+		<!-- Toggle filter visibility -->
+		<div class="flex items-center justify-between gap-4">
+			<button
+				type="button"
+				class="btn btn-sm btn-ghost gap-2 flex-1 justify-start"
+				on:click={() => (showFilters = !showFilters)}
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+					/>
+				</svg>
+				<span class="font-medium">{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
+				<svg
+					class="w-4 h-4 transition-transform {showFilters ? 'rotate-180' : ''}"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M19 9l-7 7-7-7"
+					/>
+				</svg>
+			</button>
+
+			<div class="flex items-center gap-2">
+				<div class="badge badge-ghost badge-sm">
+					{visiblePinCount}/{totalPinCount} pins
+				</div>
+				{#if !filtersPristine}
+					<button type="button" class="btn btn-xs btn-ghost" on:click={resetFilters}>
+						Reset
+					</button>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Expanded Filter UI -->
+		{#if showFilters}
+			<div class="divider my-2"></div>
+			<div class="space-y-4">
+				<!-- Search Bar -->
+				<label class="input input-bordered input-sm flex items-center gap-2">
+					<SearchIcon class="h-4 w-4 opacity-70" />
+					<input
+						type="text"
+						class="grow"
+						placeholder="Search locations, lodging, transport..."
+						bind:value={searchQuery}
+					/>
+					{#if searchQuery}
+						<button
+							type="button"
+							class="btn btn-ghost btn-xs btn-circle"
+							on:click={() => (searchQuery = '')}
+							aria-label="Clear search"
+						>
+							✕
+						</button>
+					{/if}
+				</label>
+
+				<!-- Visit Status -->
+				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+					<div class="flex items-center gap-3 rounded-box border border-base-300 p-3">
+						<div
+							class="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 grid place-items-center text-base-100"
+						>
+							✓
+						</div>
+						<div class="flex flex-col">
+							<span class="text-xs uppercase text-base-content/60">Visited</span>
+							<span class="font-semibold text-sm">{filteredVisitedCount}</span>
+						</div>
+						<label class="label cursor-pointer gap-2 p-0 ml-auto">
+							<input type="checkbox" bind:checked={showVisited} class="toggle toggle-sm" />
+						</label>
+					</div>
+
+					<div class="flex items-center gap-3 rounded-box border border-base-300 p-3">
+						<div
+							class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 grid place-items-center text-base-100"
+						>
+							○
+						</div>
+						<div class="flex flex-col">
+							<span class="text-xs uppercase text-base-content/60">Planned</span>
+							<span class="font-semibold text-sm">{filteredPlannedCount}</span>
+						</div>
+						<label class="label cursor-pointer gap-2 p-0 ml-auto">
+							<input type="checkbox" bind:checked={showPlanned} class="toggle toggle-sm" />
+						</label>
+					</div>
+				</div>
+
+				<!-- Pin Types -->
+				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+					<div class="flex items-center gap-3 rounded-box border border-base-300 p-3">
+						<div
+							class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 grid place-items-center text-base-100"
+						>
+							📍
+						</div>
+						<div class="flex flex-col">
+							<span class="text-xs uppercase text-base-content/60">Locations</span>
+							<span class="font-semibold text-sm">{locationFeatures.length}</span>
+						</div>
+						<label class="label cursor-pointer gap-2 p-0 ml-auto">
+							<input
+								type="checkbox"
+								bind:checked={showLocations}
+								class="toggle toggle-sm toggle-primary"
+							/>
+						</label>
+					</div>
+
+					{#if lodgingFeatures.length}
+						<div class="flex items-center gap-3 rounded-box border border-base-300 p-3">
+							<div
+								class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 grid place-items-center text-base-100"
+							>
+								🏨
+							</div>
+							<div class="flex flex-col">
+								<span class="text-xs uppercase text-base-content/60">Lodging</span>
+								<span class="font-semibold text-sm">{lodgingFeatures.length}</span>
+							</div>
+							<label class="label cursor-pointer gap-2 p-0 ml-auto">
+								<input
+									type="checkbox"
+									bind:checked={showLodging}
+									class="toggle toggle-sm toggle-secondary"
+								/>
+							</label>
+						</div>
+					{/if}
+
+					{#if transportationFeatures.length}
+						<div class="flex items-center gap-3 rounded-box border border-base-300 p-3">
+							<div
+								class="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 grid place-items-center text-base-100"
+							>
+								✈️
+							</div>
+							<div class="flex flex-col">
+								<span class="text-xs uppercase text-base-content/60">Transport</span>
+								<span class="font-semibold text-sm">{transportationFeatures.length / 2}</span>
+							</div>
+							<label class="label cursor-pointer gap-2 p-0 ml-auto">
+								<input
+									type="checkbox"
+									bind:checked={showTransportation}
+									class="toggle toggle-sm toggle-accent"
+								/>
+							</label>
+						</div>
+					{/if}
+				</div>
+
+				<!-- Category Filter -->
+				{#if categoryOptions.length}
+					<div class="space-y-2">
+						<div class="flex items-center justify-between">
+							<span class="text-sm font-medium">Categories</span>
+							{#if hasActiveCategoryFilter}
+								<button
+									type="button"
+									class="btn btn-ghost btn-xs"
+									on:click={() => (selectedCategories = new Set())}
+								>
+									Clear
+								</button>
+							{/if}
+						</div>
+						<div class="flex flex-wrap gap-2">
+							{#each categoryOptions as category}
+								<button
+									type="button"
+									class="badge {selectedCategories.has(category)
+										? 'badge-primary'
+										: 'badge-ghost'} cursor-pointer hover:scale-105 transition-transform"
+									on:click={() => toggleCategory(category)}
+								>
+									{category}
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Date Range Filter -->
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+					<label class="form-control">
+						<span class="label label-text text-xs">Start Date</span>
+						<input
+							type="date"
+							bind:value={startDateFilter}
+							class="input input-sm input-bordered w-full"
+							min={collection.start_date}
+							max={collection.end_date}
+						/>
+					</label>
+					<label class="form-control">
+						<span class="label label-text text-xs">End Date</span>
+						<input
+							type="date"
+							bind:value={endDateFilter}
+							class="input input-sm input-bordered w-full"
+							min={collection.start_date}
+							max={collection.end_date}
+						/>
+					</label>
+				</div>
+
+				<!-- Show Lines Toggle -->
+			</div>
+		{/if}
+	</div>
+</div>
+
+<!-- Map -->
 <div class="w-full" style="min-height:600px; height:600px;">
 	<FullMap
 		geoJson={markerGeoJson}
-		center={markerGeoJson.features.length ? markerGeoJson.features[0].geometry.coordinates : [0, 0]}
-		zoom={8}
+		center={mapCenter}
+		zoom={mapZoom}
 		mapClass="w-full h-[600px]"
 		{clusterEnabled}
-		{clusterOptions}
+		clusterOptions={resolvedClusterOptions}
 	>
-		<svelte:fragment slot="overlays" let:map>
-			{#if linesGeoJson}
-				{@const _ = mapRef = map}
-				<GeoJSON data={linesGeoJson}>
-					<LineLayer
-						id="collection-lines"
-						paint={{
-							// read per-feature baked color `_color`, fallback to blue
-							'line-color': ['coalesce', ['get', '_color'], '#60a5fa'],
-							'line-width': 3,
-							'line-opacity': 0.9
-						}}
-					/>
-				</GeoJSON>
-			{/if}
-		</svelte:fragment>
-
 		<svelte:fragment slot="marker" let:markerProps let:markerLngLat let:isActive let:setActive>
 			{#if markerProps && markerLngLat}
 				<Marker lngLat={markerLngLat} class={isActive ? 'map-pin-active' : 'map-pin'}>
 					<div class="relative group z-[1000] group-hover:z-[10000] focus-within:z-[10000]">
 						<div
-							class="map-pin-hit grid place-items-center w-8 h-8 rounded-full border-2 border-white shadow-lg text-base cursor-pointer group-hover:scale-110 transition-all duration-200 {getVisitStatusClass(
-								markerProps.visitStatus
+							class="map-pin-hit grid place-items-center w-8 h-8 rounded-full border-2 border-white shadow-lg text-base group-hover:scale-110 transition-all duration-200 {getMarkerColorClass(
+								markerProps
 							)}"
 							class:scale-110={isActive}
+							class:cursor-pointer={canNavigate(markerProps)}
+							class:cursor-default={!canNavigate(markerProps)}
 							role="button"
 							tabindex="0"
 							on:mouseenter={() => setActive(true)}
@@ -227,19 +746,20 @@
 							on:blur={() => setActive(false)}
 							on:click={(e) => {
 								e.stopPropagation();
-								goto(`/locations/${markerProps.id}`);
+								if (canNavigate(markerProps)) goto(getNavigationUrl(markerProps));
 							}}
 							on:keydown={(e) => {
-								if (e.key === 'Enter' || e.key === ' ') {
+								if ((e.key === 'Enter' || e.key === ' ') && canNavigate(markerProps)) {
 									e.preventDefault();
 									e.stopPropagation();
-									goto(`/locations/${markerProps.id}`);
+									goto(getNavigationUrl(markerProps));
 								}
 							}}
 						>
 							{markerProps.categoryIcon || '📍'}
 						</div>
 
+						<!-- Marker Popup -->
 						<div
 							class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto transition-all duration-200 z-[9999]"
 							class:opacity-100={isActive}
@@ -252,27 +772,43 @@
 									<div class="space-y-2">
 										<div class="min-w-0">
 											<h3 class="card-title text-sm leading-tight truncate">{markerProps.name}</h3>
-											<div class="mt-1 flex items-center gap-2">
+											<div class="mt-1 flex flex-wrap items-center gap-2">
 												<div
-													class="badge badge-sm {markerProps.visitStatus === 'visited'
-														? 'badge-success'
-														: 'badge-info'}"
+													class="badge badge-sm {markerProps.type === 'lodging'
+														? 'badge-secondary'
+														: markerProps.type === 'transportation'
+															? 'badge-accent'
+															: markerProps.visitStatus === 'visited'
+																? 'badge-success'
+																: 'badge-info'}"
 												>
-													{markerProps.visitStatus === 'visited' ? 'Visited' : 'Planned'}
+													{getTypeLabel(markerProps)}
 												</div>
-												{#if markerProps.categoryIcon}
-													<div class="badge badge-ghost badge-sm">{markerProps.categoryIcon}</div>
+												{#if markerProps.categoryName}
+													<div class="badge badge-ghost badge-sm">{markerProps.categoryName}</div>
+												{/if}
+												{#if markerProps.date}
+													<div class="badge badge-ghost badge-sm">
+														{formatShortDate(markerProps.date)}
+													</div>
 												{/if}
 											</div>
 										</div>
 									</div>
-									<div class="card-actions">
-										<button
-											class="btn btn-xs"
-											on:click|stopPropagation={() => goto(`/locations/${markerProps.id}`)}
-											>Open</button
-										>
-									</div>
+									{#if canNavigate(markerProps)}
+										<div class="card-actions">
+											<button
+												class="btn btn-xs btn-primary"
+												on:click|stopPropagation={() => goto(getNavigationUrl(markerProps))}
+											>
+												Open {markerProps.type === 'location'
+													? 'Location'
+													: markerProps.type === 'lodging'
+														? 'Lodging'
+														: 'Transportation'}
+											</button>
+										</div>
+									{/if}
 								</div>
 							</div>
 						</div>

@@ -114,7 +114,15 @@
 	$: availableViews = {
 		all: true, // Always available
 		itinerary: !isFolderView, // Only for collections with dates
-		map: collection?.locations?.some((l) => l.latitude && l.longitude) || false,
+		map:
+			collection?.locations?.some((l) => l.latitude && l.longitude) ||
+			collection?.lodging?.some((l) => l.latitude && l.longitude) ||
+			collection?.transportations?.some(
+				(t) =>
+					(t.origin_latitude && t.origin_longitude) ||
+					(t.destination_latitude && t.destination_longitude)
+			) ||
+			false,
 		calendar: !isFolderView,
 		recommendations: true // may be overridden by permission check below
 	};
