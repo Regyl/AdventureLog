@@ -149,32 +149,57 @@ def extractIsoCode(user, data):
 
     address = data.get('address', {}) or {}
 
-    # Prefer the most specific ISO 3166-2 code available before falling back to country-level.
-    preferred_iso_keys = [
-        "ISO3166-2-lvl6",
-        "ISO3166-2-lvl5",
-        "ISO3166-2-lvl4",
-        "ISO3166-2-lvl3",
-        "ISO3166-2-lvl2",
-        "ISO3166-2-lvl1",
-        "ISO3166-2",
-    ]
-    for key in preferred_iso_keys:
-        if key in address and address[key]:
-            iso_code = address[key]
-            break
-
-    # If no region-level code, fall back to country code only as a last resort.
-    if not iso_code and "ISO3166-1" in address:
-        iso_code = address.get("ISO3166-1")
-
-    # Capture country code early for matching by name if needed.
+    # Capture country code early for ISO selection and name fallback.
     country_code = address.get("ISO3166-1")
     state_name = address.get("state")
 
-    region = None
-    if iso_code and len(str(iso_code)) > 2:
-        region = Region.objects.filter(id=iso_code).first()
+    # Prefer the most specific ISO 3166-2 code available before falling back to country-level.
+    # France gets lvl4 (regions) first for city matching, then lvl6 (departments) as a fallback.
+    preferred_iso_keys = (
+        [
+            "ISO3166-2-lvl4",
+            "ISO3166-2-lvl6",
+            "ISO3166-2-lvl7",
+            "ISO3166-2-lvl5",
+            "ISO3166-2-lvl3",
+            "ISO3166-2-lvl2",
+            "ISO3166-2-lvl1",
+            "ISO3166-2",
+        ]
+        if country_code == "FR"
+        else [
+            "ISO3166-2-lvl7",
+            "ISO3166-2-lvl6",
+            "ISO3166-2-lvl5",
+            "ISO3166-2-lvl4",
+            "ISO3166-2-lvl3",
+            "ISO3166-2-lvl2",
+            "ISO3166-2-lvl1",
+            "ISO3166-2",
+        ]
+    )
+
+    iso_candidates = []
+    for key in preferred_iso_keys:
+        value = address.get(key)
+        if value and value not in iso_candidates:
+            iso_candidates.append(value)
+
+    # If no region-level code, fall back to country code only as a last resort.
+    if not iso_candidates and "ISO3166-1" in address:
+        iso_candidates.append(address.get("ISO3166-1"))
+
+    iso_code = iso_candidates[0] if iso_candidates else None
+
+    region_candidates = []
+    for candidate in iso_candidates:
+        if len(str(candidate)) <= 2:
+            continue
+        match = Region.objects.filter(id=candidate).first()
+        if match and match not in region_candidates:
+            region_candidates.append(match)
+
+    region = region_candidates[0] if region_candidates else None
 
     # Fallback: attempt to resolve region by name and country code when no ISO match.
     if not region and state_name:
@@ -186,38 +211,65 @@ def extractIsoCode(user, data):
             iso_code = region.id
             if not country_code:
                 country_code = region.country.country_code
+            if region not in region_candidates:
+                region_candidates.insert(0, region)
 
     if not region:
         return {"error": "No region found"}
 
-    visited_region = VisitedRegion.objects.filter(region=region, user=user).first()
-    region_visited = bool(visited_region)
+    if not country_code:
+        country_code = region.country.country_code
+
+    region_visited = False
     city_visited = False
 
     # ordered preference for best-effort locality matching
     locality_keys = [
         'suburb',
         'city',
+        'city_district',
         'town',
         'village',
         'hamlet',
         'neighbourhood',
         'neighborhood',  # alternate spelling
         'locality',
-        'county',
         'municipality',
+        'county',
     ]
 
-    def match_locality(key_name):
+    def match_locality(key_name, target_region):
         value = address.get(key_name)
         if not value:
             return None
-        return City.objects.filter(name__icontains=value, region=region).first()
+        qs = City.objects.filter(region=target_region)
 
-    for key_name in locality_keys:
-        city = match_locality(key_name)
+        # Use exact matches first to avoid broad county/name collisions (e.g. Troms vs Tromsø).
+        exact_match = qs.filter(name__iexact=value).first()
+        if exact_match:
+            return exact_match
+
+        # Allow partial matching for most locality fields but keep county strict.
+        if key_name == 'county':
+            return None
+
+        return qs.filter(name__icontains=value).first()
+
+    chosen_region = region
+    for candidate_region in region_candidates or [region]:
+        for key_name in locality_keys:
+            city = match_locality(key_name, candidate_region)
+            if city:
+                chosen_region = candidate_region
+                iso_code = chosen_region.id
+                break
         if city:
             break
+
+    region = chosen_region
+    iso_code = region.id
+    visited_region = VisitedRegion.objects.filter(region=region, user=user).first()
+    region_visited = bool(visited_region)
 
     if city:
         display_name = f"{city.name}, {region.name}, {country_code or region.country.country_code}"
