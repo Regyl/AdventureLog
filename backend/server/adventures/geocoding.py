@@ -294,6 +294,8 @@ def extractIsoCode(user, data):
         display_name = f"{city.name}, {region.name}, {country_code or region.country.country_code}"
         visited_city = VisitedCity.objects.filter(city=city, user=user).first()
         city_visited = bool(visited_city)
+    else:
+        display_name = f"{region.name}, {country_code or region.country.country_code}"
 
     return {
         "region_id": iso_code,

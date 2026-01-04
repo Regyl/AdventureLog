@@ -1034,12 +1034,12 @@
 				{/if}
 
 				<!-- Map View -->
-				{#if currentView === 'map' && collection.locations && collection.locations.some((l) => l.latitude && l.longitude)}
+				{#if currentView === 'map'}
 					<div class="card bg-base-200 shadow-xl">
 						<div class="card-body">
 							<h2 class="card-title text-2xl mb-4">🗺️ Map</h2>
 							<div class="rounded-lg overflow-hidden shadow-lg">
-								<CollectionMap {collection} />
+								<CollectionMap bind:collection user={data.user} />
 							</div>
 						</div>
 					</div>

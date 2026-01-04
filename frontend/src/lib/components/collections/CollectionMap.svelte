@@ -1,12 +1,17 @@
 <script lang="ts">
 	import FullMap, { type FullMapFeatureCollection } from '$lib/components/map/FullMap.svelte';
-	import { GeoJSON, LineLayer, Marker } from 'svelte-maplibre';
+	import { Marker } from 'svelte-maplibre';
 	import { goto } from '$app/navigation';
 	import { getActivityColor } from '$lib';
 	import SearchIcon from '~icons/mdi/magnify';
-	import type { Collection } from '$lib/types';
+	import Plus from '~icons/mdi/plus';
+	import PinIcon from '~icons/mdi/map-marker';
+	import Clear from '~icons/mdi/close';
+	import NewLocationModal from '$lib/components/locations/LocationModal.svelte';
+	import type { Collection, Location, User } from '$lib/types';
 
 	export let collection: Collection;
+	export let user: User | null = null;
 	// Allow disabling/enabling clustering for markers
 	export let clusterEnabled: boolean = false;
 	export let clusterOptions: any = { radius: 300, maxZoom: 8, minPoints: 2 };
@@ -51,6 +56,13 @@
 	// Map state for zoom control
 	let mapZoom = 8;
 	let mapCenterCoords: [number, number] = [0, 0];
+
+	// Creation state
+	let createModalOpen = false;
+	let initialLatLng: { lat: number; lng: number } | null = null;
+	let newMarker: { lngLat: { lng: number; lat: number } } | null = null;
+	let newLatitude: number | null = null;
+	let newLongitude: number | null = null;
 
 	const defaultClusterOptions = { radius: 300, maxZoom: 8, minPoints: 2 };
 	$: resolvedClusterOptions = clusterOptions || defaultClusterOptions;
@@ -428,6 +440,62 @@
 				? markerGeoJson.features[0].geometry.coordinates
 				: ([0, 0] as [number, number]);
 
+	function handleMapClick(e: CustomEvent<{ lngLat: { lng: number; lat: number } }>) {
+		newMarker = { lngLat: e.detail.lngLat };
+		newLongitude = e.detail.lngLat.lng;
+		newLatitude = e.detail.lngLat.lat;
+	}
+
+	function openCreateModal() {
+		initialLatLng = newMarker ? { lat: newMarker.lngLat.lat, lng: newMarker.lngLat.lng } : null;
+		createModalOpen = true;
+	}
+
+	function clearNewMarker() {
+		newMarker = null;
+		newLatitude = null;
+		newLongitude = null;
+	}
+
+	function upsertLocation(newLocation: Location) {
+		const existingLocations = collection?.locations || [];
+		const idx = existingLocations.findIndex((loc) => loc.id === newLocation.id);
+		const nextLocations =
+			idx === -1
+				? [...existingLocations, newLocation]
+				: existingLocations.map((loc, i) => (i === idx ? { ...loc, ...newLocation } : loc));
+
+		collection = { ...collection, locations: nextLocations };
+	}
+
+	function handleLocationCreated(event: CustomEvent<Location>) {
+		upsertLocation(event.detail);
+
+		const lat = parseNumber(event.detail.latitude);
+		const lon = parseNumber(event.detail.longitude);
+		if (lat !== null && lon !== null) {
+			mapCenterCoords = [lon, lat];
+			mapZoom = 12;
+		}
+
+		createModalOpen = false;
+		clearNewMarker();
+	}
+
+	function handleLocationSaved(event: CustomEvent<Location>) {
+		upsertLocation(event.detail);
+
+		const lat = parseNumber(event.detail.latitude);
+		const lon = parseNumber(event.detail.longitude);
+		if (lat !== null && lon !== null) {
+			mapCenterCoords = [lon, lat];
+			mapZoom = 12;
+		}
+
+		createModalOpen = false;
+		clearNewMarker();
+	}
+
 	function toggleCategory(name: string) {
 		const next = new Set(selectedCategories);
 		if (next.has(name)) {
@@ -717,6 +785,67 @@
 	</div>
 </div>
 
+<!-- Add to Collection CTA (compact) -->
+<div class="card bg-base-100 shadow-sm mb-3 border border-base-200">
+	<div class="card-body py-3 px-4 gap-2">
+		<div class="flex items-center justify-between gap-3">
+			<div class="flex items-center gap-2 min-w-0">
+				<span
+					class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary"
+				>
+					<Plus class="w-4 h-4" />
+				</span>
+				<div class="min-w-0">
+					<p class="text-sm font-semibold leading-tight truncate">Add to this collection</p>
+					<p class="text-xs text-base-content/60 leading-tight truncate">
+						Click the map to drop a marker, then add it here.
+					</p>
+				</div>
+			</div>
+			<div class="flex items-center gap-2">
+				<button type="button" class="btn btn-primary btn-xs" on:click={openCreateModal}>
+					<Plus class="w-4 h-4" />
+					Add
+				</button>
+				{#if newMarker}
+					<button type="button" class="btn btn-ghost btn-xs" on:click={clearNewMarker}>
+						<Clear class="w-4 h-4" />
+						Clear
+					</button>
+				{/if}
+			</div>
+		</div>
+
+		{#if newMarker}
+			<div
+				class="alert alert-info alert-sm flex flex-col sm:flex-row sm:items-center gap-2 py-2 px-3"
+			>
+				<div class="flex items-center gap-2 text-xs sm:text-sm">
+					<PinIcon class="w-4 h-4" />
+					<span class="truncate">
+						{newLatitude?.toFixed(4)}, {newLongitude?.toFixed(4)}
+					</span>
+				</div>
+				<div class="flex gap-2 sm:ml-auto">
+					<button
+						type="button"
+						class="btn btn-primary btn-xxs sm:btn-xs"
+						on:click={openCreateModal}
+					>
+						<Plus class="w-3 h-3 sm:w-4 sm:h-4" />
+						Add here
+					</button>
+					<button type="button" class="btn btn-ghost btn-xxs sm:btn-xs" on:click={clearNewMarker}>
+						<Clear class="w-3 h-3 sm:w-4 sm:h-4" />
+					</button>
+				</div>
+			</div>
+		{:else}
+			<p class="text-xs text-base-content/60">Tip: click the map to place a marker.</p>
+		{/if}
+	</div>
+</div>
+
 <!-- Map -->
 <div class="w-full" style="min-height:600px; height:600px;">
 	<FullMap
@@ -726,6 +855,7 @@
 		mapClass="w-full h-[600px]"
 		{clusterEnabled}
 		clusterOptions={resolvedClusterOptions}
+		on:mapClick={handleMapClick}
 	>
 		<svelte:fragment slot="marker" let:markerProps let:markerLngLat let:isActive let:setActive>
 			{#if markerProps && markerLngLat}
@@ -816,8 +946,31 @@
 				</Marker>
 			{/if}
 		</svelte:fragment>
+
+		<svelte:fragment slot="overlays">
+			{#if newMarker}
+				<Marker lngLat={[newMarker.lngLat.lng, newMarker.lngLat.lat]} class="map-pin">
+					<div
+						class="map-pin-hit grid place-items-center w-10 h-10 rounded-full bg-primary text-primary-content border-2 border-base-100 shadow-lg"
+					>
+						<Plus class="w-5 h-5" />
+					</div>
+				</Marker>
+			{/if}
+		</svelte:fragment>
 	</FullMap>
 </div>
+
+{#if createModalOpen}
+	<NewLocationModal
+		on:create={handleLocationCreated}
+		on:save={handleLocationSaved}
+		on:close={() => (createModalOpen = false)}
+		{initialLatLng}
+		{collection}
+		{user}
+	/>
+{/if}
 
 <style>
 	:global(.min-h-\[600px\]) {
