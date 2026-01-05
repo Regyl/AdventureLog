@@ -1,5 +1,5 @@
 import os
-from .models import Location, ContentImage, ChecklistItem, Collection, Note, Transportation, Checklist, Visit, Category, ContentAttachment, Lodging, CollectionInvite, Trail, Activity, CollectionItineraryItem
+from .models import Location, ContentImage, ChecklistItem, Collection, Note, Transportation, Checklist, Visit, Category, ContentAttachment, Lodging, CollectionInvite, Trail, Activity, CollectionItineraryItem, CollectionItineraryDay
 from rest_framework import serializers
 from main.utils import CustomModelSerializer
 from users.serializers import CustomUserDetailsSerializer
@@ -944,6 +944,19 @@ class UltraSlimCollectionSerializer(serializers.ModelSerializer):
         representation['shared_with'] = shared_uuids
         return representation
     
+class CollectionItineraryDaySerializer(CustomModelSerializer):
+    class Meta:
+        model = CollectionItineraryDay
+        fields = ['id', 'collection', 'date', 'name', 'description', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def update(self, instance, validated_data):
+        # Security: Prevent changing collection or date after creation
+        # This prevents shared users from reassigning itinerary days to themselves
+        validated_data.pop('collection', None)
+        validated_data.pop('date', None)
+        return super().update(instance, validated_data)
+
 class CollectionItineraryItemSerializer(CustomModelSerializer):
     item = serializers.SerializerMethodField()
     start_datetime = serializers.ReadOnlyField()
@@ -954,6 +967,15 @@ class CollectionItineraryItemSerializer(CustomModelSerializer):
         model = CollectionItineraryItem
         fields = ['id', 'collection', 'content_type', 'object_id', 'item', 'date', 'order', 'start_datetime', 'end_datetime', 'created_at', 'object_name']
         read_only_fields = ['id', 'created_at', 'start_datetime', 'end_datetime', 'item', 'object_name']
+    
+    def update(self, instance, validated_data):
+        # Security: Prevent changing collection, content_type, or object_id after creation
+        # This prevents shared users from reassigning itinerary items to themselves
+        # or linking items to objects they don't have permission to access
+        validated_data.pop('collection', None)
+        validated_data.pop('content_type', None)
+        validated_data.pop('object_id', None)
+        return super().update(instance, validated_data)
     
     def get_item(self, obj):
         """Return id and type for the linked item"""

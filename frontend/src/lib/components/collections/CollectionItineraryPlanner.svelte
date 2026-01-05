@@ -3,6 +3,7 @@
 	import type {
 		Collection,
 		CollectionItineraryItem,
+		CollectionItineraryDay,
 		Location,
 		Transportation,
 		Lodging,
@@ -47,6 +48,7 @@
 		displayDate: string;
 		items: ResolvedItineraryItem[];
 		overnightLodging: Lodging[]; // Lodging where guest is staying overnight (not check-in day)
+		dayMetadata: CollectionItineraryDay | null; // Day name and description
 	};
 
 	$: days = groupItemsByDay(collection);
@@ -525,11 +527,16 @@
 			const iso = dt.toISODate();
 			const items = (grouped.get(iso) || []).sort((a, b) => a.order - b.order);
 			const overnightLodging = getOvernightLodgingForDate(collection, iso);
+
+			// Find day metadata for this date
+			const dayMetadata = collection.itinerary_days?.find((d) => d.date === iso) || null;
+
 			days.push({
 				date: iso,
 				displayDate: dt.toFormat('cccc, LLLL d, yyyy'),
 				items,
-				overnightLodging
+				overnightLodging,
+				dayMetadata
 			});
 		}
 
@@ -915,6 +922,66 @@
 			days = groupItemsByDay(collection);
 		}
 	}
+
+	// Save or update day metadata (name and description)
+	async function saveDayMetadata(date: string, name: string | null, description: string | null) {
+		if (!canModify) return;
+
+		try {
+			// Find existing day metadata for this date
+			const existing = collection.itinerary_days?.find((d) => d.date === date);
+
+			if (existing) {
+				// Update existing day metadata
+				const response = await fetch(`/api/itinerary-days/${existing.id}/`, {
+					method: 'PATCH',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({
+						name: name || null,
+						description: description || null
+					})
+				});
+
+				if (!response.ok) throw new Error('Failed to update day metadata');
+
+				const updated = await response.json();
+
+				// Update collection.itinerary_days immutably
+				collection.itinerary_days = collection.itinerary_days?.map((d) =>
+					d.id === existing.id ? updated : d
+				);
+			} else {
+				// Create new day metadata
+				const response = await fetch('/api/itinerary-days/', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({
+						collection: collection.id,
+						date,
+						name: name || null,
+						description: description || null
+					})
+				});
+
+				if (!response.ok) throw new Error('Failed to create day metadata');
+
+				const newDay = await response.json();
+
+				// Add to collection.itinerary_days immutably
+				collection.itinerary_days = [...(collection.itinerary_days || []), newDay];
+			}
+
+			// Trigger reactivity by reassigning collection
+			collection = { ...collection };
+			days = groupItemsByDay(collection);
+		} catch (err) {
+			console.error('Error saving day metadata:', err);
+		}
+	}
 </script>
 
 {#if isLocationModalOpen}
@@ -1106,16 +1173,96 @@
 						</div>
 
 						<!-- Title and meta -->
-						<div class="flex-1 min-w-0">
-							<h3 class="text-lg md:text-xl font-bold truncate">{day.displayDate}</h3>
-							<div class="text-sm opacity-70 mt-1 flex items-center gap-3">
+						<div class="flex-1 min-w-0 space-y-1">
+							<!-- Main date title + optional day name -->
+							<div class="flex items-baseline gap-2 flex-wrap">
+								<h3 class="text-lg md:text-xl font-bold">{day.displayDate}</h3>
+
+								<!-- Day name - inline with date -->
+								{#if canModify}
+									{#if day.dayMetadata?.name}
+										<input
+											type="text"
+											class="input input-ghost text-base font-medium px-1 py-0 -ml-1 focus:bg-base-100 focus:px-2 transition-all flex-shrink min-w-0"
+											style="width: {(day.dayMetadata.name.length + 5) * 8}px; max-width: 300px;"
+											value={day.dayMetadata.name}
+											placeholder="Day name"
+											on:blur={(e) => {
+												const newName = e.currentTarget.value.trim() || null;
+												if (newName !== day.dayMetadata?.name) {
+													saveDayMetadata(day.date, newName, day.dayMetadata?.description || null);
+												}
+											}}
+										/>
+									{:else}
+										<button
+											type="button"
+											class="text-sm opacity-40 hover:opacity-100 transition-opacity px-1"
+											on:click={(e) => {
+												const input = e.currentTarget.nextElementSibling;
+												if (input) input.focus();
+											}}
+										>
+											+ name
+										</button>
+										<input
+											type="text"
+											class="input input-ghost text-base font-medium px-1 py-0 opacity-0 focus:opacity-100 focus:bg-base-100 focus:px-2 transition-all w-0 focus:w-auto"
+											style="max-width: 300px;"
+											placeholder="Day name"
+											value=""
+											on:blur={(e) => {
+												const newName = e.currentTarget.value.trim() || null;
+												if (newName) {
+													saveDayMetadata(day.date, newName, day.dayMetadata?.description || null);
+												} else {
+													e.currentTarget.classList.add('w-0');
+													e.currentTarget.classList.remove('w-auto');
+												}
+											}}
+											on:focus={(e) => {
+												e.currentTarget.classList.remove('w-0');
+												e.currentTarget.classList.add('w-auto');
+											}}
+										/>
+									{/if}
+								{:else if day.dayMetadata?.name}
+									<span class="text-base font-medium opacity-90">— {day.dayMetadata.name}</span>
+								{/if}
+							</div>
+
+							<!-- Day meta info -->
+							<div class="text-sm opacity-70 flex items-center gap-3">
 								<span class="font-medium">Day {dayNumber} of {totalDays}</span>
 								<span class="opacity-50">•</span>
 								<span>{day.items.length} {day.items.length === 1 ? 'item' : 'items'}</span>
 								{#if day.overnightLodging.length > 0}
-									<span class="badge badge-info badge-outline">Overnight Lodging</span>
+									<span class="badge badge-info badge-outline badge-sm">Overnight</span>
 								{/if}
 							</div>
+
+							<!-- Description - shows when present, ghost input when editing -->
+							{#if canModify}
+								<textarea
+									class="textarea textarea-ghost w-full px-2 py-1 text-sm leading-relaxed resize-none focus:bg-base-100 transition-all {day
+										.dayMetadata?.description
+										? ''
+										: 'opacity-40 hover:opacity-70 focus:opacity-100'}"
+									rows="2"
+									placeholder="+ Add description..."
+									value={day.dayMetadata?.description || ''}
+									on:blur={(e) => {
+										const newDesc = e.currentTarget.value.trim() || null;
+										if (newDesc !== day.dayMetadata?.description) {
+											saveDayMetadata(day.date, day.dayMetadata?.name || null, newDesc);
+										}
+									}}
+								/>
+							{:else if day.dayMetadata?.description}
+								<p class="text-sm leading-relaxed opacity-80 whitespace-pre-wrap px-2 py-1">
+									{day.dayMetadata.description}
+								</p>
+							{/if}
 						</div>
 
 						<!-- Actions: saving indicator + Add dropdown -->

@@ -685,6 +685,27 @@ class Activity(models.Model):
         verbose_name = "Activity"
         verbose_name_plural = "Activities"
 
+class CollectionItineraryDay(models.Model):
+    """Metadata for a specific day in a collection's itinerary"""
+    id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, primary_key=True)
+    collection = models.ForeignKey('Collection', on_delete=models.CASCADE, related_name='itinerary_days')
+    date = models.DateField()
+    name = models.CharField(max_length=200, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = [['collection', 'date']]
+        ordering = ['date']
+        verbose_name = "Collection Itinerary Day"
+        verbose_name_plural = "Collection Itinerary Days"
+    
+    def __str__(self):
+        return f"{
+            self.collection.name} - {self.date} - {self.name or 'Unnamed Day'}"
+
+
 class CollectionItineraryItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 

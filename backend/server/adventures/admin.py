@@ -2,7 +2,7 @@ import os
 from django.contrib import admin
 from django.utils.html import mark_safe, format_html
 from django.urls import reverse
-from .models import Location, Checklist, ChecklistItem, Collection, Transportation, Note, ContentImage, Visit, Category, ContentAttachment, Lodging, CollectionInvite, Trail, Activity, CollectionItineraryItem
+from .models import Location, Checklist, ChecklistItem, Collection, Transportation, Note, ContentImage, Visit, Category, ContentAttachment, Lodging, CollectionInvite, Trail, Activity, CollectionItineraryItem, CollectionItineraryDay
 from worldtravel.models import Country, Region, VisitedRegion, City, VisitedCity
 from allauth.account.decorators import secure_admin_login
 
@@ -194,6 +194,7 @@ admin.site.register(CollectionInvite, CollectionInviteAdmin)
 admin.site.register(Trail)
 admin.site.register(Activity, ActivityAdmin)
 admin.site.register(CollectionItineraryItem, CollectionItineraryItemAdmin)
+admin.site.register(CollectionItineraryDay)
 
 admin.site.site_header = 'AdventureLog Admin'
 admin.site.site_title = 'AdventureLog Admin Site'

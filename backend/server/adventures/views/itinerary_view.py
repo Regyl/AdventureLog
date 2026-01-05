@@ -1,9 +1,9 @@
-from adventures.models import Location, Collection, CollectionItineraryItem, Transportation, Note, Lodging, Visit, Checklist, Note
+from adventures.models import Location, Collection, CollectionItineraryItem, Transportation, Note, Lodging, Visit, Checklist, Note, CollectionItineraryDay
 import datetime
 from django.utils.dateparse import parse_date, parse_datetime
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from adventures.serializers import CollectionItineraryItemSerializer
+from adventures.serializers import CollectionItineraryItemSerializer, CollectionItineraryDaySerializer
 from adventures.utils.itinerary import reorder_itinerary_items
 from adventures.utils.autogenerate_itinerary import auto_generate_itinerary
 from rest_framework import viewsets, status
@@ -343,3 +343,57 @@ class ItineraryViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_201_CREATED)
         except ValidationError as e:
             return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ItineraryDayViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing itinerary day metadata (names and descriptions)"""
+    serializer_class = CollectionItineraryDaySerializer
+    permission_classes = [IsOwnerOrSharedWithFullAccess]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        if not user.is_authenticated:
+            return CollectionItineraryDay.objects.none()
+        
+        # Return day metadata from collections the user owns or is shared with
+        return CollectionItineraryDay.objects.filter(
+            Q(collection__user=user) | Q(collection__shared_with=user)
+        ).distinct().select_related('collection', 'collection__user').order_by('date')
+
+    def perform_create(self, serializer):
+        """Ensure the user has permission to modify the collection"""
+        collection = serializer.validated_data.get('collection')
+        
+        if not collection:
+            raise ValidationError("Collection is required")
+        
+        # Check if user has permission to modify this collection
+        if not (collection.user == self.request.user or 
+                collection.shared_with.filter(id=self.request.user.id).exists()):
+            raise PermissionDenied("You do not have permission to modify this collection")
+        
+        serializer.save()
+
+    def perform_update(self, serializer):
+        """Ensure the user has permission to modify the collection"""
+        instance = self.get_object()
+        collection = instance.collection
+        
+        # Check if user has permission to modify this collection
+        if not (collection.user == self.request.user or 
+                collection.shared_with.filter(id=self.request.user.id).exists()):
+            raise PermissionDenied("You do not have permission to modify this collection")
+        
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        """Ensure the user has permission to modify the collection"""
+        collection = instance.collection
+        
+        # Check if user has permission to modify this collection
+        if not (collection.user == self.request.user or 
+                collection.shared_with.filter(id=self.request.user.id).exists()):
+            raise PermissionDenied("You do not have permission to modify this collection")
+        
+        instance.delete()

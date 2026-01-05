@@ -146,6 +146,7 @@ export type Collection = {
 	primary_image?: ContentImage | null;
 	primary_image_id?: string | null;
 	itinerary: CollectionItineraryItem[];
+	itinerary_days: CollectionItineraryDay[]; // Day metadata (names/descriptions)
 	status: 'folder' | 'upcoming' | 'in_progress' | 'completed';
 	days_until_start: number | null;
 };
@@ -552,6 +553,16 @@ export type RecommendationResponse = {
 		osm: number;
 		total_before_dedup: number;
 	};
+};
+
+export type CollectionItineraryDay = {
+	id: string;
+	collection: string; // UUID of the collection
+	date: string; // ISO 8601 date string (YYYY-MM-DD)
+	name: string | null; // Optional custom name for the day
+	description: string | null; // Optional description for the day
+	created_at: string; // ISO 8601 date string
+	updated_at: string; // ISO 8601 date string
 };
 
 export type CollectionItineraryItem = {

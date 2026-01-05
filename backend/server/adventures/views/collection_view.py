@@ -4,9 +4,9 @@ from django.db import transaction
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from adventures.models import Collection, Location, Transportation, Note, Checklist, CollectionInvite, ContentImage, CollectionItineraryItem, Lodging
+from adventures.models import Collection, Location, Transportation, Note, Checklist, CollectionInvite, ContentImage, CollectionItineraryItem, Lodging, CollectionItineraryDay
 from adventures.permissions import CollectionShared
-from adventures.serializers import CollectionSerializer, CollectionInviteSerializer, UltraSlimCollectionSerializer, CollectionItineraryItemSerializer
+from adventures.serializers import CollectionSerializer, CollectionInviteSerializer, UltraSlimCollectionSerializer, CollectionItineraryItemSerializer, CollectionItineraryDaySerializer
 from users.models import CustomUser as User
 from adventures.utils import pagination
 from users.serializers import CustomUserDetailsSerializer as UserSerializer
@@ -216,7 +216,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
     
     def retrieve(self, request, pk=None):
-        """Retrieve a collection and include itinerary items in the response."""
+        """Retrieve a collection and include itinerary items and day metadata in the response."""
         collection = self.get_object()
         serializer = self.get_serializer(collection)
         data = serializer.data
@@ -225,6 +225,11 @@ class CollectionViewSet(viewsets.ModelViewSet):
         itinerary_items = CollectionItineraryItem.objects.filter(collection=collection)
         itinerary_serializer = CollectionItineraryItemSerializer(itinerary_items, many=True)
         data['itinerary'] = itinerary_serializer.data
+        
+        # Include itinerary day metadata
+        itinerary_days = CollectionItineraryDay.objects.filter(collection=collection)
+        days_serializer = CollectionItineraryDaySerializer(itinerary_days, many=True)
+        data['itinerary_days'] = days_serializer.data
 
         return Response(data)
     

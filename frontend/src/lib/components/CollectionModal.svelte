@@ -35,7 +35,8 @@
 		status: collectionToEdit?.status || 'folder',
 		days_until_start: collectionToEdit?.days_until_start ?? null,
 		primary_image: collectionToEdit?.primary_image ?? null,
-		primary_image_id: collectionToEdit?.primary_image_id ?? null
+		primary_image_id: collectionToEdit?.primary_image_id ?? null,
+		itinerary_days: []
 	};
 
 	let availableImages: ContentImage[] = [];
@@ -389,36 +390,6 @@
 					</div>
 				{/if}
 
-				<!-- Share Link Section (only if public and has ID) -->
-				{#if collection.is_public && collection.id}
-					<div class="card bg-base-100 border border-base-300 shadow-lg">
-						<div class="card-body p-6">
-							<h3 class="font-semibold text-lg mb-3">{$t('adventures.share_collection')}</h3>
-							<div class="flex items-center gap-3">
-								<input
-									type="text"
-									value="{window.location.origin}/collections/{collection.id}"
-									readonly
-									class="input input-bordered flex-1 font-mono text-sm"
-								/>
-								<button
-									type="button"
-									on:click={() => {
-										navigator.clipboard.writeText(
-											`${window.location.origin}/collections/${collection.id}`
-										);
-										addToast('success', $t('adventures.link_copied'));
-									}}
-									class="btn btn-primary gap-2"
-								>
-									<LinkIcon class="w-4 h-4" />
-									{$t('adventures.copy_link')}
-								</button>
-							</div>
-						</div>
-					</div>
-				{/if}
-
 				<!-- Cover Image Selection -->
 				<div class="card bg-base-100 border border-base-300 shadow-lg">
 					<div class="card-body p-6 space-y-4">
@@ -492,6 +463,36 @@
 						{/if}
 					</div>
 				</div>
+
+				<!-- Share Link Section (only if public and has ID) -->
+				{#if collection.is_public && collection.id}
+					<div class="card bg-base-100 border border-base-300 shadow-lg">
+						<div class="card-body p-6">
+							<h3 class="font-semibold text-lg mb-3">{$t('adventures.share_collection')}</h3>
+							<div class="flex items-center gap-3">
+								<input
+									type="text"
+									value="{window.location.origin}/collections/{collection.id}"
+									readonly
+									class="input input-bordered flex-1 font-mono text-sm"
+								/>
+								<button
+									type="button"
+									on:click={() => {
+										navigator.clipboard.writeText(
+											`${window.location.origin}/collections/${collection.id}`
+										);
+										addToast('success', $t('adventures.link_copied'));
+									}}
+									class="btn btn-primary gap-2"
+								>
+									<LinkIcon class="w-4 h-4" />
+									{$t('adventures.copy_link')}
+								</button>
+							</div>
+						</div>
+					</div>
+				{/if}
 
 				<!-- Action Buttons -->
 				<div class="flex gap-3 justify-end pt-4">
