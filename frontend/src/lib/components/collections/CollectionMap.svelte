@@ -4,6 +4,8 @@
 	import { goto } from '$app/navigation';
 	import { getActivityColor } from '$lib';
 	import SearchIcon from '~icons/mdi/magnify';
+	import FilterIcon from '~icons/mdi/filter-variant';
+	import ChevronDown from '~icons/mdi/chevron-down';
 	import Plus from '~icons/mdi/plus';
 	import PinIcon from '~icons/mdi/map-marker';
 	import Clear from '~icons/mdi/close';
@@ -556,39 +558,89 @@
 	}
 </script>
 
+<!-- Add to Collection CTA (compact) -->
+<div class="card bg-base-100 shadow-sm mb-3 border border-base-200">
+	<div class="card-body py-3 px-4 gap-2">
+		<div class="flex items-center justify-between gap-3">
+			<div class="flex items-center gap-2 min-w-0">
+				<span
+					class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary"
+				>
+					<Plus class="w-4 h-4" />
+				</span>
+				<div class="min-w-0">
+					<p class="text-sm font-semibold leading-tight truncate">Add to this collection</p>
+					<p class="text-xs text-base-content/60 leading-tight truncate">
+						Click the map to drop a marker, then add it here.
+					</p>
+				</div>
+			</div>
+			<div class="flex items-center gap-2">
+				<button type="button" class="btn btn-primary btn-xs" on:click={openCreateModal}>
+					<Plus class="w-4 h-4" />
+					Add
+				</button>
+				{#if newMarker}
+					<button type="button" class="btn btn-ghost btn-xs" on:click={clearNewMarker}>
+						<Clear class="w-4 h-4" />
+						Clear
+					</button>
+				{/if}
+			</div>
+		</div>
+
+		{#if newMarker}
+			<div
+				class="alert alert-info alert-sm flex flex-col sm:flex-row sm:items-center gap-2 py-2 px-3"
+			>
+				<div class="flex items-center gap-2 text-xs sm:text-sm">
+					<PinIcon class="w-4 h-4" />
+					<span class="truncate">
+						{newLatitude?.toFixed(4)}, {newLongitude?.toFixed(4)}
+					</span>
+				</div>
+				<div class="flex gap-2 sm:ml-auto">
+					<button
+						type="button"
+						class="btn btn-primary btn-xxs sm:btn-xs"
+						on:click={openCreateModal}
+					>
+						<Plus class="w-3 h-3 sm:w-4 sm:h-4" />
+						Add here
+					</button>
+					<button type="button" class="btn btn-ghost btn-xxs sm:btn-xs" on:click={clearNewMarker}>
+						<Clear class="w-3 h-3 sm:w-4 sm:h-4" />
+					</button>
+				</div>
+			</div>
+		{/if}
+	</div>
+</div>
+
 <!-- Filter Header -->
 <div class="card bg-base-100 shadow-lg mb-4">
 	<div class="card-body p-4">
 		<!-- Toggle filter visibility -->
 		<div class="flex items-center justify-between gap-4">
-			<button
-				type="button"
-				class="btn btn-sm btn-ghost gap-2 flex-1 justify-start"
-				on:click={() => (showFilters = !showFilters)}
-			>
-				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-					/>
-				</svg>
-				<span class="font-medium">{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
-				<svg
-					class="w-4 h-4 transition-transform {showFilters ? 'rotate-180' : ''}"
-					fill="none"
-					stroke="currentColor"
-					viewBox="0 0 24 24"
+			<div class="flex items-center gap-2 min-w-0 flex-1">
+				<span
+					class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary shrink-0"
 				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M19 9l-7 7-7-7"
+					<FilterIcon class="w-4 h-4" />
+				</span>
+				<button
+					type="button"
+					class="btn btn-sm btn-ghost justify-between items-center gap-3 flex-1 min-w-0"
+					on:click={() => (showFilters = !showFilters)}
+				>
+					<span class="font-medium leading-tight"
+						>{showFilters ? 'Hide Filters' : 'Show Filters'}</span
+					>
+					<ChevronDown
+						class="w-4 h-4 shrink-0 transition-transform {showFilters ? 'rotate-180' : ''}"
 					/>
-				</svg>
-			</button>
+				</button>
+			</div>
 
 			<div class="flex items-center gap-2">
 				<div class="badge badge-ghost badge-sm">
@@ -781,67 +833,6 @@
 
 				<!-- Show Lines Toggle -->
 			</div>
-		{/if}
-	</div>
-</div>
-
-<!-- Add to Collection CTA (compact) -->
-<div class="card bg-base-100 shadow-sm mb-3 border border-base-200">
-	<div class="card-body py-3 px-4 gap-2">
-		<div class="flex items-center justify-between gap-3">
-			<div class="flex items-center gap-2 min-w-0">
-				<span
-					class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 text-primary"
-				>
-					<Plus class="w-4 h-4" />
-				</span>
-				<div class="min-w-0">
-					<p class="text-sm font-semibold leading-tight truncate">Add to this collection</p>
-					<p class="text-xs text-base-content/60 leading-tight truncate">
-						Click the map to drop a marker, then add it here.
-					</p>
-				</div>
-			</div>
-			<div class="flex items-center gap-2">
-				<button type="button" class="btn btn-primary btn-xs" on:click={openCreateModal}>
-					<Plus class="w-4 h-4" />
-					Add
-				</button>
-				{#if newMarker}
-					<button type="button" class="btn btn-ghost btn-xs" on:click={clearNewMarker}>
-						<Clear class="w-4 h-4" />
-						Clear
-					</button>
-				{/if}
-			</div>
-		</div>
-
-		{#if newMarker}
-			<div
-				class="alert alert-info alert-sm flex flex-col sm:flex-row sm:items-center gap-2 py-2 px-3"
-			>
-				<div class="flex items-center gap-2 text-xs sm:text-sm">
-					<PinIcon class="w-4 h-4" />
-					<span class="truncate">
-						{newLatitude?.toFixed(4)}, {newLongitude?.toFixed(4)}
-					</span>
-				</div>
-				<div class="flex gap-2 sm:ml-auto">
-					<button
-						type="button"
-						class="btn btn-primary btn-xxs sm:btn-xs"
-						on:click={openCreateModal}
-					>
-						<Plus class="w-3 h-3 sm:w-4 sm:h-4" />
-						Add here
-					</button>
-					<button type="button" class="btn btn-ghost btn-xxs sm:btn-xs" on:click={clearNewMarker}>
-						<Clear class="w-3 h-3 sm:w-4 sm:h-4" />
-					</button>
-				</div>
-			</div>
-		{:else}
-			<p class="text-xs text-base-content/60">Tip: click the map to place a marker.</p>
 		{/if}
 	</div>
 </div>

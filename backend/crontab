@@ -1,0 +1,5 @@
+# AdventureLog cron jobs
+# Run sync_visited_regions daily at midnight
+0 0 * * * cd /code && python3 manage.py sync_visited_regions >> /var/log/cron.log 2>&1
+
+# Empty line required at end of cron file
