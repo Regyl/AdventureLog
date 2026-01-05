@@ -404,10 +404,9 @@
 							/>
 						</svg>
 						<div>
-							<div class="font-bold">Changing dates will affect itinerary items</div>
+							<div class="font-bold">{$t('collection.changing_date_title')}</div>
 							<div class="text-sm">
-								Any itinerary items outside the new date range will be removed from the itinerary
-								and placed back into the collection's undated items.
+								{$t('collection.changing_date_warning')}
 							</div>
 						</div>
 					</div>
@@ -435,7 +434,7 @@
 							<div class="alert alert-info shadow-sm">
 								<span>
 									{$t('collection.no_images_available') ??
-										'No images available from linked adventures yet.'}
+										'No images available from linked locations yet.'}
 								</span>
 							</div>
 						{:else}

@@ -2,10 +2,9 @@
 	import type { Collection, ContentImage, Location } from '$lib/types';
 	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
-	import { goto, invalidateAll } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import Lost from '$lib/assets/undraw_lost.svg';
-	import { DefaultMarker, MapLibre, Popup } from 'svelte-maplibre';
 	import { t } from 'svelte-i18n';
 	import { marked } from 'marked';
 	import DOMPurify from 'dompurify';
@@ -14,7 +13,7 @@
 	import Calendar from '~icons/mdi/calendar';
 	import CalendarComponent from '$lib/components/calendar/Calendar.svelte';
 	import EventDetailsModal from '$lib/components/calendar/EventDetailsModal.svelte';
-	import { formatDateInTimezone, formatAllDayDate } from '$lib/dateUtils';
+	import { formatAllDayDate } from '$lib/dateUtils';
 	import { isAllDay } from '$lib';
 	import ImageDisplayModal from '$lib/components/ImageDisplayModal.svelte';
 	import CollectionAllItems from '$lib/components/collections/CollectionAllItems.svelte';
@@ -211,10 +210,11 @@
 		}>;
 	};
 
-	const costCategoryLabels: Record<CostCategory, string> = {
-		lodging: 'Lodging',
-		transportation: 'Transportation',
-		location: 'Locations'
+	// Localized category labels - computed reactively from i18n
+	$: costCategoryLabels = {
+		lodging: $t('adventures.lodging') || 'Lodging',
+		transportation: $t('adventures.transportation') || 'Transportation',
+		location: $t('locations.locations') || 'Locations'
 	};
 
 	let preferredCurrency: string = DEFAULT_CURRENCY;
@@ -225,7 +225,7 @@
 
 	$: preferredCurrency = (data.user as any)?.default_currency || DEFAULT_CURRENCY;
 	$: costEntries = buildCostEntries(collection, preferredCurrency);
-	$: costSummary = summarizeCostEntries(costEntries, numberLocale);
+	$: costSummary = summarizeCostEntries(costEntries, numberLocale, costCategoryLabels);
 	$: pricedItemCount = costEntries.length;
 	$: currencyCount = costSummary.length;
 
@@ -478,7 +478,11 @@
 		return entries;
 	}
 
-	function summarizeCostEntries(entries: CostEntry[], locale: string): CurrencyBreakdown[] {
+	function summarizeCostEntries(
+		entries: CostEntry[],
+		locale: string,
+		labels: Record<CostCategory, string>
+	): CurrencyBreakdown[] {
 		const currencyBuckets: Record<
 			string,
 			{ total: number; categories: Record<CostCategory, { total: number; count: number }> }
@@ -510,7 +514,7 @@
 					const category = categoryKey as CostCategory;
 					return {
 						category,
-						label: costCategoryLabels[category],
+						label: labels[category],
 						total: info.total,
 						count: info.count,
 						formattedTotal: format(info.total, currency)
@@ -660,7 +664,6 @@
 			<div class="max-w-md">
 				<img src={Lost} alt="Lost" class="w-64 mx-auto mb-8 opacity-80" />
 				<h1 class="text-5xl font-bold text-primary mb-4">{$t('collections.not_found')}</h1>
-				<p class="text-lg opacity-70 mb-8">{$t('collections.not_found_desc')}</p>
 				<button class="btn btn-primary btn-lg" on:click={() => goto('/')}>
 					{$t('adventures.homepage')}
 				</button>
@@ -870,7 +873,9 @@
 						{#if collection.locations && collection.locations.length > 0}
 							<div class="badge badge-lg badge-primary font-semibold px-4 py-3">
 								📍 {collection.locations.length}
-								{collection.locations.length === 1 ? 'Location' : 'Locations'}
+								{collection.locations.length === 1
+									? $t('locations.location')
+									: $t('locations.locations')}
 							</div>
 						{/if}
 						{#if collection.start_date || collection.end_date}
@@ -886,7 +891,9 @@
 							</div>
 						{/if}
 						{#if collection.is_archived}
-							<div class="badge badge-lg badge-neutral font-semibold px-4 py-3">📦 Archived</div>
+							<div class="badge badge-lg badge-neutral font-semibold px-4 py-3">
+								📦 {$t('adventures.archived')}
+							</div>
 						{/if}
 					</div>
 
@@ -953,7 +960,7 @@
 						on:click={() => switchView('all')}
 					>
 						<FormatListBulleted class="w-5 h-5 sm:mr-2" aria-hidden="true" />
-						<span class="hidden sm:inline">All Items</span>
+						<span class="hidden sm:inline">{$t('collections.all_items')}</span>
 					</button>
 				{/if}
 				{#if availableViews.itinerary}
@@ -963,7 +970,7 @@
 						on:click={() => switchView('itinerary')}
 					>
 						<Timeline class="w-5 h-5 sm:mr-2" aria-hidden="true" />
-						<span class="hidden sm:inline">Itinerary</span>
+						<span class="hidden sm:inline">{$t('adventures.itinerary')}</span>
 					</button>
 				{/if}
 				{#if availableViews.map}
@@ -973,7 +980,7 @@
 						on:click={() => switchView('map')}
 					>
 						<Map class="w-5 h-5 sm:mr-2" aria-hidden="true" />
-						<span class="hidden sm:inline">Map</span>
+						<span class="hidden sm:inline">{$t('navbar.map')}</span>
 					</button>
 				{/if}
 				{#if availableViews.calendar}
@@ -983,7 +990,7 @@
 						on:click={() => switchView('calendar')}
 					>
 						<Calendar class="w-5 h-5 sm:mr-2" aria-hidden="true" />
-						<span class="hidden sm:inline">Calendar</span>
+						<span class="hidden sm:inline">{$t('navbar.calendar')}</span>
 					</button>
 				{/if}
 				{#if availableViews.recommendations}
@@ -993,7 +1000,7 @@
 						on:click={() => switchView('recommendations')}
 					>
 						<Lightbulb class="w-5 h-5 sm:mr-2" aria-hidden="true" />
-						<span class="hidden sm:inline">Recommendations</span>
+						<span class="hidden sm:inline">{$t('recomendations.recommendations')}</span>
 					</button>
 				{/if}
 			</div>
@@ -1037,7 +1044,7 @@
 				{#if currentView === 'map'}
 					<div class="card bg-base-200 shadow-xl">
 						<div class="card-body">
-							<h2 class="card-title text-2xl mb-4">🗺️ Map</h2>
+							<h2 class="card-title text-2xl mb-4">🗺️ {$t('navbar.map')}</h2>
 							<div class="rounded-lg overflow-hidden shadow-lg">
 								<CollectionMap bind:collection user={data.user} />
 							</div>
@@ -1050,40 +1057,45 @@
 					{#if collectionEvents.length === 0}
 						<div class="card bg-base-200 shadow-xl">
 							<div class="card-body">
-								<h2 class="card-title text-2xl mb-4">📆 Calendar</h2>
-								<p class="text-base-content/70">No visits are scheduled for this collection yet.</p>
+								<h2 class="card-title text-2xl mb-4">📆 {$t('navbar.calendar')}</h2>
+								<p class="text-base-content/70">{$t('collections.no_calendar_events')}</p>
 							</div>
 						</div>
 					{:else}
 						<div class="card bg-base-200 shadow-xl">
 							<div class="card-body space-y-4">
-								<h2 class="card-title text-2xl flex items-center gap-2">📆 Calendar</h2>
+								<h2 class="card-title text-2xl flex items-center gap-2">
+									📆 {$t('navbar.calendar')}
+								</h2>
 								<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 									<div class="flex items-center gap-2 text-sm text-base-content/80">
-										<span class="badge badge-ghost">{collectionEvents.length} events</span>
+										<span class="badge badge-ghost"
+											>{collectionEvents.length} {$t('collections.events')}</span
+										>
 									</div>
 									<div class="flex items-center gap-2">
-										<span class="text-xs opacity-70">Times shown in</span>
+										<span class="text-xs opacity-70">{$t('collections.times_shown_in')}</span>
 										<div class="join">
 											<button
 												class="btn btn-xs sm:btn-sm join-item"
 												class:btn-active={timezoneMode === 'event'}
 												on:click={() => (timezoneMode = 'event')}
 											>
-												Event timezone
+												{$t('collections.event_timezone')}
 											</button>
 											<button
 												class="btn btn-xs sm:btn-sm join-item"
 												class:btn-active={timezoneMode === 'local'}
 												on:click={() => (timezoneMode = 'local')}
 											>
-												My timezone
+												{$t('collections.local_timezone')}
 											</button>
 										</div>
 									</div>
 								</div>
 								<p class="text-xs text-base-content/70">
-									Event timezone uses the location or item timezone when available. My timezone uses {userTimezone}.
+									{$t('collections.event_timezone_desc')}
+									{userTimezone}.
 								</p>
 								<CalendarComponent
 									events={collectionEvents}
@@ -1114,7 +1126,7 @@
 					{@const progressPercent = totalCount > 0 ? (visitedCount / totalCount) * 100 : 0}
 					<div class="card bg-base-200 shadow-xl">
 						<div class="card-body">
-							<h3 class="card-title text-lg mb-4">✅ Progress</h3>
+							<h3 class="card-title text-lg mb-4">✅ {$t('worldtravel.progress')}</h3>
 							<div class="space-y-4">
 								<div class="flex justify-between text-sm">
 									<span class="opacity-70">Visited</span>
@@ -1135,17 +1147,17 @@
 								{/if}
 								<div class="grid grid-cols-2 gap-2 pt-2">
 									<div class="stat bg-base-300 rounded-lg p-3">
-										<div class="stat-title text-xs">Visited</div>
+										<div class="stat-title text-xs">{$t('adventures.visited')}</div>
 										<div class="stat-value text-lg text-success">{visitedCount}</div>
 									</div>
 									<div class="stat bg-base-300 rounded-lg p-3">
-										<div class="stat-title text-xs">Planned</div>
+										<div class="stat-title text-xs">{$t('adventures.planned')}</div>
 										<div class="stat-value text-lg text-warning">{totalCount - visitedCount}</div>
 									</div>
 								</div>
 								{#if visitedCount === totalCount && totalCount > 0}
 									<div class="alert alert-success text-sm py-2">
-										<span>🎉 All locations visited!</span>
+										<span>🎉 {$t('worldtravel.all_locations_visited')}</span>
 									</div>
 								{/if}
 							</div>
@@ -1160,7 +1172,7 @@
 						<div class="space-y-3">
 							{#if collection.start_date || collection.end_date}
 								<div>
-									<div class="text-sm opacity-70 mb-1">Dates</div>
+									<div class="text-sm opacity-70 mb-1">{$t('adventures.dates')}</div>
 									<div class="text-sm">
 										{#if collection.start_date && collection.end_date}
 											{formatDate(collection.start_date)} - {formatDate(collection.end_date)}
@@ -1188,7 +1200,7 @@
 							{/if}
 							{#if collection.shared_with && collection.shared_with.length > 0}
 								<div>
-									<div class="text-sm opacity-70 mb-1">Shared With</div>
+									<div class="text-sm opacity-70 mb-1">{$t('share.shared_with')}</div>
 									<div class="flex flex-wrap gap-1">
 										{#each collection.shared_with as username}
 											<span class="badge badge-sm badge-outline">{username}</span>
@@ -1204,18 +1216,18 @@
 				<div class="card bg-base-200 shadow-xl">
 					<div class="card-body space-y-4">
 						<div class="flex items-center justify-between">
-							<h3 class="card-title text-lg">💰 Trip Costs</h3>
+							<h3 class="card-title text-lg">💰 {$t('collections.trip_costs')}</h3>
 							{#if currencyCount > 0}
 								<span class="badge badge-primary badge-sm">
 									{currencyCount}
-									{currencyCount === 1 ? 'currency' : 'currencies'}
+									{currencyCount === 1 ? $t('collections.currency') : $t('collections.currencies')}
 								</span>
 							{/if}
 						</div>
 
 						{#if pricedItemCount === 0}
 							<p class="text-sm opacity-70">
-								Add prices to locations, lodging, or transportation to see trip totals by currency.
+								{$t('collections.no_priced_items')}
 							</p>
 						{:else}
 							<div class="space-y-3">
@@ -1224,7 +1236,7 @@
 										<div class="flex items-center justify-between">
 											<div class="flex items-center gap-2">
 												<span class="badge badge-outline badge-sm">{summary.currency}</span>
-												<span class="text-xs opacity-70">Total</span>
+												<span class="text-xs opacity-70">{$t('adventures.total')}</span>
 											</div>
 											<span class="text-lg font-bold">{summary.formattedTotal}</span>
 										</div>
@@ -1246,35 +1258,35 @@
 				<!-- Collection Stats Card -->
 				<div class="card bg-base-200 shadow-xl">
 					<div class="card-body">
-						<h3 class="card-title text-lg mb-4">📊 Statistics</h3>
+						<h3 class="card-title text-lg mb-4">📊 {$t('collections.statistics')}</h3>
 						<div class="stats stats-vertical shadow">
 							{#if collection.locations}
 								<div class="stat">
-									<div class="stat-title">Locations</div>
+									<div class="stat-title">{$t('locations.locations')}</div>
 									<div class="stat-value text-2xl">{collection.locations.length}</div>
 								</div>
 							{/if}
 							{#if collection.transportations}
 								<div class="stat">
-									<div class="stat-title">Transportations</div>
+									<div class="stat-title">{$t('adventures.transportations')}</div>
 									<div class="stat-value text-2xl">{collection.transportations.length}</div>
 								</div>
 							{/if}
 							{#if collection.lodging}
 								<div class="stat">
-									<div class="stat-title">Lodging</div>
+									<div class="stat-title">{$t('adventures.lodging')}</div>
 									<div class="stat-value text-2xl">{collection.lodging.length}</div>
 								</div>
 							{/if}
 							{#if collection.notes}
 								<div class="stat">
-									<div class="stat-title">Notes</div>
+									<div class="stat-title">{$t('adventures.notes')}</div>
 									<div class="stat-value text-2xl">{collection.notes.length}</div>
 								</div>
 							{/if}
 							{#if collection.checklists}
 								<div class="stat">
-									<div class="stat-title">Checklists</div>
+									<div class="stat-title">{$t('adventures.checklists')}</div>
 									<div class="stat-value text-2xl">{collection.checklists.length}</div>
 								</div>
 							{/if}

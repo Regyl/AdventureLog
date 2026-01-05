@@ -2,11 +2,52 @@ from typing import List
 from datetime import date, timedelta
 from django.db import transaction
 from django.contrib.contenttypes.models import ContentType
+from django.utils import timezone
+from pytz import timezone as pytz_timezone
 from adventures.models import Collection, CollectionItineraryItem, Visit, Lodging, Transportation, Note, Checklist
 from rest_framework.exceptions import ValidationError
 
 
-@transaction.atomic
+def _datetime_to_date_in_timezone(dt, timezone_str: str | None) -> date:
+    """
+    Convert a datetime to a date, accounting for timezone only if there's actual time information.
+    
+    If the datetime is at UTC midnight (00:00:00), treat it as a date-only value and don't convert.
+    If the datetime has a time component, apply timezone conversion.
+    
+    Args:
+        dt: datetime object (can be timezone-aware or naive)
+        timezone_str: IANA timezone string (e.g., 'America/New_York')
+        
+    Returns:
+        date: The date in the specified timezone (or UTC if date-only)
+    """
+    if dt is None:
+        return None
+    
+    # If it's already a date, return it
+    if isinstance(dt, date) and not hasattr(dt, 'time'):
+        return dt
+    
+    # Check if this is a date-only value (stored as UTC midnight)
+    # If time is 00:00:00, treat it as date-only and don't apply timezone conversion
+    if hasattr(dt, 'hour') and dt.hour == 0 and dt.minute == 0 and dt.second == 0:
+        return dt.date() if hasattr(dt, 'date') else dt
+    
+    # Ensure datetime is timezone-aware (assume UTC if naive)
+    if hasattr(dt, 'tzinfo') and dt.tzinfo is None:
+        dt = timezone.make_aware(dt, timezone.utc)
+    
+    # Convert to target timezone if provided, otherwise use UTC
+    if timezone_str:
+        try:
+            target_tz = pytz_timezone(timezone_str)
+            dt = dt.astimezone(target_tz)
+        except Exception:
+            # If timezone conversion fails, use UTC
+            pass
+    
+    return dt.date() if hasattr(dt, 'date') else dt
 def auto_generate_itinerary(collection: Collection) -> List[CollectionItineraryItem]:
     """
     Auto-generate itinerary items for a collection based on dated records.
@@ -67,8 +108,9 @@ def auto_generate_itinerary(collection: Collection) -> List[CollectionItineraryI
     visits = Visit.objects.filter(location__collections=collection).select_related('location').distinct()
     for visit in visits:
         if visit.start_date and visit.location:
-            visit_start = visit.start_date.date() if hasattr(visit.start_date, 'date') else visit.start_date
-            visit_end = visit.end_date.date() if visit.end_date and hasattr(visit.end_date, 'date') else visit_start
+            # Convert to date using visit's timezone
+            visit_start = _datetime_to_date_in_timezone(visit.start_date, visit.timezone)
+            visit_end = _datetime_to_date_in_timezone(visit.end_date, visit.timezone) if visit.end_date else visit_start
             
             # Only include dates within collection range
             visit_start = max(visit_start, start_date)
@@ -89,7 +131,8 @@ def auto_generate_itinerary(collection: Collection) -> List[CollectionItineraryI
     lodgings = Lodging.objects.filter(collection=collection)
     for lodging in lodgings:
         if lodging.check_in:
-            checkin_date = lodging.check_in.date() if hasattr(lodging.check_in, 'date') else lodging.check_in
+            # Convert to date using lodging's timezone
+            checkin_date = _datetime_to_date_in_timezone(lodging.check_in, lodging.timezone)
             
             # Only include if within collection range
             if start_date <= checkin_date <= end_date:
@@ -105,7 +148,8 @@ def auto_generate_itinerary(collection: Collection) -> List[CollectionItineraryI
     transportations = Transportation.objects.filter(collection=collection)
     for transportation in transportations:
         if transportation.date:
-            trans_date = transportation.date.date() if hasattr(transportation.date, 'date') else transportation.date
+            # Convert to date using transportation's start timezone
+            trans_date = _datetime_to_date_in_timezone(transportation.date, transportation.start_timezone)
             
             # Only include if within collection range
             if start_date <= trans_date <= end_date:
@@ -121,7 +165,8 @@ def auto_generate_itinerary(collection: Collection) -> List[CollectionItineraryI
     notes = Note.objects.filter(collection=collection)
     for note in notes:
         if note.date:
-            note_date = note.date.date() if hasattr(note.date, 'date') else note.date
+            # Notes don't have timezone field, use UTC
+            note_date = _datetime_to_date_in_timezone(note.date, None)
             
             # Only include if within collection range
             if start_date <= note_date <= end_date:
@@ -137,7 +182,8 @@ def auto_generate_itinerary(collection: Collection) -> List[CollectionItineraryI
     checklists = Checklist.objects.filter(collection=collection)
     for checklist in checklists:
         if checklist.date:
-            checklist_date = checklist.date.date() if hasattr(checklist.date, 'date') else checklist.date
+            # Checklists don't have timezone field, use UTC
+            checklist_date = _datetime_to_date_in_timezone(checklist.date, None)
             
             # Only include if within collection range
             if start_date <= checklist_date <= end_date:

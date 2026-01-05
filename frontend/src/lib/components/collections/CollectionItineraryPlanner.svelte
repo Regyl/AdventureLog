@@ -16,6 +16,7 @@
 	import { flip } from 'svelte/animate';
 	import CalendarBlank from '~icons/mdi/calendar-blank';
 	import Bed from '~icons/mdi/bed';
+	import Info from '~icons/mdi/information';
 	import LocationCard from '$lib/components/cards/LocationCard.svelte';
 	import TransportationCard from '$lib/components/cards/TransportationCard.svelte';
 	import LodgingCard from '$lib/components/cards/LodgingCard.svelte';
@@ -829,7 +830,7 @@
 									location: objectId,
 									start_date: `${dateISO}T00:00:00`,
 									end_date: `${dateISO}T23:59:59`,
-									notes: 'Created from itinerary planning',
+									notes: $t('itinerary.visit_created_via_itinerary'),
 									created_at: new Date().toISOString(),
 									updated_at: new Date().toISOString(),
 									images: [],
@@ -1088,7 +1089,7 @@
 	<ItineraryDayPickModal
 		isOpen={isDayPickModalOpen}
 		{days}
-		itemName={dayPickItemToAdd?.item?.name || 'Item'}
+		itemName={dayPickItemToAdd?.item?.name || `${$t('checklist.item')}`}
 		on:daySelected={handleDaySelected}
 		on:close={() => {
 			isDayPickModalOpen = false;
@@ -1100,26 +1101,13 @@
 {#if canAutoGenerate}
 	<div class="alert alert-info shadow-lg mb-6">
 		<div class="flex-1 flex items-center gap-3 min-w-0">
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				fill="none"
-				viewBox="0 0 24 24"
-				class="w-6 h-6 stroke-current flex-shrink-0"
-			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					stroke-width="2"
-					d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-				></path>
-			</svg>
+			<Info class="w-6 h-6 stroke-current flex-shrink-0" />
 			<div class="min-w-0">
 				<div class="flex items-baseline gap-3">
-					<h3 class="font-bold truncate">Auto-Generate Itinerary</h3>
+					<h3 class="font-bold truncate">{$t('itinerary.auto_generate_itinerary')}</h3>
 				</div>
 				<div class="text-sm opacity-90 truncate">
-					This collection has dated items but no itinerary yet. Would you like to automatically
-					organize them by date?
+					{$t('itinerary.auto_generate_itinerary_desc')}
 				</div>
 			</div>
 		</div>
@@ -1131,9 +1119,9 @@
 			>
 				{#if isAutoGenerating}
 					<span class="loading loading-spinner loading-sm"></span>
-					Generating...
+					{$t('itinerary.generating')}...
 				{:else}
-					Auto-Generate
+					{$t('itinerary.auto_generate')}
 				{/if}
 			</button>
 		</div>
@@ -1144,8 +1132,8 @@
 	<div class="card bg-base-200 shadow-xl">
 		<div class="card-body text-center py-12">
 			<CalendarBlank class="w-16 h-16 mx-auto mb-4 opacity-50" />
-			<h3 class="text-2xl font-bold mb-2">No Itinerary Yet</h3>
-			<p class="opacity-70">Start planning your trip by adding items to specific days.</p>
+			<h3 class="text-2xl font-bold mb-2">{$t('itinerary.no_itinerary_yet')}</h3>
+			<p class="opacity-70">{$t('itinerary.start_planning')}</p>
 		</div>
 	</div>
 {:else}
@@ -1203,7 +1191,7 @@
 												if (input) input.focus();
 											}}
 										>
-											+ name
+											+ `{$t('adventures.name')}`
 										</button>
 										<input
 											type="text"
@@ -1233,11 +1221,18 @@
 
 							<!-- Day meta info -->
 							<div class="text-sm opacity-70 flex items-center gap-3">
-								<span class="font-medium">Day {dayNumber} of {totalDays}</span>
+								<span class="font-medium"
+									>{$t('calendar.day')} {dayNumber} {$t('worldtravel.of')} {totalDays}</span
+								>
 								<span class="opacity-50">•</span>
-								<span>{day.items.length} {day.items.length === 1 ? 'item' : 'items'}</span>
+								<span
+									>{day.items.length}
+									{day.items.length === 1 ? $t('checklist.item') : $t('checklist.items')}</span
+								>
 								{#if day.overnightLodging.length > 0}
-									<span class="badge badge-info badge-outline badge-sm">Overnight</span>
+									<span class="badge badge-info badge-outline badge-sm"
+										>{$t('adventures.overnight')}</span
+									>
 								{/if}
 							</div>
 
@@ -1271,7 +1266,7 @@
 								<div>
 									<div class="badge badge-neutral-300 gap-2 p-2">
 										<span class="loading loading-spinner loading-sm"></span>
-										Saving...
+										{$t('adventures.saving')}...
 									</div>
 								</div>
 							{/if}
@@ -1301,10 +1296,10 @@
 													isItineraryLinkModalOpen = true;
 												}}
 											>
-												Link existing item
+												{$t('itinerary.link_existing_item')}
 											</button>
 										</li>
-										<li class="menu-title">Create new</li>
+										<li class="menu-title">{$t('adventures.create_new')}</li>
 										<li>
 											<button
 												type="button"
@@ -1317,7 +1312,7 @@
 													isLocationModalOpen = true;
 												}}
 											>
-												Location
+												{$t('locations.location')}
 											</button>
 										</li>
 										<li>
@@ -1332,7 +1327,7 @@
 													isLodgingModalOpen = true;
 												}}
 											>
-												Lodging
+												{$t('adventures.lodging')}
 											</button>
 										</li>
 										<li>
@@ -1345,7 +1340,7 @@
 													isTransportationModalOpen = true;
 												}}
 											>
-												Transportation
+												{$t('adventures.transportation')}
 											</button>
 										</li>
 										<li>
@@ -1358,7 +1353,7 @@
 													isNoteModalOpen = true;
 												}}
 											>
-												Note
+												{$t('adventures.note')}
 											</button>
 										</li>
 										<li>
@@ -1371,7 +1366,7 @@
 													isChecklistModalOpen = true;
 												}}
 											>
-												Checklist
+												{$t('adventures.checklist')}
 											</button>
 										</li>
 									</ul>
@@ -1388,7 +1383,7 @@
 							>
 								<div class="card-body p-2">
 									<CalendarBlank class="w-8 h-8 mx-auto mb-2 opacity-40" />
-									<p class="opacity-70">No plans for this day</p>
+									<p class="opacity-70">{$t('itinerary.no_plans_for_day')}</p>
 								</div>
 							</div>
 						{:else}
@@ -1475,7 +1470,7 @@
 																d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
 															/>
 														</svg>
-														Multi-day
+														<span class="text-xs">{$t('itinerary.multi_day')}</span>
 													</div>
 												</div>
 											{/if}
@@ -1541,7 +1536,7 @@
 										{:else}
 											<!-- Fallback for unresolved items -->
 											<div class="alert alert-warning">
-												<span>⚠️ Item not found (ID: {item.object_id})</span>
+												<span>⚠️ {$t('itinerary.item_not_found')} (ID: {item.object_id})</span>
 											</div>
 										{/if}
 									</div>
@@ -1555,7 +1550,7 @@
 						<div class="mt-4 pt-4 border-t border-base-300 border-dashed">
 							<div class="flex items-center gap-2 mb-2 opacity-70">
 								<Bed class="w-4 h-4" />
-								<span class="text-sm font-medium">Staying overnight</span>
+								<span class="text-sm font-medium">{$t('itinerary.staying_overnight')}</span>
 							</div>
 							<div class="space-y-2">
 								{#each day.overnightLodging as lodging}
@@ -1583,7 +1578,7 @@
 										</div>
 										{#if checkOut}
 											<div class="badge badge-ghost badge-sm">
-												Check-out: {checkOut}
+												{$t('adventures.check_out')}: {checkOut}
 											</div>
 										{/if}
 									</div>
@@ -1602,15 +1597,15 @@
 					<!-- Unscheduled Header -->
 					<div class="flex items-center gap-3 mb-4 pb-4 border-b border-base-300">
 						<div class="w-6 h-6 rounded-full border-2 border-dashed border-base-content/30"></div>
-						<h3 class="text-xl font-bold opacity-70">Unscheduled Items</h3>
+						<h3 class="text-xl font-bold opacity-70">{$t('itinerary.unscheduled_items')}</h3>
 						<div class="badge badge-ghost ml-auto">
 							{unscheduledItems.length}
-							{unscheduledItems.length === 1 ? 'item' : 'items'}
+							{unscheduledItems.length === 1 ? $t('checklist.item') : $t('checklist.items')}
 						</div>
 					</div>
 
 					<p class="text-sm opacity-70 mb-4">
-						These items are linked to this trip but haven't been added to a specific day yet.
+						{$t('itinerary.unscheduled_items_desc')}
 					</p>
 
 					<!-- Unscheduled Items List -->
