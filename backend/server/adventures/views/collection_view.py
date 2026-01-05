@@ -531,6 +531,58 @@ class CollectionViewSet(viewsets.ModelViewSet):
         # This is ok because you cannot share a collection when creating it
         serializer.save(user=self.request.user)
     
+    def _cleanup_out_of_range_itinerary_items(self, collection):
+        """Delete itinerary items and day metadata outside the collection's date range."""
+        if not collection.start_date or not collection.end_date:
+            # If no date range is set, don't delete anything
+            return
+        
+        # Delete itinerary items outside the date range
+        deleted_items = CollectionItineraryItem.objects.filter(
+            collection=collection
+        ).exclude(
+            date__range=[collection.start_date, collection.end_date]
+        ).delete()
+        
+        # Delete day metadata outside the date range
+        deleted_days = CollectionItineraryDay.objects.filter(
+            collection=collection
+        ).exclude(
+            date__range=[collection.start_date, collection.end_date]
+        ).delete()
+        
+        return deleted_items, deleted_days
+    
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        """Override update to clean up out-of-range itinerary items when dates change."""
+        instance = self.get_object()
+        old_start_date = instance.start_date
+        old_end_date = instance.end_date
+        
+        # Perform the standard update
+        partial = kwargs.pop('partial', False)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        # Check if dates changed
+        new_start_date = serializer.instance.start_date
+        new_end_date = serializer.instance.end_date
+        
+        dates_changed = (old_start_date != new_start_date or old_end_date != new_end_date)
+        
+        # Clean up out-of-range items if dates changed
+        if dates_changed:
+            self._cleanup_out_of_range_itinerary_items(serializer.instance)
+        
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+        
+        return Response(serializer.data)
+    
     def paginate_and_respond(self, queryset, request):
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(queryset, request)
