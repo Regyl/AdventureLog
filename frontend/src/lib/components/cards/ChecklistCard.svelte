@@ -14,6 +14,7 @@
 	import CheckCircle from '~icons/mdi/check-circle';
 	import CheckboxBlankCircleOutline from '~icons/mdi/checkbox-blank-circle-outline';
 	import CalendarRemove from '~icons/mdi/calendar-remove';
+	import Close from '~icons/mdi/close';
 	import type { CollectionItineraryItem } from '$lib/types';
 
 	export let checklist: Checklist;
@@ -30,6 +31,18 @@
 		!readOnly &&
 		(checklist.user == user?.uuid ||
 			(collection && user && collection.shared_with?.includes(user.uuid)));
+
+	const normalizeDateForApi = (date: string | Date | null | undefined): string | null => {
+		if (!date) return null;
+		if (date instanceof Date && !isNaN(date.getTime())) {
+			return date.toISOString().slice(0, 10);
+		}
+		if (typeof date === 'string') {
+			const match = date.match(/^\d{4}-\d{2}-\d{2}/);
+			return match ? match[0] : null;
+		}
+		return null;
+	};
 
 	function editChecklist() {
 		dispatch('edit', checklist);
@@ -68,6 +81,7 @@
 		const updatedItems = checklist.items.map((item) =>
 			item.id === itemId ? { ...item, is_checked: !item.is_checked } : item
 		);
+		const dateForApi = normalizeDateForApi(checklist.date);
 
 		updatingItemId = itemId;
 		checklist = { ...checklist, items: updatedItems };
@@ -80,7 +94,7 @@
 				},
 				body: JSON.stringify({
 					name: checklist.name,
-					date: checklist.date || null,
+					date: dateForApi,
 					items: updatedItems,
 					collection: checklist.collection,
 					is_public: checklist.is_public
@@ -121,46 +135,83 @@
 {#if isDetailsOpen}
 	<dialog class="modal modal-open" open>
 		<div class="modal-box max-w-3xl space-y-4">
-			<div class="flex items-center gap-2">
-				<h3 class="text-xl font-semibold leading-tight">{checklist.name}</h3>
-				<div class="badge badge-primary badge-sm">{$t('adventures.checklist')}</div>
-			</div>
-
-			<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70">
-				{#if checklist.date && checklist.date !== ''}
+			<div class="flex items-start justify-between gap-3">
+				<div class="space-y-2">
 					<div class="flex items-center gap-2">
-						<Calendar class="w-4 h-4 text-primary" />
-						<span
-							>{new Date(checklist.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span
-						>
+						<h3 class="text-xl font-semibold leading-tight">{checklist.name}</h3>
+						<div class="badge badge-primary badge-sm">{$t('adventures.checklist')}</div>
 					</div>
-				{/if}
-				{#if checklist.items.length > 0}
-					{@const completedCount = checklist.items.filter((item) => item.is_checked).length}
-					<div class="badge badge-ghost badge-sm">
-						{completedCount}/{checklist.items.length}
-						{$t('checklist.completed')}
+
+					<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70">
+						{#if checklist.date && checklist.date !== ''}
+							<div class="flex items-center gap-2">
+								<Calendar class="w-4 h-4 text-primary" />
+								<span>
+									{new Date(checklist.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}
+								</span>
+							</div>
+						{/if}
+						{#if checklist.items.length > 0}
+							{@const completedCount = checklist.items.filter((item) => item.is_checked).length}
+							<div class="badge badge-ghost badge-sm">
+								{completedCount}/{checklist.items.length}
+								{$t('checklist.completed')}
+							</div>
+						{/if}
 					</div>
-				{/if}
+				</div>
+				<button
+					type="button"
+					class="btn btn-circle btn-ghost btn-sm"
+					on:click={() => (isDetailsOpen = false)}
+					aria-label={$t('about.close')}
+				>
+					<Close class="w-4 h-4" />
+				</button>
 			</div>
 
 			{#if checklist.items.length > 0}
 				<div class="space-y-2 max-h-96 overflow-y-auto pr-1">
 					{#each checklist.items as item}
-						<div class="flex items-center gap-3 rounded-lg bg-base-200/60 p-2">
-							{#if item.is_checked}
-								<CheckCircle class="w-5 h-5 text-success flex-shrink-0" />
-							{:else}
-								<CheckboxBlankCircleOutline class="w-5 h-5 flex-shrink-0" />
-							{/if}
-							<span
-								class="flex-1 text-sm"
-								class:line-through={item.is_checked}
-								class:opacity-60={item.is_checked}
+						{#if canEdit}
+							<button
+								type="button"
+								on:click={() => toggleItemStatus(item.id)}
+								disabled={updatingItemId === item.id}
+								class="flex w-full items-center gap-3 rounded-lg bg-base-200/60 p-2 text-left transition-colors hover:bg-base-200 disabled:opacity-70"
 							>
-								{item.name}
-							</span>
-						</div>
+								{#if updatingItemId === item.id}
+									<span class="loading loading-spinner loading-xs text-primary flex-shrink-0"
+									></span>
+								{:else if item.is_checked}
+									<CheckCircle class="w-5 h-5 text-success flex-shrink-0" />
+								{:else}
+									<CheckboxBlankCircleOutline class="w-5 h-5 flex-shrink-0" />
+								{/if}
+								<span
+									class="flex-1 text-sm"
+									class:line-through={item.is_checked}
+									class:opacity-60={item.is_checked}
+								>
+									{item.name}
+								</span>
+							</button>
+						{:else}
+							<div class="flex items-center gap-3 rounded-lg bg-base-200/60 p-2">
+								{#if item.is_checked}
+									<CheckCircle class="w-5 h-5 text-success flex-shrink-0" />
+								{:else}
+									<CheckboxBlankCircleOutline class="w-5 h-5 flex-shrink-0" />
+								{/if}
+								<span
+									class="flex-1 text-sm"
+									class:line-through={item.is_checked}
+									class:opacity-60={item.is_checked}
+								>
+									{item.name}
+								</span>
+							</div>
+						{/if}
 					{/each}
 				</div>
 			{:else}
@@ -190,53 +241,56 @@
 				</div>
 			</div>
 
-			{#if canEdit}
-				<details class="dropdown dropdown-end relative z-50">
-					<summary class="btn btn-square btn-sm p-1 text-base-content">
-						<DotsHorizontal class="w-5 h-5" />
-					</summary>
-					<ul
-						class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow-lg border border-base-300"
-					>
-						<li>
-							<button on:click={editChecklist} class="flex items-center gap-2">
-								<FileDocumentEdit class="w-4 h-4" />
-								{$t('notes.open')}
-							</button>
-						</li>
-						{#if itineraryItem && itineraryItem.id}
+			<div class="flex items-center gap-2">
+				<button
+					class="btn btn-square btn-sm p-1 text-base-content"
+					on:click={() => (isDetailsOpen = true)}
+					aria-label={$t('adventures.view')}
+					type="button"
+				>
+					<Launch class="w-5 h-5" />
+				</button>
+
+				{#if canEdit}
+					<details class="dropdown dropdown-end relative z-50">
+						<summary class="btn btn-square btn-sm p-1 text-base-content">
+							<DotsHorizontal class="w-5 h-5" />
+						</summary>
+						<ul
+							class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow-lg border border-base-300"
+						>
+							<li>
+								<button on:click={editChecklist} class="flex items-center gap-2">
+									<FileDocumentEdit class="w-4 h-4" />
+									{$t('lodging.edit')}
+								</button>
+							</li>
+							{#if itineraryItem && itineraryItem.id}
+								<div class="divider my-1"></div>
+								<li>
+									<button
+										on:click={() => removeFromItinerary()}
+										class="text-error flex items-center gap-2"
+									>
+										<CalendarRemove class="w-4 h-4 text-error" />
+										{$t('itinerary.remove_from_itinerary')}
+									</button>
+								</li>
+							{/if}
 							<div class="divider my-1"></div>
 							<li>
 								<button
-									on:click={() => removeFromItinerary()}
 									class="text-error flex items-center gap-2"
+									on:click={() => (isWarningModalOpen = true)}
 								>
-									<CalendarRemove class="w-4 h-4 text-error" />
-									{$t('itinerary.remove_from_itinerary')}
+									<TrashCan class="w-4 h-4" />
+									{$t('adventures.delete')}
 								</button>
 							</li>
-						{/if}
-						<div class="divider my-1"></div>
-						<li>
-							<button
-								class="text-error flex items-center gap-2"
-								on:click={() => (isWarningModalOpen = true)}
-							>
-								<TrashCan class="w-4 h-4" />
-								{$t('adventures.delete')}
-							</button>
-						</li>
-					</ul>
-				</details>
-			{:else}
-				<button
-					class="btn btn-neutral-200 btn-sm px-3 text-base-content"
-					on:click={() => (isDetailsOpen = true)}
-					type="button"
-				>
-					{$t('adventures.view')}
-				</button>
-			{/if}
+						</ul>
+					</details>
+				{/if}
+			</div>
 		</div>
 
 		<!-- Checklist Items Preview -->

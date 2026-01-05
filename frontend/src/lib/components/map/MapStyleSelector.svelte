@@ -4,6 +4,26 @@
 	import MapIcon from '~icons/mdi/map';
 
 	export let basemapType: string = 'default';
+
+	const categoryOrder = [
+		'Standard',
+		'3D Terrain',
+		'Satellite',
+		'Topographic',
+		'Clean',
+		'Specialized'
+	];
+
+	const groupedOptions = basemapOptions.reduce<Record<string, typeof basemapOptions>>(
+		(acc, option) => {
+			if (!acc[option.category]) {
+				acc[option.category] = [];
+			}
+			acc[option.category].push(option);
+			return acc;
+		},
+		{}
+	);
 </script>
 
 <div class="dropdown dropdown-left">
@@ -20,35 +40,53 @@
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
 		</svg>
 	</div>
-	<ul class="dropdown-content z-20 menu p-2 shadow-lg bg-base-200 rounded-box w-48">
-		{#each basemapOptions as option}
-			<li>
-				<button
-					class="flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors {basemapType ===
-					option.value
-						? 'bg-primary/10  font-medium'
-						: ''}"
-					on:pointerdown={(e) => {
-						e.preventDefault();
-						e.stopPropagation();
-						basemapType = option.value;
-					}}
-					on:click={() => (basemapType = option.value)}
-					role="menuitem"
-				>
-					<span class="text-lg">{option.icon}</span>
-					<span>{option.label}</span>
-					{#if basemapType === option.value}
-						<svg class="w-4 h-4 ml-auto text-primary" fill="currentColor" viewBox="0 0 20 20">
-							<path
-								fill-rule="evenodd"
-								d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-								clip-rule="evenodd"
-							/>
-						</svg>
-					{/if}
-				</button>
-			</li>
-		{/each}
-	</ul>
+	{#if basemapOptions?.length}
+		<div
+			class="dropdown-content z-20 shadow-lg bg-base-200 rounded-box w-54 max-h-80 overflow-y-auto overflow-x-hidden p-3"
+			role="menu"
+		>
+			{#each categoryOrder as category}
+				{#if groupedOptions[category]?.length}
+					<div class="mb-2 last:mb-0">
+						<p class="px-2 pb-1 text-xs uppercase tracking-wide text-base-content/60">{category}</p>
+						<ul class="space-y-1">
+							{#each groupedOptions[category] as option}
+								<li>
+									<button
+										class="flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors {basemapType ===
+										option.value
+											? 'bg-primary/10 font-medium'
+											: 'hover:bg-base-300/60'}"
+										on:pointerdown={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											basemapType = option.value;
+										}}
+										on:click={() => (basemapType = option.value)}
+										role="menuitem"
+									>
+										<span class="text-lg">{option.icon}</span>
+										<span class="truncate">{option.label}</span>
+										{#if basemapType === option.value}
+											<svg
+												class="w-4 h-4 ml-auto text-primary"
+												fill="currentColor"
+												viewBox="0 0 20 20"
+											>
+												<path
+													fill-rule="evenodd"
+													d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+													clip-rule="evenodd"
+												/>
+											</svg>
+										{/if}
+									</button>
+								</li>
+							{/each}
+						</ul>
+					</div>
+				{/if}
+			{/each}
+		</div>
+	{/if}
 </div>

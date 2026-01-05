@@ -787,7 +787,8 @@
     "cover": "Cover",
     "location_primary": "Location cover",
     "set_cover": "Set cover",
-    "clear_cover": "Clear cover"
+    "clear_cover": "Clear cover",
+    "collaborators": "Collaborators"
   },
   "notes": {
     "note_deleted": "Note deleted successfully!",

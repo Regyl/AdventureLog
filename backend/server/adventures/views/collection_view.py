@@ -110,7 +110,8 @@ class CollectionViewSet(viewsets.ModelViewSet):
                 'locations__images',
                 queryset=ContentImage.objects.filter(is_primary=True).select_related('user'),
                 to_attr='primary_images'
-            )
+            ),
+            'shared_with'
         )
 
     def get_base_queryset(self):
@@ -146,7 +147,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
                 Q(user=self.request.user.id) & Q(is_archived=False)
             ).distinct()
 
-        return queryset.select_related('primary_image')
+        return queryset.select_related('primary_image').prefetch_related('shared_with')
 
     def get_queryset(self):
         """Get queryset with optimizations for list actions"""

@@ -17,6 +17,7 @@
 	import CalendarBlank from '~icons/mdi/calendar-blank';
 	import Bed from '~icons/mdi/bed';
 	import Info from '~icons/mdi/information';
+	import Plus from '~icons/mdi/plus';
 	import LocationCard from '$lib/components/cards/LocationCard.svelte';
 	import TransportationCard from '$lib/components/cards/TransportationCard.svelte';
 	import LodgingCard from '$lib/components/cards/LodgingCard.svelte';
@@ -1191,7 +1192,7 @@
 												if (input) input.focus();
 											}}
 										>
-											+ `{$t('adventures.name')}`
+											+ {$t('adventures.name')}
 										</button>
 										<input
 											type="text"
@@ -1272,14 +1273,15 @@
 							{/if}
 
 							{#if canModify}
-								<div class="dropdown z-[9999]">
+								<div class="dropdown z-30">
 									<button
 										type="button"
-										class="btn btn-sm btn-outline gap-2"
+										class="btn btn-square btn-sm btn-outline p-1"
 										aria-haspopup="menu"
 										aria-expanded="false"
+										title={$t('adventures.add')}
 									>
-										Add
+										<Plus class="w-5 h-5" />
 									</button>
 									<ul
 										class="dropdown-content menu p-2 shadow bg-base-300 rounded-box w-56"

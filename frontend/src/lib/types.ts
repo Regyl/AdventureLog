@@ -21,6 +21,17 @@ export type User = {
 	default_currency: string;
 };
 
+export type Collaborator = {
+	uuid: string;
+	username: string;
+	first_name: string | null;
+	last_name: string | null;
+	profile_pic: string | null;
+	public_profile?: boolean;
+	is_owner: boolean;
+	is_current_user?: boolean;
+};
+
 export type ContentImage = {
 	id: string;
 	image: string;
@@ -142,6 +153,7 @@ export type Collection = {
 	checklists?: Checklist[];
 	is_archived?: boolean;
 	shared_with: string[] | undefined;
+	collaborators?: Collaborator[];
 	link?: string | null;
 	primary_image?: ContentImage | null;
 	primary_image_id?: string | null;
@@ -166,6 +178,7 @@ export type SlimCollection = {
 	location_images: ContentImage[];
 	location_count: number;
 	shared_with: string[];
+	collaborators?: Collaborator[];
 	primary_image?: ContentImage | null;
 	status: 'folder' | 'upcoming' | 'in_progress' | 'completed';
 	days_until_start: number | null;

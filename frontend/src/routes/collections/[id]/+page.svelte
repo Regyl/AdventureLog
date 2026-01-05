@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Collection, ContentImage, Location } from '$lib/types';
+	import type { Collection, ContentImage, Location, Collaborator } from '$lib/types';
 	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
@@ -566,6 +566,22 @@
 	function formatDate(dateString: string | null) {
 		if (!dateString) return '';
 		return DateTime.fromISO(dateString).toLocaleString(DateTime.DATE_MED);
+	}
+
+	function collaboratorDisplayName(person: Collaborator | null | undefined): string {
+		if (!person) return '';
+		const fullName = [person.first_name, person.last_name].filter(Boolean).join(' ').trim();
+		return fullName || person.username;
+	}
+
+	function collaboratorInitials(person: Collaborator | null | undefined): string {
+		const name = collaboratorDisplayName(person) || person?.username || '';
+		const parts = name.split(/\s+/).filter(Boolean);
+		const initials = parts
+			.slice(0, 2)
+			.map((part) => part[0]?.toUpperCase() || '')
+			.join('');
+		return initials || (person?.username ? person.username.slice(0, 2).toUpperCase() : '');
 	}
 
 	function switchView(view: ViewType) {
@@ -1198,7 +1214,54 @@
 									</a>
 								</div>
 							{/if}
-							{#if collection.shared_with && collection.shared_with.length > 0}
+							{#if collection.collaborators && collection.collaborators.length > 0}
+								<div>
+									<div class="text-sm opacity-70 mb-1">{$t('collection.collaborators')}</div>
+									<div class="avatar-group -space-x-3">
+										{#each collection.collaborators as person (person.uuid)}
+											{#if person.public_profile}
+												<a
+													href={`/profile/${person.username}`}
+													class="avatar tooltip"
+													data-tip={collaboratorDisplayName(person)}
+													title={collaboratorDisplayName(person)}
+													tabindex="0"
+												>
+													<div
+														class="w-9 h-9 rounded-full ring ring-base-200 ring-offset-base-100 ring-offset-2 bg-base-300 overflow-hidden"
+													>
+														{#if person.profile_pic}
+															<img src={person.profile_pic} alt={collaboratorDisplayName(person)} />
+														{:else}
+															<span
+																class="text-xs font-semibold text-base-content/80 flex items-center justify-center w-full h-full bg-primary/10"
+															>
+																{collaboratorInitials(person)}
+															</span>
+														{/if}
+													</div>
+												</a>
+											{:else}
+												<div class="avatar tooltip" data-tip={collaboratorDisplayName(person)}>
+													<div
+														class="w-9 h-9 rounded-full ring ring-base-200 ring-offset-base-100 ring-offset-2 bg-base-300 overflow-hidden"
+													>
+														{#if person.profile_pic}
+															<img src={person.profile_pic} alt={collaboratorDisplayName(person)} />
+														{:else}
+															<span
+																class="text-xs font-semibold text-base-content/80 flex items-center justify-center w-full h-full bg-primary/10"
+															>
+																{collaboratorInitials(person)}
+															</span>
+														{/if}
+													</div>
+												</div>
+											{/if}
+										{/each}
+									</div>
+								</div>
+							{:else if collection.shared_with && collection.shared_with.length > 0}
 								<div>
 									<div class="text-sm opacity-70 mb-1">{$t('share.shared_with')}</div>
 									<div class="flex flex-wrap gap-1">

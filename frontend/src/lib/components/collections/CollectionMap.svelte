@@ -1,6 +1,6 @@
 <script lang="ts">
 	import FullMap, { type FullMapFeatureCollection } from '$lib/components/map/FullMap.svelte';
-	import { Marker } from 'svelte-maplibre';
+	import { GeoJSON, LineLayer, Marker } from 'svelte-maplibre';
 	import { goto } from '$app/navigation';
 	import { getActivityColor } from '$lib';
 	import SearchIcon from '~icons/mdi/magnify';
@@ -50,6 +50,7 @@
 	let showTransportation = true;
 	let showVisited = true;
 	let showPlanned = true;
+	let showLines = true;
 	let startDateFilter = '';
 	let endDateFilter = '';
 	let selectedCategories: Set<string> = new Set();
@@ -213,7 +214,9 @@
 	}
 
 	// Merge attachments/activity geojson into a single feature collection
-	function collectLinesGeojson(coll: Collection) {
+	function collectLinesGeojson(
+		coll: Collection
+	): { type: 'FeatureCollection'; features: any[] } | null {
 		if (!coll) return null;
 		const features: any[] = [];
 
@@ -312,6 +315,7 @@
 		.filter(Boolean) as MarkerFeature[];
 
 	$: allFeatures = [...locationFeatures, ...lodgingFeatures, ...transportationFeatures];
+	$: linesGeoJson = collectLinesGeojson(collection);
 
 	function matchesFilters(
 		feature: MarkerFeature,
@@ -389,6 +393,7 @@
 		showTransportation &&
 		showVisited &&
 		showPlanned &&
+		showLines &&
 		!hasActiveCategoryFilter &&
 		!hasActiveDateFilter &&
 		!hasActiveSearchFilter;
@@ -430,7 +435,7 @@
 			else mapZoom = 10;
 		}
 	}
-	$: mapKey = `${visiblePinCount}-${startDateFilter}-${endDateFilter}-${showLocations}-${showLodging}-${showTransportation}-${showVisited}-${showPlanned}-${Array.from(
+	$: mapKey = `${visiblePinCount}-${startDateFilter}-${endDateFilter}-${showLocations}-${showLodging}-${showTransportation}-${showVisited}-${showPlanned}-${showLines}-${Array.from(
 		selectedCategories
 	)
 		.sort()
@@ -514,6 +519,7 @@
 		showTransportation = true;
 		showVisited = true;
 		showPlanned = true;
+		showLines = true;
 		startDateFilter = '';
 		endDateFilter = '';
 		selectedCategories = new Set();
@@ -831,7 +837,26 @@
 					</label>
 				</div>
 
-				<!-- Show Lines Toggle -->
+				<!-- Routes & Activities Filter -->
+				<div class="space-y-2">
+					<div class="flex items-center justify-between">
+						<span class="text-sm font-medium">Routes & Activities</span>
+					</div>
+					<div class="flex items-center gap-3 rounded-box border border-base-300 p-3">
+						<div
+							class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 grid place-items-center text-base-100"
+						>
+							🗺️
+						</div>
+						<div class="flex flex-col flex-1">
+							<span class="text-xs uppercase text-base-content/60">GPX Routes</span>
+							<span class="text-xs text-base-content/70">Transport & activity paths</span>
+						</div>
+						<label class="label cursor-pointer gap-2 p-0 ml-auto">
+							<input type="checkbox" bind:checked={showLines} class="toggle toggle-sm" />
+						</label>
+					</div>
+				</div>
 			</div>
 		{/if}
 	</div>
@@ -939,6 +964,19 @@
 		</svelte:fragment>
 
 		<svelte:fragment slot="overlays">
+			{#if showLines && linesGeoJson}
+				<GeoJSON id={`collection-lines-${mapKey}`} data={linesGeoJson} generateId>
+					<LineLayer
+						id={`collection-lines-path-${mapKey}`}
+						paint={{
+							'line-color': ['coalesce', ['get', '_color'], '#60a5fa'],
+							'line-width': 3,
+							'line-opacity': 0.9
+						}}
+					/>
+				</GeoJSON>
+			{/if}
+
 			{#if newMarker}
 				<Marker lngLat={[newMarker.lngLat.lng, newMarker.lngLat.lat]} class="map-pin">
 					<div

@@ -64,7 +64,8 @@
 	let selectedMarker: { lng: number; lat: number } | null = null;
 	let locationData: LocationMeta | null = null;
 	let mapCenter: [number, number] = [-74.5, 40];
-	let mapZoom = 2;
+	let mapZoom: number | undefined = 2;
+	let mapBounds: [[number, number], [number, number]] | null = null;
 	let mapComponent: any;
 	let searchTimeout: ReturnType<typeof setTimeout>;
 	let initialApplied = false;
@@ -96,6 +97,7 @@
 		selectedEndLocation = null;
 		startMarker = null;
 		endMarker = null;
+		mapBounds = null;
 		startLocationData = null;
 		startCode = null;
 		endCode = null;
@@ -410,18 +412,31 @@
 
 	function updateMapBounds() {
 		if (startMarker && endMarker) {
-			const lngs = [startMarker.lng, endMarker.lng];
-			const lats = [startMarker.lat, endMarker.lat];
-			const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
-			const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
-			mapCenter = [centerLng, centerLat];
-			mapZoom = 4;
+			const minLng = Math.min(startMarker.lng, endMarker.lng);
+			const maxLng = Math.max(startMarker.lng, endMarker.lng);
+			const minLat = Math.min(startMarker.lat, endMarker.lat);
+			const maxLat = Math.max(startMarker.lat, endMarker.lat);
+
+			// Add a small padding so pins are not flush against the edge when fitting
+			const lonPadding = Math.max((maxLng - minLng) * 0.1, 0.5);
+			const latPadding = Math.max((maxLat - minLat) * 0.1, 0.5);
+
+			mapBounds = [
+				[minLng - lonPadding, minLat - latPadding],
+				[maxLng + lonPadding, maxLat + latPadding]
+			];
+			mapCenter = [(minLng + maxLng) / 2, (minLat + maxLat) / 2];
+			mapZoom = undefined;
 		} else if (startMarker) {
 			mapCenter = [startMarker.lng, startMarker.lat];
 			mapZoom = 8;
+			mapBounds = null;
 		} else if (endMarker) {
 			mapCenter = [endMarker.lng, endMarker.lat];
 			mapZoom = 8;
+			mapBounds = null;
+		} else {
+			mapBounds = null;
 		}
 	}
 
@@ -595,6 +610,7 @@
 		}
 		mapCenter = [-74.5, 40];
 		mapZoom = 2;
+		mapBounds = null;
 		dispatch('clear');
 	}
 
@@ -986,6 +1002,7 @@
 				class="w-full h-80 rounded-lg border border-base-300"
 				center={mapCenter}
 				zoom={mapZoom}
+				bounds={mapBounds ?? undefined}
 				standardControls
 			>
 				<MapEvents on:click={handleMapClick} />

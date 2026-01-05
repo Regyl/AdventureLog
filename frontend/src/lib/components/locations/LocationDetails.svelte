@@ -315,8 +315,12 @@
 							value={moneyValue}
 							on:change={(event) => {
 								location.price = event.detail.amount;
-								location.price_currency =
-									event.detail.amount === null ? null : event.detail.currency || defaultCurrency;
+								location.price_currency = event.detail.currency;
+
+								// If an amount exists but no currency is chosen, fall back to the user's default
+								if (location.price !== null && !location.price_currency) {
+									location.price_currency = defaultCurrency;
+								}
 							}}
 						/>
 

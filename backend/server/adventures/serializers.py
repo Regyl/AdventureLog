@@ -13,6 +13,32 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _build_profile_pic_url(user):
+    """Return absolute-ish profile pic URL using PUBLIC_URL if available."""
+    if not getattr(user, 'profile_pic', None):
+        return None
+
+    public_url = os.environ.get('PUBLIC_URL', 'http://127.0.0.1:8000').rstrip('/')
+    public_url = public_url.replace("'", "")
+    return f"{public_url}/media/{user.profile_pic.name}"
+
+
+def _serialize_collaborator(user, owner_id=None, request_user=None):
+    if not user:
+        return None
+
+    return {
+        'uuid': str(user.uuid),
+        'username': user.username,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'profile_pic': _build_profile_pic_url(user),
+        'public_profile': bool(getattr(user, 'public_profile', False)),
+        'is_owner': owner_id == user.id,
+        'is_current_user': bool(request_user and request_user.id == user.id),
+    }
+
+
 class ContentImageSerializer(CustomModelSerializer):
     class Meta:
         model = ContentImage
@@ -678,6 +704,7 @@ class ChecklistSerializer(CustomModelSerializer):
         return data
 
 class CollectionSerializer(CustomModelSerializer):
+    collaborators = serializers.SerializerMethodField()
     locations = serializers.SerializerMethodField()
     transportations = serializers.SerializerMethodField()
     notes = serializers.SerializerMethodField()
@@ -712,6 +739,7 @@ class CollectionSerializer(CustomModelSerializer):
             'checklists',
             'is_archived',
             'shared_with',
+            'collaborators',
             'link',
             'lodging',
             'status',
@@ -720,6 +748,30 @@ class CollectionSerializer(CustomModelSerializer):
             'primary_image_id',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'user', 'shared_with', 'status', 'days_until_start', 'primary_image']
+
+    def get_collaborators(self, obj):
+        request = self.context.get('request')
+        request_user = getattr(request, 'user', None) if request else None
+
+        users = []
+        if obj.user:
+            users.append(obj.user)
+        users.extend(list(obj.shared_with.all()))
+
+        collaborators = []
+        seen = set()
+        for user in users:
+            if not user:
+                continue
+            key = str(user.uuid)
+            if key in seen:
+                continue
+            seen.add(key)
+            serialized = _serialize_collaborator(user, owner_id=obj.user_id, request_user=request_user)
+            if serialized:
+                collaborators.append(serialized)
+
+        return collaborators
 
     def get_locations(self, obj):
         if self.context.get('nested', False):
@@ -856,15 +908,40 @@ class UltraSlimCollectionSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     days_until_start = serializers.SerializerMethodField()
     primary_image = ContentImageSerializer(read_only=True)
+    collaborators = serializers.SerializerMethodField()
     
     class Meta:
         model = Collection
         fields = [
             'id', 'user', 'name', 'description', 'is_public', 'start_date', 'end_date', 
             'is_archived', 'link', 'created_at', 'updated_at', 'location_images', 
-            'location_count', 'shared_with', 'status', 'days_until_start', 'primary_image'
+            'location_count', 'shared_with', 'collaborators', 'status', 'days_until_start', 'primary_image'
         ]
         read_only_fields = fields  # All fields are read-only for listing
+
+    def get_collaborators(self, obj):
+        request = self.context.get('request')
+        request_user = getattr(request, 'user', None) if request else None
+
+        users = []
+        if obj.user:
+            users.append(obj.user)
+        users.extend(list(obj.shared_with.all()))
+
+        collaborators = []
+        seen = set()
+        for user in users:
+            if not user:
+                continue
+            key = str(user.uuid)
+            if key in seen:
+                continue
+            seen.add(key)
+            serialized = _serialize_collaborator(user, owner_id=obj.user_id, request_user=request_user)
+            if serialized:
+                collaborators.append(serialized)
+
+        return collaborators
 
     def get_location_images(self, obj):
         """Get primary images from locations in this collection, optimized with select_related"""

@@ -18,6 +18,8 @@
 	import FileDocumentEdit from '~icons/mdi/file-document-edit';
 	import LinkVariant from '~icons/mdi/link-variant';
 	import CalendarRemove from '~icons/mdi/calendar-remove';
+	import Launch from '~icons/mdi/launch';
+	import Close from '~icons/mdi/close';
 	import type { CollectionItineraryItem } from '$lib/types';
 
 	export let note: Note;
@@ -79,22 +81,35 @@
 {#if isDetailsOpen}
 	<dialog class="modal modal-open" open>
 		<div class="modal-box max-w-3xl space-y-4">
-			<h3 class="text-xl font-semibold">{note.name}</h3>
-			<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70">
-				<div class="badge badge-primary badge-sm">{$t('adventures.note')}</div>
-				{#if note.date && note.date !== ''}
-					<div class="flex items-center gap-2">
-						<Calendar class="w-4 h-4 text-primary" />
-						<span>{new Date(note.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span>
+			<div class="flex items-start justify-between gap-3">
+				<div class="space-y-2">
+					<h3 class="text-xl font-semibold leading-tight">{note.name}</h3>
+					<div class="flex flex-wrap items-center gap-3 text-sm text-base-content/70">
+						<div class="badge badge-primary badge-sm">{$t('adventures.note')}</div>
+						{#if note.date && note.date !== ''}
+							<div class="flex items-center gap-2">
+								<Calendar class="w-4 h-4 text-primary" />
+								<span>{new Date(note.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}</span
+								>
+							</div>
+						{/if}
+						{#if note.links && note.links?.length > 0}
+							<div class="badge badge-ghost badge-sm">
+								<LinkVariant class="w-3 h-3 mr-1" />
+								{note.links.length}
+								{note.links.length > 1 ? $t('adventures.links') : $t('adventures.link')}
+							</div>
+						{/if}
 					</div>
-				{/if}
-				{#if note.links && note.links?.length > 0}
-					<div class="badge badge-ghost badge-sm">
-						<LinkVariant class="w-3 h-3 mr-1" />
-						{note.links.length}
-						{note.links.length > 1 ? $t('adventures.links') : $t('adventures.link')}
-					</div>
-				{/if}
+				</div>
+				<button
+					type="button"
+					class="btn btn-circle btn-ghost btn-sm"
+					on:click={() => (isDetailsOpen = false)}
+					aria-label={$t('adventures.close')}
+				>
+					<Close class="w-4 h-4" />
+				</button>
 			</div>
 
 			{#if note.content && note.content?.length > 0}
@@ -148,53 +163,56 @@
 				</div>
 			</div>
 
-			{#if canEdit}
-				<details class="dropdown dropdown-end relative z-50">
-					<summary class="btn btn-square btn-sm p-1 text-base-content">
-						<DotsHorizontal class="w-5 h-5" />
-					</summary>
-					<ul
-						class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow-lg border border-base-300"
-					>
-						<li>
-							<button on:click={editNote} class="flex items-center gap-2">
-								<FileDocumentEdit class="w-4 h-4" />
-								{$t('notes.open')}
-							</button>
-						</li>
-						{#if itineraryItem && itineraryItem.id}
+			<div class="flex items-center gap-2">
+				<button
+					class="btn btn-square btn-sm p-1 text-base-content"
+					on:click={() => (isDetailsOpen = true)}
+					aria-label={$t('adventures.view')}
+					type="button"
+				>
+					<Launch class="w-5 h-5" />
+				</button>
+
+				{#if canEdit}
+					<details class="dropdown dropdown-end relative z-50">
+						<summary class="btn btn-square btn-sm p-1 text-base-content">
+							<DotsHorizontal class="w-5 h-5" />
+						</summary>
+						<ul
+							class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow-lg border border-base-300"
+						>
+							<li>
+								<button on:click={editNote} class="flex items-center gap-2">
+									<FileDocumentEdit class="w-4 h-4" />
+									{$t('lodging.edit')}
+								</button>
+							</li>
+							{#if itineraryItem && itineraryItem.id}
+								<div class="divider my-1"></div>
+								<li>
+									<button
+										on:click={() => removeFromItinerary()}
+										class="text-error flex items-center gap-2"
+									>
+										<CalendarRemove class="w-4 h-4 text-error" />
+										{$t('itinerary.remove_from_itinerary')}
+									</button>
+								</li>
+							{/if}
 							<div class="divider my-1"></div>
 							<li>
 								<button
-									on:click={() => removeFromItinerary()}
 									class="text-error flex items-center gap-2"
+									on:click={() => (isWarningModalOpen = true)}
 								>
-									<CalendarRemove class="w-4 h-4 text-error" />
-									{$t('itinerary.remove_from_itinerary')}
+									<TrashCan class="w-4 h-4" />
+									{$t('adventures.delete')}
 								</button>
 							</li>
-						{/if}
-						<div class="divider my-1"></div>
-						<li>
-							<button
-								class="text-error flex items-center gap-2"
-								on:click={() => (isWarningModalOpen = true)}
-							>
-								<TrashCan class="w-4 h-4" />
-								{$t('adventures.delete')}
-							</button>
-						</li>
-					</ul>
-				</details>
-			{:else}
-				<button
-					class="btn btn-neutral-200 btn-sm px-3 text-base-content"
-					on:click={() => (isDetailsOpen = true)}
-					type="button"
-				>
-					{$t('adventures.view')}
-				</button>
-			{/if}
+						</ul>
+					</details>
+				{/if}
+			</div>
 		</div>
 
 		<!-- Note Content Preview -->
