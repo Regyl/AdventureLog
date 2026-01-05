@@ -2,7 +2,7 @@
 	import FullMap, { type FullMapFeatureCollection } from '$lib/components/map/FullMap.svelte';
 	import { GeoJSON, LineLayer, Marker } from 'svelte-maplibre';
 	import { goto } from '$app/navigation';
-	import { getActivityColor } from '$lib';
+	import { LODGING_TYPES_ICONS, getActivityColor } from '$lib';
 	import SearchIcon from '~icons/mdi/magnify';
 	import FilterIcon from '~icons/mdi/filter-variant';
 	import ChevronDown from '~icons/mdi/chevron-down';
@@ -130,6 +130,15 @@
 		return t?.date || t?.start_date || t?.end_date || null;
 	}
 
+	function getLodgingIcon(type?: string | null): string {
+		if (!type) return '🏨';
+		const key = String(type).toLowerCase().trim();
+		if (key in LODGING_TYPES_ICONS) {
+			return LODGING_TYPES_ICONS[key as keyof typeof LODGING_TYPES_ICONS];
+		}
+		return '🏨';
+	}
+
 	function getTransportIcon(type?: string | null): string {
 		if (!type) return '✈️';
 		const normalized = String(type).toLowerCase();
@@ -172,7 +181,7 @@
 			properties: {
 				id: String(l.id),
 				name: l.name || 'Lodging',
-				categoryIcon: '🏨',
+				categoryIcon: getLodgingIcon(l.type),
 				categoryName: l.type || 'Lodging',
 				type: 'lodging',
 				date: l.check_in || l.check_out || null
