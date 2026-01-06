@@ -20,7 +20,9 @@
 	import DotsHorizontal from '~icons/mdi/dots-horizontal';
 	import CalendarRemove from '~icons/mdi/calendar-remove';
 	import Launch from '~icons/mdi/launch';
+	import Globe from '~icons/mdi/globe';
 	import { goto } from '$app/navigation';
+	import Calendar from '~icons/mdi/calendar';
 	import type { CollectionItineraryItem } from '$lib/types';
 
 	const dispatch = createEventDispatcher();
@@ -93,6 +95,10 @@
 			isWarningModalOpen = false;
 			dispatch('delete', lodging.id);
 		}
+	}
+
+	function changeDay() {
+		dispatch('changeDay', { type: 'lodging', item: lodging, forcePicker: true });
 	}
 
 	async function removeFromItinerary() {
@@ -193,6 +199,23 @@
 							</li>
 							{#if itineraryItem && itineraryItem.id}
 								<div class="divider my-1"></div>
+								{#if !itineraryItem.is_global}
+									<li>
+										<button
+											on:click={() => dispatch('moveToGlobal', { type: 'lodging', id: lodging.id })}
+											class="flex items-center gap-2"
+										>
+											<Globe class="w-4 h-4" />
+											{$t('itinerary.move_to_trip_wide') || 'Move to Trip-wide'}
+										</button>
+									</li>
+								{/if}
+								<li>
+									<button on:click={() => changeDay()} class=" flex items-center gap-2">
+										<Calendar class="w-4 h-4 text" />
+										{$t('itinerary.change_day')}
+									</button>
+								</li>
 								<li>
 									<button
 										on:click={() => removeFromItinerary()}

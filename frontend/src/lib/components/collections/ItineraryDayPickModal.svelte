@@ -8,11 +8,15 @@
 	export let isOpen: boolean = false;
 	export let days: Array<{ date: string; displayDate: string; items: any[] }> = [];
 	export let itemName: string = 'Item';
+	export let scheduledDates: string[] = [];
+	// Optional: source visit info when moving a dated location
 
 	const dispatch = createEventDispatcher();
 
+	let deleteSourceVisit: boolean = false;
+
 	function handleDaySelect(dayDate: string, updateDate: boolean) {
-		dispatch('daySelected', { date: dayDate, updateDate });
+		dispatch('daySelected', { date: dayDate, updateDate, deleteSourceVisit });
 		isOpen = false;
 	}
 
@@ -68,6 +72,7 @@
 					{@const weekday = DateTime.fromISO(day.date).toFormat('ccc')}
 					{@const dayOfMonth = DateTime.fromISO(day.date).toFormat('d')}
 					{@const monthAbbrev = DateTime.fromISO(day.date).toFormat('LLL')}
+					{@const isScheduled = scheduledDates?.includes(day.date)}
 
 					<div
 						class="card bg-base-100 border border-base-300 shadow-sm hover:border-primary/60 hover:shadow-md transition-all"
@@ -86,6 +91,11 @@
 									<div class="flex items-center gap-2">
 										<span class="badge badge-primary badge-sm">Day {dayNumber}</span>
 										<span class="text-xs opacity-60">of {totalDays}</span>
+										{#if isScheduled}
+											<span class="badge badge-neutral badge-outline badge-sm"
+												>Already scheduled</span
+											>
+										{/if}
 									</div>
 									<div class="font-semibold text-base mt-1">{day.displayDate}</div>
 									<div class="text-sm opacity-70 flex items-center gap-2 mt-1">
@@ -99,17 +109,11 @@
 							<div class="flex gap-2">
 								<button
 									type="button"
-									class="btn btn-outline btn-sm flex-1"
-									on:click={() => handleDaySelect(day.date, false)}
-								>
-									Add as is
-								</button>
-								<button
-									type="button"
 									class="btn btn-primary btn-sm flex-1"
+									disabled={isScheduled}
 									on:click={() => handleDaySelect(day.date, true)}
 								>
-									Add & Update Date
+									{isScheduled ? 'Already scheduled' : 'Update to this day'}
 								</button>
 							</div>
 						</div>

@@ -1104,7 +1104,9 @@
     "item_not_found": "Item not found",
     "staying_overnight": "Staying overnight",
     "unscheduled_items": "Unscheduled Items",
-    "unscheduled_items_desc": "These items are linked to this trip but haven't been added to a specific day yet."
+    "unscheduled_items_desc": "These items are linked to this trip but haven't been added to a specific day yet.",
+    "change_day": "Change Day",
+    "move_to_trip_wide": "Move Trip Wide"
   },
   "common": {
     "show_less": "Hide details",

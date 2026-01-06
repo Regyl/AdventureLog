@@ -20,6 +20,7 @@
 	import CalendarRemove from '~icons/mdi/calendar-remove';
 	import Launch from '~icons/mdi/launch';
 	import Close from '~icons/mdi/close';
+	import Globe from '~icons/mdi/globe';
 	import type { CollectionItineraryItem } from '$lib/types';
 
 	export let note: Note;
@@ -51,6 +52,10 @@
 		} else {
 			addToast($t('notes.note_delete_error'), 'error');
 		}
+	}
+
+	function changeDay() {
+		dispatch('changeDay', { type: 'note', item: note, forcePicker: true });
 	}
 
 	async function removeFromItinerary() {
@@ -189,6 +194,23 @@
 							</li>
 							{#if itineraryItem && itineraryItem.id}
 								<div class="divider my-1"></div>
+								{#if !itineraryItem.is_global}
+									<li>
+										<button
+											on:click={() => dispatch('moveToGlobal', { type: 'note', id: note.id })}
+											class="text-info flex items-center gap-2"
+										>
+											<Globe class="w-4 h-4 text-info" />
+											{$t('itinerary.move_to_trip_wide') || 'Move to Trip-wide'}
+										</button>
+									</li>
+								{/if}
+								<li>
+									<button on:click={() => changeDay()} class=" flex items-center gap-2">
+										<CalendarRemove class="w-4 h-4 text" />
+										{$t('itinerary.change_day')}
+									</button>
+								</li>
 								<li>
 									<button
 										on:click={() => removeFromItinerary()}

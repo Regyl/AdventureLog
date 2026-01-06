@@ -31,6 +31,8 @@
 	import ItineraryLinkModal from '$lib/components/collections/ItineraryLinkModal.svelte';
 	import ItineraryDayPickModal from '$lib/components/collections/ItineraryDayPickModal.svelte';
 	import { t } from 'svelte-i18n';
+	import { addToast } from '$lib/toasts';
+	import Globe from '~icons/mdi/globe';
 
 	export let collection: Collection;
 	export let user: any;
@@ -156,6 +158,118 @@
 		pendingAddDate = null;
 	}
 
+	/**
+	 * Move an item to the global (trip-wide) itinerary.
+	 * Removes all dated entries for this item and adds it to the global view instead.
+	 */
+	async function moveItemToGlobal(objectType: string, objectId: string) {
+		if (!collection.id) return;
+
+		try {
+			// Remove all dated itinerary entries for this item
+			const entriesToRemove = (collection.itinerary || [])
+				.filter((it) => it.object_id === objectId && it.date && !it.is_global)
+				.map((it) => it.id);
+
+			// Delete the dated entries
+			for (const entryId of entriesToRemove) {
+				await fetch(`/api/itineraries/${entryId}`, { method: 'DELETE' });
+			}
+
+			// Add as global if not already there
+			const alreadyGlobal = (collection.itinerary || []).some(
+				(it) => it.object_id === objectId && it.is_global
+			);
+
+			if (!alreadyGlobal) {
+				const order = globalItems.length;
+				const res = await fetch('/api/itineraries/', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						collection: collection.id,
+						content_type: objectType,
+						object_id: objectId,
+						is_global: true,
+						order
+					})
+				});
+
+				if (!res.ok) throw new Error('Failed to add to global itinerary');
+				const created = await res.json();
+				collection.itinerary = [...(collection.itinerary || []), created];
+			}
+
+			// Remove dated entries from local state
+			collection.itinerary = (collection.itinerary || []).filter(
+				(it) => !entriesToRemove.includes(it.id)
+			);
+
+			// Refresh reactive variables
+			days = groupItemsByDay(collection);
+			globalItems = (collection.itinerary || [])
+				.filter((it) => it.is_global)
+				.map((it) => resolveItineraryItem(it, collection))
+				.sort((a, b) => a.order - b.order);
+
+			addToast('success', `Moved to trip-wide items`);
+		} catch (error) {
+			console.error('Error moving item to global:', error);
+			addToast('error', 'Failed to move item to trip-wide');
+		}
+	}
+
+	/**
+	 * Add an unscheduled item directly to the global (trip-wide) itinerary.
+	 */
+	async function addUnscheduledItemToGlobal(type: string, itemId: string) {
+		if (!collection.id) return;
+
+		try {
+			// Check if already in global view
+			const alreadyGlobal = (collection.itinerary || []).some(
+				(it) => it.object_id === itemId && it.is_global
+			);
+
+			if (alreadyGlobal) {
+				addToast('info', 'Item already in trip-wide view');
+				return;
+			}
+
+			const order = globalItems.length;
+			const res = await fetch('/api/itineraries/', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					collection: collection.id,
+					content_type: type,
+					object_id: itemId,
+					is_global: true,
+					order
+				})
+			});
+
+			if (!res.ok) throw new Error('Failed to add to global itinerary');
+
+			const created = await res.json();
+			collection.itinerary = [...(collection.itinerary || []), created];
+
+			// Remove from unscheduled by moving it to itinerary
+			unscheduledItems = unscheduledItems.filter((item) => !(item.item.id === itemId));
+
+			// Refresh global items
+			globalItems = (collection.itinerary || [])
+				.filter((it) => it.is_global)
+				.map((it) => resolveItineraryItem(it, collection))
+				.sort((a, b) => a.order - b.order);
+
+			addToast('success', `Added to trip-wide items`);
+		} catch (error) {
+			console.error('Error adding item to global:', error);
+			addToast('error', 'Failed to add item to trip-wide');
+		}
+	}
+
 	function handleItemDelete(event: CustomEvent<CollectionItineraryItem | string | number>) {
 		const payload = event.detail;
 
@@ -239,6 +353,8 @@
 	// Day picker modal state for unscheduled items
 	let isDayPickModalOpen = false;
 	let dayPickItemToAdd: { type: string; item: any } | null = null;
+	let dayPickScheduledDates: string[] = [];
+	let dayPickSourceVisit: { id: string; start_date: string } | null = null;
 
 	// When opening a "create new item" modal we store the target date here
 	let pendingAddDate: string | null = null;
@@ -835,16 +951,31 @@
 		}
 	}
 
-	// Handle opening the day picker modal for an unscheduled item
-	function handleOpenDayPickerForItem(type: string, item: any) {
+	// Handle opening the day picker modal for an item (scheduled or unscheduled)
+	// currentItineraryDate: the date of the itinerary entry being moved (if any)
+	function handleOpenDayPickerForItem(
+		type: string,
+		item: any,
+		forcePicker: boolean = false,
+		currentItineraryDate: string | null = null
+	) {
 		// Check if the item already has a date, and if so, add it directly
 		let itemDate: string | null = null;
+		// Track all itinerary dates this item is already scheduled on (non-global)
+		const scheduledDates = (collection.itinerary || [])
+			.filter((it) => it.object_id === item.id && it.date && !it.is_global)
+			.map((it) => it.date as string);
 
 		if (type === 'location') {
-			// For locations, check if there's a visit with a start_date
-			const firstVisit = item.visits?.[0];
+			// For locations, prefer the visit matching the current itinerary date
+			let matchedVisit = null;
+			if (currentItineraryDate) {
+				matchedVisit = item.visits?.find((v) => v.start_date?.startsWith(currentItineraryDate));
+			}
+			const firstVisit = matchedVisit || item.visits?.[0];
 			if (firstVisit?.start_date) {
 				itemDate = firstVisit.start_date.split('T')[0]; // Extract date only (YYYY-MM-DD)
+				dayPickSourceVisit = { id: firstVisit.id, start_date: firstVisit.start_date };
 			}
 		} else if (type === 'transportation') {
 			if (item.date) {
@@ -862,6 +993,25 @@
 			if (item.date) {
 				itemDate = item.date.split('T')[0]; // Extract date only (YYYY-MM-DD)
 			}
+		}
+
+		// If caller explicitly wants the picker, bypass auto-add
+		if (forcePicker) {
+			dayPickItemToAdd = { type, item };
+			dayPickScheduledDates = scheduledDates;
+			// Capture source visit for locations (match itinerary date first)
+			dayPickSourceVisit = null;
+			if (type === 'location') {
+				const matchedVisit = currentItineraryDate
+					? item.visits?.find((v) => v.start_date?.startsWith(currentItineraryDate))
+					: null;
+				const firstVisit = matchedVisit || item.visits?.[0];
+				if (firstVisit?.start_date) {
+					dayPickSourceVisit = { id: firstVisit.id, start_date: firstVisit.start_date };
+				}
+			}
+			isDayPickModalOpen = true;
+			return;
 		}
 
 		// If we found a date, add it directly to that date
@@ -889,33 +1039,120 @@
 			// If the item's date is outside the collection range, prompt the day picker
 			if (!isDateWithinCollectionRange(itemDate)) {
 				dayPickItemToAdd = { type, item };
+				dayPickScheduledDates = scheduledDates;
+				dayPickSourceVisit = null;
+				if (type === 'location') {
+					// Prefer the visit that matches itemDate if present
+					const source = item.visits?.find((v) => v.start_date?.startsWith(itemDate));
+					const useVisit = source || item.visits?.[0];
+					if (useVisit?.start_date) {
+						dayPickSourceVisit = { id: useVisit.id, start_date: useVisit.start_date };
+					}
+				}
 				isDayPickModalOpen = true;
 				return;
+			}
+
+			// We have a valid date; ensure dayPickSourceVisit is aligned for locations with multiple visits
+			if (type === 'location' && !dayPickSourceVisit) {
+				const source = item.visits?.find((v) => v.start_date?.startsWith(itemDate));
+				if (source?.start_date) {
+					dayPickSourceVisit = { id: source.id, start_date: source.start_date };
+				}
 			}
 
 			addItineraryItemForObject(type, item.id, itemDate, false);
 		} else {
 			// Otherwise, show the day picker modal
 			dayPickItemToAdd = { type, item };
+			dayPickScheduledDates = scheduledDates;
+			dayPickSourceVisit = null;
+			if (type === 'location') {
+				const matchedVisit = currentItineraryDate
+					? item.visits?.find((v) => v.start_date?.startsWith(currentItineraryDate))
+					: item.visits?.[0];
+				if (matchedVisit?.start_date) {
+					dayPickSourceVisit = { id: matchedVisit.id, start_date: matchedVisit.start_date };
+				}
+			}
 			isDayPickModalOpen = true;
 		}
 	}
 
 	// Handle day selection from the day picker modal
-	async function handleDaySelected(event: CustomEvent<{ date: string; updateDate: boolean }>) {
-		const { date: selectedDate, updateDate } = event.detail;
+	async function handleDaySelected(
+		event: CustomEvent<{ date: string; updateDate: boolean; deleteSourceVisit?: boolean }>
+	) {
+		const { date: selectedDate, updateDate, deleteSourceVisit } = event.detail;
 		if (!dayPickItemToAdd) return;
 
 		const { type, item } = dayPickItemToAdd;
 		const objectType = type; // 'location', 'transportation', 'lodging', 'note', 'checklist'
 		const objectId = item.id;
 
-		// Add the item to the selected day
-		await addItineraryItemForObject(objectType, objectId, selectedDate, updateDate);
+		// Identify existing dated itinerary entries for this object
+		const existingDatedItems = (collection.itinerary || []).filter(
+			(it) => it.object_id === objectId && it.date && !it.is_global
+		);
 
-		// Reset state
-		dayPickItemToAdd = null;
-		isDayPickModalOpen = false;
+		// Avoid duplicate add if already scheduled for the selected date
+		const alreadyScheduledForSelectedDate = existingDatedItems.some(
+			(it) => it.date === selectedDate
+		);
+
+		try {
+			if (!alreadyScheduledForSelectedDate) {
+				// Add the item to the selected day
+				await addItineraryItemForObject(objectType, objectId, selectedDate, updateDate);
+			}
+
+			// Optionally delete the source visit (for locations) — skip if we're updating it
+			if (deleteSourceVisit && objectType === 'location' && dayPickSourceVisit?.id && !updateDate) {
+				try {
+					await fetch(`/api/visits/${dayPickSourceVisit.id}/`, { method: 'DELETE' });
+					// Update local state: remove visit from the location
+					if (collection.locations) {
+						collection.locations = collection.locations.map((loc) => {
+							if (loc.id === objectId) {
+								return {
+									...loc,
+									visits: (loc.visits || []).filter((v) => v.id !== dayPickSourceVisit?.id)
+								};
+							}
+							return loc;
+						});
+					}
+				} catch (e) {
+					console.error('Failed to delete source visit', dayPickSourceVisit.id, e);
+				}
+			}
+
+			// If we are moving the item (user chose to update the underlying date or an existing dated entry exists),
+			// remove old dated itinerary entries for this object on other dates.
+			// This ensures the item is moved rather than duplicated across days.
+			const toRemove = existingDatedItems.filter((it) => it.date !== selectedDate);
+			for (const oldItem of toRemove) {
+				try {
+					await fetch(`/api/itineraries/${oldItem.id}`, { method: 'DELETE' });
+				} catch (e) {
+					console.error('Failed to remove old itinerary item', oldItem.id, e);
+				}
+			}
+
+			if (toRemove.length > 0) {
+				// Update local state to reflect removals
+				collection.itinerary = (collection.itinerary || []).filter(
+					(it) => !toRemove.some((r) => r.id === it.id)
+				);
+				days = groupItemsByDay(collection);
+			}
+		} finally {
+			// Reset state regardless of success/failure
+			dayPickItemToAdd = null;
+			dayPickScheduledDates = [];
+			dayPickSourceVisit = null;
+			isDayPickModalOpen = false;
+		}
 	}
 
 	// Add an itinerary item locally and attempt to persist to backend
@@ -953,7 +1190,12 @@
 					object_id: objectId,
 					date: dateISO,
 					order,
-					update_item_date: updateItemDate
+					update_item_date: updateItemDate,
+					// Prefer updating an existing Visit when moving a location
+					source_visit_id:
+						objectType === 'location' && updateItemDate && dayPickSourceVisit?.id
+							? dayPickSourceVisit.id
+							: undefined
 				})
 			});
 
@@ -966,89 +1208,58 @@
 			collection.itinerary = collection.itinerary.map((it) => (it.id === tempId ? created : it));
 			pendingAddDate = null;
 
-			// If we updated the item's date, update local state directly
-			if (updateItemDate) {
+			// If we updated the item's date, sync the updated object from server response
+			if (updateItemDate && created.updated_object) {
+				if (objectType === 'transportation') {
+					if (collection.transportations) {
+						collection.transportations = collection.transportations.map((t) =>
+							t.id === objectId ? { ...t, ...created.updated_object } : t
+						);
+					}
+				} else if (objectType === 'lodging') {
+					if (collection.lodging) {
+						collection.lodging = collection.lodging.map((l) =>
+							l.id === objectId ? { ...l, ...created.updated_object } : l
+						);
+					}
+				}
+			} else if (updateItemDate) {
+				// Fallback: if server didn't return updated_object, do manual update for other types
 				const isoDate = `${dateISO}T00:00:00`;
 				const nextDayISO = DateTime.fromISO(dateISO).plus({ days: 1 }).toISODate();
 
 				if (objectType === 'location') {
-					// For locations, create a new visit locally
+					// For locations, update existing source visit when available; otherwise append a new visit
+					const sourceId = dayPickSourceVisit?.id;
 					if (collection.locations) {
 						collection.locations = collection.locations.map((loc) => {
-							if (loc.id === objectId) {
-								const newVisit = {
-									id: `temp-visit-${Date.now()}`,
-									location: objectId,
-									start_date: `${dateISO}T00:00:00`,
-									end_date: `${dateISO}T23:59:59`,
-									notes: $t('itinerary.visit_created_via_itinerary'),
-									created_at: new Date().toISOString(),
-									updated_at: new Date().toISOString(),
-									images: [],
-									attachments: []
-								};
-								return {
-									...loc,
-									visits: [...(loc.visits || []), newVisit]
-								};
-							}
-							return loc;
-						});
-					}
-				} else if (objectType === 'transportation') {
-					if (collection.transportations) {
-						collection.transportations = collection.transportations.map((t) => {
-							if (t.id === objectId) {
-								// If end_date exists and is before the new start date, set it to next day
-								let newEndDate = t.end_date;
-								if (newEndDate) {
-									const endDate = DateTime.fromISO(newEndDate);
-									const startDate = DateTime.fromISO(isoDate);
-									if (endDate < startDate) {
-										// Check if original end_date has a time component (not all-day)
-										const hasTime = !newEndDate.includes('T00:00:00');
-										if (hasTime && t.end_timezone) {
-											// Set to 9am in the end timezone
-											newEndDate = DateTime.fromISO(nextDayISO, { zone: t.end_timezone })
-												.set({ hour: 9, minute: 0, second: 0 })
-												.toISO();
-										} else {
-											// All-day event, keep at UTC 0
-											newEndDate = `${nextDayISO}T00:00:00`;
-										}
-									}
+							if (loc.id !== objectId) return loc;
+							const visits = [...(loc.visits || [])];
+							if (sourceId) {
+								const idx = visits.findIndex((v) => v.id === sourceId);
+								if (idx !== -1) {
+									visits[idx] = {
+										...visits[idx],
+										start_date: `${dateISO}T00:00:00`,
+										end_date: `${dateISO}T23:59:59`
+									};
+									return { ...loc, visits };
 								}
-								return { ...t, date: isoDate, end_date: newEndDate };
 							}
-							return t;
-						});
-					}
-				} else if (objectType === 'lodging') {
-					if (collection.lodging) {
-						collection.lodging = collection.lodging.map((l) => {
-							if (l.id === objectId) {
-								// If check_out exists and is before the new check_in, set it to next day
-								let newCheckOut = l.check_out;
-								if (newCheckOut) {
-									const checkOut = DateTime.fromISO(newCheckOut);
-									const checkIn = DateTime.fromISO(isoDate);
-									if (checkOut < checkIn) {
-										// Check if original check_out has a time component (not all-day)
-										const hasTime = !newCheckOut.includes('T00:00:00');
-										if (hasTime && l.timezone) {
-											// Set to 9am in the lodging timezone
-											newCheckOut = DateTime.fromISO(nextDayISO, { zone: l.timezone })
-												.set({ hour: 9, minute: 0, second: 0 })
-												.toISO();
-										} else {
-											// All-day event, keep at UTC 0
-											newCheckOut = `${nextDayISO}T00:00:00`;
-										}
-									}
-								}
-								return { ...l, check_in: isoDate, check_out: newCheckOut };
-							}
-							return l;
+
+							// No source visit to update; append a new one
+							const newVisit = {
+								id: `temp-visit-${Date.now()}`,
+								location: objectId,
+								start_date: `${dateISO}T00:00:00`,
+								end_date: `${dateISO}T23:59:59`,
+								notes: $t('itinerary.visit_created_via_itinerary'),
+								created_at: new Date().toISOString(),
+								updated_at: new Date().toISOString(),
+								images: [],
+								attachments: []
+							};
+							return { ...loc, visits: [...(loc.visits || []), newVisit] };
 						});
 					}
 				} else if (objectType === 'note') {
@@ -1241,10 +1452,14 @@
 		isOpen={isDayPickModalOpen}
 		{days}
 		itemName={dayPickItemToAdd?.item?.name || `${$t('checklist.item')}`}
+		scheduledDates={dayPickScheduledDates}
+		sourceVisitDate={dayPickSourceVisit ? dayPickSourceVisit.start_date.split('T')[0] : null}
 		on:daySelected={handleDaySelected}
 		on:close={() => {
 			isDayPickModalOpen = false;
 			dayPickItemToAdd = null;
+			dayPickScheduledDates = [];
+			dayPickSourceVisit = null;
 		}}
 	/>
 {/if}
@@ -1314,12 +1529,40 @@
 									<Plus class="w-5 h-5" />
 								</button>
 								<ul
-									class="dropdown-content menu p-2 shadow bg-base-300 rounded-box w-56"
+									class="dropdown-content menu p-2 shadow bg-base-300 rounded-box w-72"
 									role="menu"
 								>
-									<li class="menu-title">{$t('itinerary.link_existing_item')}</li>
+									{#if unscheduledItems.length > 0}
+										<li class="menu-title">
+											<span>{$t('itinerary.add_to_trip_wide') || 'Add Unscheduled Items'}</span>
+										</li>
+										{#each unscheduledItems as unscheduledItem (unscheduledItem.item.id)}
+											<li>
+												<button
+													type="button"
+													on:click={() => {
+														addUnscheduledItemToGlobal(
+															unscheduledItem.type,
+															unscheduledItem.item.id
+														);
+													}}
+													class="text-xs py-1"
+												>
+													<span class="truncate">{unscheduledItem.item.name}</span>
+													<span class="badge badge-xs badge-ghost">
+														{unscheduledItem.type}
+													</span>
+												</button>
+											</li>
+										{/each}
+										<li class="divider my-1"></li>
+									{/if}
 									<li class="text-xs opacity-70 px-2 py-1 select-none">
-										Add items below (Unscheduled) to trip-wide
+										{#if unscheduledItems.length === 0}
+											All items are scheduled or in trip-wide view
+										{:else}
+											Or drag items from unscheduled below
+										{/if}
 									</li>
 								</ul>
 							</div>
@@ -1392,6 +1635,7 @@
 												on:delete={handleItemDelete}
 												itineraryItem={item}
 												on:removeFromItinerary={handleRemoveItineraryItem}
+												on:moveToGlobal={(e) => moveItemToGlobal(e.detail.type, e.detail.id)}
 												{user}
 												{collection}
 												compact={true}
@@ -1405,6 +1649,7 @@
 												itineraryItem={item}
 												on:removeFromItinerary={handleRemoveItineraryItem}
 												on:edit={handleEditTransportation}
+												on:moveToGlobal={(e) => moveItemToGlobal(e.detail.type, e.detail.id)}
 											/>
 										{:else if objectType === 'lodging'}
 											<LodgingCard
@@ -1415,6 +1660,7 @@
 												on:delete={handleItemDelete}
 												on:removeFromItinerary={handleRemoveItineraryItem}
 												on:edit={handleEditLodging}
+												on:moveToGlobal={(e) => moveItemToGlobal(e.detail.type, e.detail.id)}
 											/>
 										{:else if objectType === 'note'}
 											<NoteCard
@@ -1425,6 +1671,7 @@
 												itineraryItem={item}
 												on:removeFromItinerary={handleRemoveItineraryItem}
 												on:edit={handleEditNote}
+												on:moveToGlobal={(e) => moveItemToGlobal(e.detail.type, e.detail.id)}
 											/>
 										{:else if objectType === 'checklist'}
 											<ChecklistCard
@@ -1435,6 +1682,7 @@
 												itineraryItem={item}
 												on:removeFromItinerary={handleRemoveItineraryItem}
 												on:edit={handleEditChecklist}
+												on:moveToGlobal={(e) => moveItemToGlobal(e.detail.type, e.detail.id)}
 											/>
 										{/if}
 									{:else}
@@ -1797,9 +2045,17 @@
 														on:delete={handleItemDelete}
 														itineraryItem={item}
 														on:removeFromItinerary={handleRemoveItineraryItem}
+														on:moveToGlobal={(e) => moveItemToGlobal(e.detail.type, e.detail.id)}
 														{user}
 														{collection}
 														compact={true}
+														on:changeDay={(e) =>
+															handleOpenDayPickerForItem(
+																e.detail.type,
+																e.detail.item,
+																e.detail.forcePicker,
+																day.date
+															)}
 													/>
 												{:else if objectType === 'transportation'}
 													<TransportationCard
@@ -1810,6 +2066,13 @@
 														itineraryItem={item}
 														on:removeFromItinerary={handleRemoveItineraryItem}
 														on:edit={handleEditTransportation}
+														on:moveToGlobal={(e) => moveItemToGlobal(e.detail.type, e.detail.id)}
+														on:changeDay={(e) =>
+															handleOpenDayPickerForItem(
+																e.detail.type,
+																e.detail.item,
+																e.detail.forcePicker
+															)}
 													/>
 												{:else if objectType === 'lodging'}
 													<LodgingCard
@@ -1820,6 +2083,13 @@
 														on:delete={handleItemDelete}
 														on:removeFromItinerary={handleRemoveItineraryItem}
 														on:edit={handleEditLodging}
+														on:moveToGlobal={(e) => moveItemToGlobal(e.detail.type, e.detail.id)}
+														on:changeDay={(e) =>
+															handleOpenDayPickerForItem(
+																e.detail.type,
+																e.detail.item,
+																e.detail.forcePicker
+															)}
 													/>
 												{:else if objectType === 'note'}
 													<!-- @ts-ignore - TypeScript can't narrow union type properly -->
@@ -1831,6 +2101,13 @@
 														itineraryItem={item}
 														on:removeFromItinerary={handleRemoveItineraryItem}
 														on:edit={handleEditNote}
+														on:moveToGlobal={(e) => moveItemToGlobal(e.detail.type, e.detail.id)}
+														on:changeDay={(e) =>
+															handleOpenDayPickerForItem(
+																e.detail.type,
+																e.detail.item,
+																e.detail.forcePicker
+															)}
 													/>
 												{:else if objectType === 'checklist'}
 													<!-- @ts-ignore - TypeScript can't narrow union type properly -->
@@ -1842,6 +2119,13 @@
 														itineraryItem={item}
 														on:removeFromItinerary={handleRemoveItineraryItem}
 														on:edit={handleEditChecklist}
+														on:moveToGlobal={(e) => moveItemToGlobal(e.detail.type, e.detail.id)}
+														on:changeDay={(e) =>
+															handleOpenDayPickerForItem(
+																e.detail.type,
+																e.detail.item,
+																e.detail.forcePicker
+															)}
 													/>
 												{/if}
 											</div>

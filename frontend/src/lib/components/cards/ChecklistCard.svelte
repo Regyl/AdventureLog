@@ -15,6 +15,7 @@
 	import CheckboxBlankCircleOutline from '~icons/mdi/checkbox-blank-circle-outline';
 	import CalendarRemove from '~icons/mdi/calendar-remove';
 	import Close from '~icons/mdi/close';
+	import Globe from '~icons/mdi/globe';
 	import type { CollectionItineraryItem } from '$lib/types';
 
 	export let checklist: Checklist;
@@ -46,6 +47,10 @@
 
 	function editChecklist() {
 		dispatch('edit', checklist);
+	}
+
+	function changeDay() {
+		dispatch('changeDay', { type: 'checklist', item: checklist, forcePicker: true });
 	}
 
 	async function deleteChecklist() {
@@ -267,6 +272,24 @@
 							</li>
 							{#if itineraryItem && itineraryItem.id}
 								<div class="divider my-1"></div>
+								{#if !itineraryItem.is_global}
+									<li>
+										<button
+											on:click={() =>
+												dispatch('moveToGlobal', { type: 'checklist', id: checklist.id })}
+											class="flex items-center gap-2"
+										>
+											<Globe class="w-4 h-4" />
+											{$t('itinerary.move_to_trip_wide') || 'Move to Trip-wide'}
+										</button>
+									</li>
+								{/if}
+								<li>
+									<button on:click={() => changeDay()} class=" flex items-center gap-2">
+										<Calendar class="w-4 h-4 text" />
+										{$t('itinerary.change_day')}
+									</button>
+								</li>
 								<li>
 									<button
 										on:click={() => removeFromItinerary()}

@@ -152,32 +152,91 @@ class ItineraryViewSet(viewsets.ModelViewSet):
                                 new_start = None
                                 new_end = None
 
-                        # If we have valid bounds, check for any overlapping Visit for this location.
-                        # Overlap condition: existing.start_date <= new_end AND existing.end_date >= new_start
+                        # If we have valid bounds, update an existing Visit when provided, else create if none overlaps.
+                        # This keeps linked data (attachments, comments) on the same Visit object.
                         if new_start and new_end:
-                            overlap_q = Q(start_date__lte=new_end) & Q(end_date__gte=new_start)
-                            existing = Visit.objects.filter(location=content_object).filter(overlap_q)
-                            if not existing.exists():
-                                Visit.objects.create(
-                                    location=content_object,
-                                    start_date=new_start,
-                                    end_date=new_end,
-                                    notes="Created from itinerary planning"
-                                )
-                            # else: an overlapping visit already exists — skip creating a duplicate
+                            source_visit_id = data.get('source_visit_id')
+                            if source_visit_id:
+                                try:
+                                    source_visit = Visit.objects.get(id=source_visit_id, location=content_object)
+                                    source_visit.start_date = new_start
+                                    source_visit.end_date = new_end
+                                    source_visit.save(update_fields=['start_date', 'end_date'])
+                                except Visit.DoesNotExist:
+                                    # Fall back to create-or-skip logic below
+                                    pass
+
+                            if not data.get('source_visit_id'):
+                                # Overlap condition: existing.start_date <= new_end AND existing.end_date >= new_start
+                                overlap_q = Q(start_date__lte=new_end) & Q(end_date__gte=new_start)
+                                existing = Visit.objects.filter(location=content_object).filter(overlap_q)
+                                if not existing.exists():
+                                    Visit.objects.create(
+                                        location=content_object,
+                                        start_date=new_start,
+                                        end_date=new_end,
+                                        notes="Created from itinerary planning"
+                                    )
+                                # else: an overlapping visit already exists — skip creating a duplicate
                     else:
-                        # For other item types, update their date field
-                        date_field = None
-                        if hasattr(content_object, 'date'):
-                            date_field = 'date'
-                        elif hasattr(content_object, 'start_date'):
-                            date_field = 'start_date'
-                        elif hasattr(content_object, 'check_in'):
-                            date_field = 'check_in'
-                        
-                        if date_field:
-                            setattr(content_object, date_field, clean_date)
-                            content_object.save(update_fields=[date_field])
+                        # For other item types, update their date field and preserve duration
+                        if content_type_val == 'transportation':
+                            # For transportation: update date and end_date, preserving duration and times
+                            if hasattr(content_object, 'date') and hasattr(content_object, 'end_date'):
+                                old_date = content_object.date
+                                old_end_date = content_object.end_date
+                                
+                                if old_date and old_end_date:
+                                    # Extract time from original start date
+                                    original_time = old_date.time()
+                                    # Create new_date with the new date but preserve the original time
+                                    new_date = datetime.datetime.combine(parse_date(clean_date), original_time)
+                                    # Duration = end_date - date
+                                    duration = old_end_date - old_date
+                                    # Apply same duration to new date
+                                    new_end_date = new_date + duration
+                                else:
+                                    # No original end date, set to same as start date
+                                    new_date = datetime.datetime.combine(parse_date(clean_date), datetime.time.min)
+                                    new_end_date = new_date
+                                
+                                content_object.date = new_date
+                                content_object.end_date = new_end_date
+                                content_object.save(update_fields=['date', 'end_date'])
+                        elif content_type_val == 'lodging':
+                            # For lodging: update check_in and check_out, preserving duration and times
+                            if hasattr(content_object, 'check_in') and hasattr(content_object, 'check_out'):
+                                old_check_in = content_object.check_in
+                                old_check_out = content_object.check_out
+                                
+                                if old_check_in and old_check_out:
+                                    # Extract time from original check_in
+                                    original_time = old_check_in.time()
+                                    # Create new_check_in with the new date but preserve the original time
+                                    new_check_in = datetime.datetime.combine(parse_date(clean_date), original_time)
+                                    # Duration = check_out - check_in
+                                    duration = old_check_out - old_check_in
+                                    # Apply same duration to new check_in
+                                    new_check_out = new_check_in + duration
+                                else:
+                                    # No original check_out, set to same as check_in
+                                    new_check_in = datetime.datetime.combine(parse_date(clean_date), datetime.time.min)
+                                    new_check_out = new_check_in
+                                
+                                content_object.check_in = new_check_in
+                                content_object.check_out = new_check_out
+                                content_object.save(update_fields=['check_in', 'check_out'])
+                        else:
+                            # For note, checklist, etc. - just update the date field
+                            date_field = None
+                            if hasattr(content_object, 'date'):
+                                date_field = 'date'
+                            elif hasattr(content_object, 'start_date'):
+                                date_field = 'start_date'
+                            
+                            if date_field:
+                                setattr(content_object, date_field, clean_date)
+                                content_object.save(update_fields=[date_field])
 
         # Ensure order is unique for this collection+group combination (day or global)
         collection_id = data.get('collection')
@@ -246,8 +305,27 @@ class ItineraryViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
+        
+        # If we updated the item's date, include the updated object in response for frontend sync
+        response_data = serializer.data
+        if update_item_date and content_type_val and object_id:
+            if content_type_val == 'transportation':
+                try:
+                    t = Transportation.objects.get(id=object_id)
+                    from adventures.serializers import TransportationSerializer
+                    response_data['updated_object'] = TransportationSerializer(t).data
+                except Transportation.DoesNotExist:
+                    pass
+            elif content_type_val == 'lodging':
+                try:
+                    l = Lodging.objects.get(id=object_id)
+                    from adventures.serializers import LodgingSerializer
+                    response_data['updated_object'] = LodgingSerializer(l).data
+                except Lodging.DoesNotExist:
+                    pass
+        
         headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
     
     @transaction.atomic
     def destroy(self, request, *args, **kwargs):

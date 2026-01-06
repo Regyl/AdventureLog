@@ -27,6 +27,7 @@
 	import EyeOff from '~icons/mdi/eye-off';
 	import CollectionItineraryPlanner from '../collections/CollectionItineraryPlanner.svelte';
 	import CalendarRemove from '~icons/mdi/calendar-remove';
+	import Globe from '~icons/mdi/globe';
 	import { DEFAULT_CURRENCY, formatMoney, toMoneyValue } from '$lib/money';
 
 	export let type: string | null = null;
@@ -91,6 +92,10 @@
 			stars.push(i <= rating);
 		}
 		return stars;
+	}
+
+	function changeDay() {
+		dispatch('changeDay', { type: 'location', item: adventure, forcePicker: true });
 	}
 
 	async function deleteAdventure() {
@@ -373,6 +378,24 @@
 
 								{#if itineraryItem && itineraryItem.id}
 									<div class="divider my-1"></div>
+									{#if !itineraryItem.is_global}
+										<li>
+											<button
+												on:click={() =>
+													dispatch('moveToGlobal', { type: 'location', id: adventure.id })}
+												class=" flex items-center gap-2"
+											>
+												<Globe class="w-4 h-4" />
+												{$t('itinerary.move_to_trip_wide') || 'Move to Trip-wide'}
+											</button>
+										</li>
+									{/if}
+									<li>
+										<button on:click={() => changeDay()} class=" flex items-center gap-2">
+											<Calendar class="w-4 h-4" />
+											{$t('itinerary.change_day')}
+										</button>
+									</li>
 									<li>
 										<button
 											on:click={() => removeFromItinerary()}

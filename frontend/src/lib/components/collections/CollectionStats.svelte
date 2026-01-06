@@ -12,7 +12,7 @@
 	// @ts-ignore
 	import { DateTime } from 'luxon';
 	// lodging icons and helpers
-	import { LODGING_TYPES_ICONS } from '$lib';
+	import { LODGING_TYPES_ICONS, getActivityIcon, SPORT_TYPE_CHOICES } from '$lib';
 
 	export let collection: Collection;
 	export let user: User | null = null;
@@ -268,6 +268,12 @@
 		if (!text) return '';
 		const s = String(text);
 		return s.charAt(0).toUpperCase() + s.slice(1);
+	}
+
+	function getSportLabel(key: string): string {
+		const found = (SPORT_TYPE_CHOICES as Array<any>).find((a) => a.key === key);
+		if (found) return found.label;
+		return String(key).replace(/([a-z])([A-Z])/g, '$1 $2');
 	}
 
 	$: distanceByTransportType = (() => {
@@ -566,9 +572,11 @@
 						<h4 class="font-semibold mb-2">Sport Types</h4>
 						<div class="flex flex-wrap gap-2">
 							{#each sportTypes as [sport, count]}
-								<span class="badge badge-lg badge-primary badge-outline">
-									{sport} ({count})
-								</span>
+								<div class="badge badge-lg badge-primary badge-outline p-3 flex items-center gap-2">
+									<span class="text-lg">{getActivityIcon(sport)}</span>
+									<span class="font-medium">{getSportLabel(sport)}</span>
+									<span class="badge badge-xs badge-primary ml-2">{count}</span>
+								</div>
 							{/each}
 						</div>
 					</div>

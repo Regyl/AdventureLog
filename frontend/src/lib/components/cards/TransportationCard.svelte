@@ -17,9 +17,11 @@
 	import EyeOff from '~icons/mdi/eye-off';
 	import Star from '~icons/mdi/star';
 	import StarOutline from '~icons/mdi/star-outline';
+	import Calendar from '~icons/mdi/calendar';
 	import DotsHorizontal from '~icons/mdi/dots-horizontal';
 	import CalendarRemove from '~icons/mdi/calendar-remove';
 	import Launch from '~icons/mdi/launch';
+	import Globe from '~icons/mdi/globe';
 	import { goto } from '$app/navigation';
 	import type { CollectionItineraryItem } from '$lib/types';
 
@@ -71,6 +73,10 @@
 		parts.push(`${mins}m`);
 		return parts.join(' ');
 	};
+
+	function changeDay() {
+		dispatch('changeDay', { type: 'transportation', item: transportation, forcePicker: true });
+	}
 
 	let travelDurationLabel: string | null = null;
 	$: travelDurationLabel = formatTravelDuration(transportation?.travel_duration_minutes ?? null);
@@ -226,6 +232,24 @@
 							</li>
 							{#if itineraryItem && itineraryItem.id}
 								<div class="divider my-1"></div>
+								{#if !itineraryItem.is_global}
+									<li>
+										<button
+											on:click={() =>
+												dispatch('moveToGlobal', { type: 'transportation', id: transportation.id })}
+											class=" flex items-center gap-2"
+										>
+											<Globe class="w-4 h-4 " />
+											{$t('itinerary.move_to_trip_wide') || 'Move to Trip-wide'}
+										</button>
+									</li>
+								{/if}
+								<li>
+									<button on:click={() => changeDay()} class=" flex items-center gap-2">
+										<Calendar class="w-4 h-4 text" />
+										{$t('itinerary.change_day')}
+									</button>
+								</li>
 								<li>
 									<button
 										on:click={() => removeFromItinerary()}
@@ -367,12 +391,6 @@
 											</span>
 										</div>
 									</div>
-								</div>
-							{/if}
-
-							{#if travelDurationLabel}
-								<div class="flex items-center gap-2 text-xs text-base-content/70">
-									<span class="badge badge-ghost badge-xs">⏱️ {travelDurationLabel}</span>
 								</div>
 							{/if}
 						</div>
