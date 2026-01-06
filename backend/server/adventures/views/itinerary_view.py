@@ -49,6 +49,11 @@ class ItineraryViewSet(viewsets.ModelViewSet):
         object_id = data.get('object_id')
         update_item_date = data.get('update_item_date', False)
         target_date = data.get('date')
+        is_global = data.get('is_global', False)
+        # Normalize is_global to boolean
+        if isinstance(is_global, str):
+            is_global = is_global.lower() in ['1', 'true', 'yes']
+        data['is_global'] = is_global
 
         # Support legacy field 'location' -> treat as content_type='location'
         if not content_type_val and data.get('location'):
@@ -174,14 +179,20 @@ class ItineraryViewSet(viewsets.ModelViewSet):
                             setattr(content_object, date_field, clean_date)
                             content_object.save(update_fields=[date_field])
 
-        # Ensure order is unique for this collection+date combination
+        # Ensure order is unique for this collection+group combination (day or global)
         collection_id = data.get('collection')
         item_date = data.get('date')
         item_order = data.get('order', 0)
         
+        # Basic XOR validation between date and is_global
+        if is_global and item_date:
+            return Response({'error': 'Global itinerary items must not include a date.'}, status=status.HTTP_400_BAD_REQUEST)
+        if (not is_global) and not item_date:
+            return Response({'error': 'Dated itinerary items must include a date.'}, status=status.HTTP_400_BAD_REQUEST)
+        
         # Validate that the itinerary date (if provided) falls within the
         # collection's start_date/end_date range (if those bounds are set).
-        if collection_id and item_date:
+        if collection_id and item_date and not is_global:
             # Try parse date or datetime-like values
             parsed_date = None
             try:
@@ -207,17 +218,29 @@ class ItineraryViewSet(viewsets.ModelViewSet):
                 if collection_obj.end_date and parsed_date > collection_obj.end_date:
                     return Response({'error': 'Itinerary item date is after the collection end_date'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if collection_id and item_date:
-            # Find the maximum order for this collection+date
-            existing_max = CollectionItineraryItem.objects.filter(
-                collection_id=collection_id,
-                date=item_date
-            ).aggregate(max_order=models.Max('order'))['max_order']
-            
-            # Check if the requested order conflicts with existing items
-            if existing_max is not None and item_order <= existing_max:
-                # Assign next available order
-                data['order'] = existing_max + 1
+        if collection_id:
+            if is_global:
+                # Max order within global group
+                existing_max = CollectionItineraryItem.objects.filter(
+                    collection_id=collection_id,
+                    is_global=True
+                ).aggregate(max_order=models.Max('order'))['max_order']
+                if existing_max is None:
+                    existing_max = -1
+                if item_order is None or item_order <= existing_max:
+                    data['order'] = existing_max + 1
+            elif item_date:
+                # Find the maximum order for this collection+date
+                existing_max = CollectionItineraryItem.objects.filter(
+                    collection_id=collection_id,
+                    date=item_date,
+                    is_global=False
+                ).aggregate(max_order=models.Max('order'))['max_order']
+                
+                # Check if the requested order conflicts with existing items
+                if existing_max is not None and item_order <= existing_max:
+                    # Assign next available order
+                    data['order'] = existing_max + 1
         
         # Proceed with normal serializer flow using modified data
         serializer = self.get_serializer(data=data)

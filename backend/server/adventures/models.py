@@ -15,6 +15,7 @@ from adventures.utils.timezones import TIMEZONES
 from adventures.utils.sports_types import SPORT_TYPE_CHOICES
 from adventures.utils.get_is_visited import is_location_visited
 from django.contrib.contenttypes.fields import GenericForeignKey
+from django.db.models import Q
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericRelation
 
@@ -721,17 +722,45 @@ class CollectionItineraryItem(models.Model):
     item = GenericForeignKey("content_type", "object_id")
 
     # Placement (planning concern, not content concern)
+    # Either a specific date or marked as trip-wide (global). Exactly one of these applies.
     date = models.DateField(blank=True, null=True)
+    is_global = models.BooleanField(default=False, help_text="Applies to the whole trip (no specific date)")
     order = models.PositiveIntegerField(help_text="Manual order within a day")
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["date", "order"]
-        unique_together = ("collection", "date", "order")
+        constraints = [
+            # Ensure unique order per day for dated items
+            models.UniqueConstraint(
+                fields=["collection", "date", "order"],
+                name="unique_order_per_collection_day",
+                condition=Q(is_global=False) & Q(date__isnull=False),
+            ),
+            # Ensure unique order within the global group for a collection
+            models.UniqueConstraint(
+                fields=["collection", "order"],
+                name="unique_order_per_collection_global",
+                condition=Q(is_global=True),
+            ),
+        ]
 
     def __str__(self):
-        return f"{self.collection.name} - {self.content_type.model} - {self.date} ({self.order})"
+        scope = "GLOBAL" if self.is_global else str(self.date)
+        return f"{self.collection.name} - {self.content_type.model} - {scope} ({self.order})"
+
+    def clean(self):
+        # Enforce XOR between date and is_global
+        if self.is_global and self.date is not None:
+            raise ValidationError({
+                "is_global": "Global items must not have a date.",
+                "date": "Provide either a date or set is_global, not both.",
+            })
+        if (not self.is_global) and self.date is None:
+            raise ValidationError({
+                "date": "Dated items must include a date. To create a trip-wide item, set is_global=true.",
+            })
     
     @property
     def start_datetime(self):

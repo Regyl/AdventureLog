@@ -585,6 +585,7 @@ export type CollectionItineraryItem = {
 	object_id: string; // UUID of the referenced object
 	item: Visit | Transportation | Lodging | Note | Checklist; // The actual referenced object
 	date: string | null; // ISO 8601 date string
+	is_global?: boolean; // Trip-wide item (no specific date)
 	order: number; // Manual order within a day
 	created_at: string; // ISO 8601 date string
 	start_datetime: string | null; // Computed property - ISO 8601 date string

@@ -55,6 +55,11 @@
 
 	$: days = groupItemsByDay(collection);
 	$: unscheduledItems = getUnscheduledItems(collection);
+	// Trip-wide (global) itinerary items
+	$: globalItems = (collection.itinerary || [])
+		.filter((it) => it.is_global)
+		.map((it) => resolveItineraryItem(it, collection))
+		.sort((a, b) => a.order - b.order);
 
 	// Auto-generate state
 	let isAutoGenerating = false;
@@ -605,6 +610,29 @@
 		days = [...days];
 	}
 
+	function handleDndConsiderGlobal(e: CustomEvent) {
+		const { items: newItems } = e.detail;
+		globalItems = newItems;
+	}
+
+	async function handleDndFinalizeGlobal(e: CustomEvent) {
+		const { items: newItems, info } = e.detail;
+		globalItems = newItems;
+		if (
+			info.trigger === TRIGGERS.DROPPED_INTO_ZONE ||
+			info.trigger === TRIGGERS.DROPPED_INTO_ANOTHER
+		) {
+			if (!isSavingOrder) {
+				isSavingOrder = true;
+				try {
+					await saveReorderedItems();
+				} finally {
+					isSavingOrder = false;
+				}
+			}
+		}
+	}
+
 	async function handleDndFinalize(dayIndex: number, e: CustomEvent) {
 		const { items: newItems, info } = e.detail;
 
@@ -635,7 +663,7 @@
 	async function saveReorderedItems() {
 		try {
 			// Collect all items across all days with their new positions
-			const itemsToUpdate = days.flatMap((day) =>
+			const dayUpdates = days.flatMap((day) =>
 				day.items
 					.filter((item) => item.id && !item[SHADOW_ITEM_MARKER_PROPERTY_NAME])
 					.map((item, index) => ({
@@ -644,6 +672,12 @@
 						order: index
 					}))
 			);
+
+			const globalUpdates = globalItems
+				.filter((item) => item.id && !item[SHADOW_ITEM_MARKER_PROPERTY_NAME])
+				.map((item, index) => ({ id: item.id, is_global: true, date: null, order: index }));
+
+			const itemsToUpdate = [...dayUpdates, ...globalUpdates];
 
 			if (itemsToUpdate.length === 0) {
 				return;
@@ -672,6 +706,7 @@
 					return {
 						...it,
 						date: updatedItem.date,
+						is_global: updatedItem.is_global ?? it.is_global,
 						order: updatedItem.order
 					};
 				}
@@ -682,6 +717,69 @@
 			console.error('Error saving itinerary order:', error);
 			// Optionally show error notification to user
 			alert('Failed to save itinerary order. Please try again.');
+		}
+	}
+
+	// Add a trip-wide (global) itinerary item
+	async function addGlobalItineraryItemForObject(objectType: string, objectId: string) {
+		const tempId = `temp-global-${Date.now()}`;
+		const order = globalItems.length;
+
+		const newIt = {
+			id: tempId,
+			collection: collection.id,
+			content_type: objectType,
+			object_id: objectId,
+			item: { id: objectId, type: objectType },
+			date: null,
+			is_global: true,
+			order,
+			created_at: new Date().toISOString()
+		};
+
+		collection.itinerary = [...(collection.itinerary || []), newIt];
+		// trigger reactive globals and days
+		days = groupItemsByDay(collection);
+		globalItems = (collection.itinerary || [])
+			.filter((it) => it.is_global)
+			.map((it) => resolveItineraryItem(it, collection))
+			.sort((a, b) => a.order - b.order);
+
+		try {
+			const res = await fetch('/api/itineraries/', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					collection: collection.id,
+					content_type: objectType,
+					object_id: objectId,
+					is_global: true,
+					order
+				})
+			});
+
+			if (!res.ok) {
+				const j = await res.json().catch(() => ({}));
+				throw new Error(j.detail || 'Failed to add global itinerary item');
+			}
+
+			const created = await res.json();
+			collection.itinerary = collection.itinerary.map((it) => (it.id === tempId ? created : it));
+			// refresh
+			days = groupItemsByDay(collection);
+			globalItems = (collection.itinerary || [])
+				.filter((it) => it.is_global)
+				.map((it) => resolveItineraryItem(it, collection))
+				.sort((a, b) => a.order - b.order);
+		} catch (err) {
+			console.error('Error creating global itinerary item:', err);
+			alert('Failed to add item to trip-wide itinerary.');
+			collection.itinerary = collection.itinerary.filter((it) => it.id !== tempId);
+			days = groupItemsByDay(collection);
+			globalItems = (collection.itinerary || [])
+				.filter((it) => it.is_global)
+				.map((it) => resolveItineraryItem(it, collection))
+				.sort((a, b) => a.order - b.order);
 		}
 	}
 
@@ -1139,6 +1237,166 @@
 	</div>
 {:else}
 	<div class="space-y-6">
+		<!-- Trip-wide (Global) Items -->
+		{#if globalItems.length > 0 || canModify}
+			<div class="card bg-base-200 shadow-xl">
+				<div class="card-body">
+					<div class="flex items-center gap-3 mb-4 pb-4 border-b border-base-300">
+						<div
+							class="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary"
+						>
+							<CalendarBlank class="w-4 h-4" />
+						</div>
+						<h3 class="text-xl font-bold">
+							{$t('itinerary.trip_wide_items') || 'Trip-wide Items'}
+						</h3>
+						{#if canModify}
+							<div class="dropdown z-30 ml-auto">
+								<button
+									type="button"
+									class="btn btn-square btn-sm btn-outline p-1"
+									aria-haspopup="menu"
+									aria-expanded="false"
+									title={$t('adventures.add')}
+								>
+									<Plus class="w-5 h-5" />
+								</button>
+								<ul
+									class="dropdown-content menu p-2 shadow bg-base-300 rounded-box w-56"
+									role="menu"
+								>
+									<li class="menu-title">{$t('itinerary.link_existing_item')}</li>
+									<li class="text-xs opacity-70 px-2 py-1 select-none">
+										Add items below (Unscheduled) to trip-wide
+									</li>
+								</ul>
+							</div>
+						{/if}
+					</div>
+
+					{#if globalItems.length === 0}
+						<div
+							class="card bg-base-100 shadow-sm border border-dashed border-base-300 p-4 text-center"
+						>
+							<div class="card-body p-2">
+								<CalendarBlank class="w-8 h-8 mx-auto mb-2 opacity-40" />
+								<p class="opacity-70">
+									{$t('itinerary.no_trip_wide_items') || 'No trip-wide items yet'}
+								</p>
+							</div>
+						</div>
+					{:else}
+						<div
+							use:dndzone={{
+								items: globalItems,
+								flipDurationMs,
+								dropTargetStyle: { outline: 'none', border: 'none' },
+								dragDisabled: isSavingOrder || !canModify,
+								dropFromOthersDisabled: true
+							}}
+							on:consider={handleDndConsiderGlobal}
+							on:finalize={handleDndFinalizeGlobal}
+							class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"
+						>
+							{#each globalItems as item (item.id)}
+								{@const objectType = item.item?.type || ''}
+								{@const resolvedObj = item.resolvedObject}
+								<div
+									class="group relative transition-all duration-200 pointer-events-auto h-full"
+									animate:flip={{ duration: flipDurationMs }}
+								>
+									{#if resolvedObj}
+										{#if canModify}
+											<div
+												class="absolute left-2 top-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+												title="Drag to reorder"
+											>
+												<div
+													class="itinerary-drag-handle btn btn-circle btn-xs btn-ghost bg-base-100/80 backdrop-blur-sm shadow-sm hover:bg-base-200 cursor-grab active:cursor-grabbing"
+													aria-label="Drag to reorder"
+													role="button"
+													tabindex="0"
+												>
+													<svg
+														xmlns="http://www.w3.org/2000/svg"
+														class="h-3 w-3"
+														fill="none"
+														viewBox="0 0 24 24"
+														stroke="currentColor"
+														><path
+															stroke-linecap="round"
+															stroke-linejoin="round"
+															stroke-width="2"
+															d="M4 8h16M4 16h16"
+														/></svg
+													>
+												</div>
+											</div>
+										{/if}
+										{#if objectType === 'location'}
+											<LocationCard
+												adventure={resolvedObj}
+												on:edit={handleEditLocation}
+												on:delete={handleItemDelete}
+												itineraryItem={item}
+												on:removeFromItinerary={handleRemoveItineraryItem}
+												{user}
+												{collection}
+												compact={true}
+											/>
+										{:else if objectType === 'transportation'}
+											<TransportationCard
+												transportation={resolvedObj}
+												{user}
+												{collection}
+												on:delete={handleItemDelete}
+												itineraryItem={item}
+												on:removeFromItinerary={handleRemoveItineraryItem}
+												on:edit={handleEditTransportation}
+											/>
+										{:else if objectType === 'lodging'}
+											<LodgingCard
+												lodging={resolvedObj}
+												{user}
+												{collection}
+												itineraryItem={item}
+												on:delete={handleItemDelete}
+												on:removeFromItinerary={handleRemoveItineraryItem}
+												on:edit={handleEditLodging}
+											/>
+										{:else if objectType === 'note'}
+											<NoteCard
+												note={resolvedObj}
+												{user}
+												{collection}
+												on:delete={handleItemDelete}
+												itineraryItem={item}
+												on:removeFromItinerary={handleRemoveItineraryItem}
+												on:edit={handleEditNote}
+											/>
+										{:else if objectType === 'checklist'}
+											<ChecklistCard
+												checklist={resolvedObj}
+												{user}
+												{collection}
+												on:delete={handleItemDelete}
+												itineraryItem={item}
+												on:removeFromItinerary={handleRemoveItineraryItem}
+												on:edit={handleEditChecklist}
+											/>
+										{/if}
+									{:else}
+										<div class="alert alert-warning">
+											<span>⚠️ {$t('itinerary.item_not_found')} (ID: {item.object_id})</span>
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			</div>
+		{/if}
 		<!-- Scheduled Days -->
 		{#each days as day, dayIndex}
 			{@const dayNumber = dayIndex + 1}
@@ -1617,26 +1875,47 @@
 								<!-- "Add to itinerary" indicator -->
 								{#if canModify}
 									<div class="absolute -right-2 top-2 z-10">
-										<button
-											class="btn btn-circle btn-sm btn-primary"
-											title="Add to itinerary"
-											on:click={() => handleOpenDayPickerForItem(type, item)}
-										>
-											<svg
-												xmlns="http://www.w3.org/2000/svg"
-												class="h-4 w-4"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
+										<div class="join">
+											<button
+												class="btn btn-circle btn-sm btn-primary join-item"
+												title="Add to day"
+												on:click={() => handleOpenDayPickerForItem(type, item)}
 											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M12 4v16m8-8H4"
-												/>
-											</svg>
-										</button>
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													class="h-4 w-4"
+													fill="none"
+													viewBox="0 0 24 24"
+													stroke="currentColor"
+												>
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														stroke-width="2"
+														d="M12 4v16m8-8H4"
+													/>
+												</svg>
+											</button>
+											<button
+												class="btn btn-circle btn-sm btn-outline join-item"
+												title="Add to trip-wide"
+												on:click={() => addGlobalItineraryItemForObject(type, item.id)}
+											>
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													class="h-4 w-4"
+													fill="none"
+													viewBox="0 0 24 24"
+													stroke="currentColor"
+													><path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														stroke-width="2"
+														d="M8 17l4 4 4-4m-4-13v17"
+													/></svg
+												>
+											</button>
+										</div>
 									</div>
 								{/if}
 

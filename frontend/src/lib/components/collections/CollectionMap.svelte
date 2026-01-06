@@ -222,9 +222,20 @@
 		return features;
 	}
 
+	function getActivityDate(activity: any, visit?: any): string | null {
+		return (
+			activity?.start_date ||
+			activity?.start_date_local ||
+			visit?.start_date ||
+			visit?.end_date ||
+			null
+		);
+	}
+
 	// Merge attachments/activity geojson into a single feature collection
 	function collectLinesGeojson(
-		coll: Collection
+		coll: Collection,
+		filters: { startDate: string; endDate: string }
 	): { type: 'FeatureCollection'; features: any[] } | null {
 		if (!coll) return null;
 		const features: any[] = [];
@@ -246,6 +257,8 @@
 				for (const visit of loc.visits) {
 					if (!visit.activities) continue;
 					for (const activity of visit.activities) {
+						const activityDate = getActivityDate(activity, visit);
+						if (!isWithinDateRange(activityDate, filters.startDate, filters.endDate)) continue;
 						if (activity && activity.geojson) {
 							// normalize features and inject activity-type color
 							const color = getActivityColor(activity.sport_type || (activity as any).type || '');
@@ -324,7 +337,10 @@
 		.filter(Boolean) as MarkerFeature[];
 
 	$: allFeatures = [...locationFeatures, ...lodgingFeatures, ...transportationFeatures];
-	$: linesGeoJson = collectLinesGeojson(collection);
+	$: linesGeoJson = collectLinesGeojson(collection, {
+		startDate: startDateFilter || collection?.start_date || '',
+		endDate: endDateFilter || collection?.end_date || ''
+	});
 
 	function matchesFilters(
 		feature: MarkerFeature,

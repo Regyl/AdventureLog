@@ -139,9 +139,14 @@
 				location: initialStartLocation.location
 			};
 			startMarker = { lng: initialStartLocation.lng, lat: initialStartLocation.lat };
-			startCode =
-				initialStartCode || deriveCode(initialStartLocation.name, initialStartLocation.name);
-			startSearchQuery = startCode || initialStartLocation.location || initialStartLocation.name;
+			if (airportMode) {
+				startCode =
+					initialStartCode || deriveCode(initialStartLocation.name, initialStartLocation.name);
+				startSearchQuery = startCode || initialStartLocation.location || initialStartLocation.name;
+			} else {
+				startCode = null;
+				startSearchQuery = initialStartLocation.location || initialStartLocation.name;
+			}
 			await performDetailedReverseGeocode(
 				initialStartLocation.lat,
 				initialStartLocation.lng,
@@ -157,8 +162,13 @@
 				location: initialEndLocation.location
 			};
 			endMarker = { lng: initialEndLocation.lng, lat: initialEndLocation.lat };
-			endCode = initialEndCode || deriveCode(initialEndLocation.name, initialEndLocation.name);
-			endSearchQuery = endCode || initialEndLocation.location || initialEndLocation.name;
+			if (airportMode) {
+				endCode = initialEndCode || deriveCode(initialEndLocation.name, initialEndLocation.name);
+				endSearchQuery = endCode || initialEndLocation.location || initialEndLocation.name;
+			} else {
+				endCode = null;
+				endSearchQuery = initialEndLocation.location || initialEndLocation.name;
+			}
 			await performDetailedReverseGeocode(initialEndLocation.lat, initialEndLocation.lng, 'end');
 		}
 

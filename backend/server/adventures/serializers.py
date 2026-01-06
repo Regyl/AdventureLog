@@ -1042,7 +1042,7 @@ class CollectionItineraryItemSerializer(CustomModelSerializer):
     
     class Meta:
         model = CollectionItineraryItem
-        fields = ['id', 'collection', 'content_type', 'object_id', 'item', 'date', 'order', 'start_datetime', 'end_datetime', 'created_at', 'object_name']
+        fields = ['id', 'collection', 'content_type', 'object_id', 'item', 'date', 'is_global', 'order', 'start_datetime', 'end_datetime', 'created_at', 'object_name']
         read_only_fields = ['id', 'created_at', 'start_datetime', 'end_datetime', 'item', 'object_name']
     
     def update(self, instance, validated_data):

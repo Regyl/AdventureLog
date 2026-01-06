@@ -339,6 +339,7 @@ class BackupViewSet(viewsets.ViewSet):
                         'content_type': content_type_str,
                         'item_reference': item_reference,
                         'date': itinerary_item.date.isoformat() if itinerary_item.date else None,
+                        'is_global': itinerary_item.is_global,
                         'order': itinerary_item.order
                     })
         
@@ -922,7 +923,8 @@ class BackupViewSet(viewsets.ViewSet):
                     collection=collection,
                     content_type=content_type,
                     object_id=content_object.id,
-                    date=itinerary_data.get('date'),
+                    date=itinerary_data.get('date') if not itinerary_data.get('is_global') else None,
+                    is_global=bool(itinerary_data.get('is_global', False)),
                     order=itinerary_data['order']
                 )
                 summary['itinerary_items'] += 1

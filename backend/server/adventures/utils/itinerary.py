@@ -74,8 +74,14 @@ def reorder_itinerary_items(user, items_data: List[dict]):
             continue
 
         new_date = item_data.get('date')
+        new_is_global = item_data.get('is_global')
         new_order = item_data.get('order')
-        if new_date is not None:
+        # If is_global is explicitly provided, set it and reconcile date accordingly
+        if new_is_global is not None:
+            item.is_global = bool(new_is_global)
+            if item.is_global:
+                item.date = None
+        if (new_date is not None) and (not item.is_global):
             # validate date is within collection bounds (if collection has start/end)
             parsed = None
             try:
@@ -104,6 +110,6 @@ def reorder_itinerary_items(user, items_data: List[dict]):
         updated_items.append(item)
 
     if updated_items:
-        CollectionItineraryItem.objects.bulk_update(updated_items, ['date', 'order'])
+        CollectionItineraryItem.objects.bulk_update(updated_items, ['date', 'is_global', 'order'])
 
     return updated_items

@@ -20,6 +20,7 @@
 	import CollectionItineraryPlanner from '$lib/components/collections/CollectionItineraryPlanner.svelte';
 	import CollectionRecommendationView from '$lib/components/CollectionRecommendationView.svelte';
 	import CollectionMap from '$lib/components/collections/CollectionMap.svelte';
+	import CollectionStats from '$lib/components/collections/CollectionStats.svelte';
 	import LocationLink from '$lib/components/LocationLink.svelte';
 	import { getBasemapUrl } from '$lib';
 	import { formatMoney, toMoneyValue, DEFAULT_CURRENCY } from '$lib/money';
@@ -28,6 +29,7 @@
 	import Timeline from '~icons/mdi/timeline';
 	import Map from '~icons/mdi/map';
 	import Lightbulb from '~icons/mdi/lightbulb';
+	import ChartBar from '~icons/mdi/chart-bar';
 	import Plus from '~icons/mdi/plus';
 	import { addToast } from '$lib/toasts';
 	import NoteModal from '$lib/components/NoteModal.svelte';
@@ -88,7 +90,7 @@
 	}
 
 	// View state from URL params
-	type ViewType = 'all' | 'itinerary' | 'map' | 'calendar' | 'recommendations';
+	type ViewType = 'all' | 'itinerary' | 'map' | 'calendar' | 'recommendations' | 'stats';
 	let currentView: ViewType = 'itinerary';
 
 	// Determine if this is a folder view (no dates) or itinerary view (has dates)
@@ -123,7 +125,8 @@
 			) ||
 			false,
 		calendar: !isFolderView,
-		recommendations: true // may be overridden by permission check below
+		recommendations: true, // may be overridden by permission check below
+		stats: true
 	};
 
 	// Get default view based on available views
@@ -135,7 +138,7 @@
 		const view = $page.url.searchParams.get('view') as ViewType;
 		if (
 			view &&
-			['all', 'itinerary', 'map', 'calendar', 'recommendations'].includes(view) &&
+			['all', 'itinerary', 'map', 'calendar', 'recommendations', 'stats'].includes(view) &&
 			availableViews[view]
 		) {
 			currentView = view;
@@ -1019,6 +1022,16 @@
 						<span class="hidden sm:inline">{$t('recomendations.recommendations')}</span>
 					</button>
 				{/if}
+				{#if availableViews.stats}
+					<button
+						class="btn join-item"
+						class:btn-active={currentView === 'stats'}
+						on:click={() => switchView('stats')}
+					>
+						<ChartBar class="w-5 h-5 sm:mr-2" aria-hidden="true" />
+						<span class="hidden sm:inline">{$t('collections.statistics')}</span>
+					</button>
+				{/if}
 			</div>
 		</div>
 
@@ -1054,6 +1067,11 @@
 						user={data.user}
 						canModify={canModifyCollection}
 					/>
+				{/if}
+
+				<!-- Stats View -->
+				{#if currentView === 'stats'}
+					<CollectionStats {collection} user={data.user} />
 				{/if}
 
 				<!-- Map View -->
