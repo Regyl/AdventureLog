@@ -273,17 +273,40 @@
 	}
 
 	async function handleNoteUpsert(note: Note) {
+		// Get the old note to compare dates
+		const oldNote = collection.notes?.find((n) => n.id === note.id);
+		const oldDate = oldNote ? normalizeDateOnly(oldNote.date) : null;
+		const newDate = normalizeDateOnly(note.date);
+
 		upsertNote(note);
 
-		const noteDate = normalizeDateOnly(note.date);
-		const targetDate = noteDate || pendingAddDate;
-		const isAlreadyScheduled = collection.itinerary?.some(
-			(it) => it.item?.type === 'note' && it.object_id === note.id && it.date === targetDate
-		);
+		const targetDate = newDate || pendingAddDate;
 
 		try {
+			// If the date changed, remove old itinerary items for this note on the old date
+			if (oldDate && newDate && oldDate !== newDate) {
+				// Remove itinerary items from the old date
+				const itemsToRemove =
+					collection.itinerary?.filter(
+						(it) => it.item?.type === 'note' && it.object_id === note.id && it.date === oldDate
+					) || [];
+
+				for (const item of itemsToRemove) {
+					await fetch(`/api/itinerary/${item.id}`, { method: 'DELETE' });
+				}
+
+				collection.itinerary =
+					collection.itinerary?.filter(
+						(it) => !(it.item?.type === 'note' && it.object_id === note.id && it.date === oldDate)
+					) || [];
+			}
+
+			const isAlreadyScheduled = collection.itinerary?.some(
+				(it) => it.item?.type === 'note' && it.object_id === note.id && it.date === targetDate
+			);
+
 			if (targetDate && !isAlreadyScheduled) {
-				await addItineraryItemForObject('note', note.id, targetDate, !noteDate && !!pendingAddDate);
+				await addItineraryItemForObject('note', note.id, targetDate, !newDate && !!pendingAddDate);
 			}
 		} finally {
 			pendingAddDate = null;
@@ -292,22 +315,51 @@
 	}
 
 	async function handleChecklistUpsert(checklist: Checklist) {
+		// Get the old checklist to compare dates
+		const oldChecklist = collection.checklists?.find((c) => c.id === checklist.id);
+		const oldDate = oldChecklist ? normalizeDateOnly(oldChecklist.date) : null;
+		const newDate = normalizeDateOnly(checklist.date);
+
 		upsertChecklist(checklist);
 
-		const checklistDate = normalizeDateOnly(checklist.date);
-		const targetDate = checklistDate || pendingAddDate;
-		const isAlreadyScheduled = collection.itinerary?.some(
-			(it) =>
-				it.item?.type === 'checklist' && it.object_id === checklist.id && it.date === targetDate
-		);
+		const targetDate = newDate || pendingAddDate;
 
 		try {
+			// If the date changed, remove old itinerary items for this checklist on the old date
+			if (oldDate && newDate && oldDate !== newDate) {
+				// Remove itinerary items from the old date
+				const itemsToRemove =
+					collection.itinerary?.filter(
+						(it) =>
+							it.item?.type === 'checklist' && it.object_id === checklist.id && it.date === oldDate
+					) || [];
+
+				for (const item of itemsToRemove) {
+					await fetch(`/api/itinerary/${item.id}`, { method: 'DELETE' });
+				}
+
+				collection.itinerary =
+					collection.itinerary?.filter(
+						(it) =>
+							!(
+								it.item?.type === 'checklist' &&
+								it.object_id === checklist.id &&
+								it.date === oldDate
+							)
+					) || [];
+			}
+
+			const isAlreadyScheduled = collection.itinerary?.some(
+				(it) =>
+					it.item?.type === 'checklist' && it.object_id === checklist.id && it.date === targetDate
+			);
+
 			if (targetDate && !isAlreadyScheduled) {
 				await addItineraryItemForObject(
 					'checklist',
 					checklist.id,
 					targetDate,
-					!checklistDate && !!pendingAddDate
+					!newDate && !!pendingAddDate
 				);
 			}
 		} finally {

@@ -90,6 +90,10 @@
 		return new Date(parsed).toISOString().split('T')[0];
 	}
 
+	// Normalize collection start/end dates to YYYY-MM-DD for cross-browser compatibility (Firefox is strict)
+	$: collectionStartDateISO = formatShortDate(collection?.start_date || null) || undefined;
+	$: collectionEndDateISO = formatShortDate(collection?.end_date || null) || undefined;
+
 	type FilterConfig = {
 		showLocations: boolean;
 		showLodging: boolean;
@@ -846,8 +850,8 @@
 							type="date"
 							bind:value={startDateFilter}
 							class="input input-sm input-bordered w-full"
-							min={collection.start_date}
-							max={collection.end_date}
+							min={collectionStartDateISO}
+							max={collectionEndDateISO}
 						/>
 					</label>
 					<label class="form-control">
@@ -856,8 +860,8 @@
 							type="date"
 							bind:value={endDateFilter}
 							class="input input-sm input-bordered w-full"
-							min={collection.start_date}
-							max={collection.end_date}
+							min={collectionStartDateISO}
+							max={collectionEndDateISO}
 						/>
 					</label>
 				</div>
