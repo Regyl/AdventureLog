@@ -30,6 +30,8 @@
 	import ChecklistModal from '$lib/components/ChecklistModal.svelte';
 	import ItineraryLinkModal from '$lib/components/collections/ItineraryLinkModal.svelte';
 	import ItineraryDayPickModal from '$lib/components/collections/ItineraryDayPickModal.svelte';
+	import Car from '~icons/mdi/car';
+	import LocationMarker from '~icons/mdi/map-marker';
 	import { t } from 'svelte-i18n';
 	import { addToast } from '$lib/toasts';
 	import Globe from '~icons/mdi/globe';
@@ -52,6 +54,7 @@
 		displayDate: string;
 		items: ResolvedItineraryItem[];
 		overnightLodging: Lodging[]; // Lodging where guest is staying overnight (not check-in day)
+		globalDatedItems: ResolvedItineraryItem[]; // Trip-wide items that still carry a date
 		dayMetadata: CollectionItineraryDay | null; // Day name and description
 	};
 
@@ -635,6 +638,97 @@
 		});
 	}
 
+	function getGlobalItemsByDate(collection: Collection): Map<string, ResolvedItineraryItem[]> {
+		const grouped = new Map<string, ResolvedItineraryItem[]>();
+
+		// Filter for global items only (no date filter - extract from resolved object)
+		// Determine collection date range for filtering visits
+		let collectionStart: DateTime | null = null;
+		let collectionEnd: DateTime | null = null;
+		if (collection.start_date)
+			collectionStart = DateTime.fromISO(collection.start_date).startOf('day');
+		if (collection.end_date) collectionEnd = DateTime.fromISO(collection.end_date).startOf('day');
+
+		collection.itinerary
+			?.filter((item) => item.is_global)
+			.forEach((item) => {
+				const resolved = resolveItineraryItem(item, collection);
+				const objectType = resolved.item?.type || '';
+				const datesToAdd = new Set<string>();
+
+				// Helper to clamp dates to collection range and dedupe
+				function addDateIfInRange(date: DateTime) {
+					if (collectionStart && date < collectionStart) return;
+					if (collectionEnd && date > collectionEnd) return;
+					const iso = date.toISODate();
+					if (iso) datesToAdd.add(iso);
+				}
+
+				// Extract date(s) from the resolved object based on its type
+				if (objectType === 'location') {
+					const location = resolved.resolvedObject as Location | null;
+					if (location?.visits && location.visits.length > 0) {
+						location.visits.forEach((visit) => {
+							if (!visit.start_date) return;
+							const start = DateTime.fromISO(visit.start_date.split('T')[0]).startOf('day');
+							const end = visit.end_date
+								? DateTime.fromISO(visit.end_date.split('T')[0]).startOf('day')
+								: start;
+
+							let cursor = start;
+							// If end is before start, treat as single day
+							const last = end < start ? start : end;
+							while (cursor <= last) {
+								addDateIfInRange(cursor);
+								cursor = cursor.plus({ days: 1 });
+							}
+						});
+					}
+				} else if (objectType === 'transportation') {
+					const transport = resolved.resolvedObject as Transportation | null;
+					if (transport?.date) {
+						addDateIfInRange(DateTime.fromISO(transport.date.split('T')[0]).startOf('day'));
+					}
+				} else if (objectType === 'lodging') {
+					const lodging = resolved.resolvedObject as Lodging | null;
+					if (lodging?.check_in) {
+						const start = DateTime.fromISO(lodging.check_in.split('T')[0]).startOf('day');
+						const end = lodging.check_out
+							? DateTime.fromISO(lodging.check_out.split('T')[0]).startOf('day').minus({ days: 1 })
+							: start;
+						const last = end < start ? start : end;
+
+						let cursor = start;
+						while (cursor <= last) {
+							addDateIfInRange(cursor);
+							cursor = cursor.plus({ days: 1 });
+						}
+					}
+				} else if (objectType === 'note') {
+					const note = resolved.resolvedObject as Note | null;
+					if (note?.date) {
+						addDateIfInRange(DateTime.fromISO(note.date.split('T')[0]).startOf('day'));
+					}
+				} else if (objectType === 'checklist') {
+					const checklist = resolved.resolvedObject as Checklist | null;
+					if (checklist?.date) {
+						addDateIfInRange(DateTime.fromISO(checklist.date.split('T')[0]).startOf('day'));
+					}
+				}
+
+				// Add the item to each applicable date
+				datesToAdd.forEach((dateISO) => {
+					if (!grouped.has(dateISO)) grouped.set(dateISO, []);
+					grouped.get(dateISO)!.push(resolved);
+				});
+			});
+
+		// Sort items within each date group by order
+		grouped.forEach((items) => items.sort((a, b) => a.order - b.order));
+
+		return grouped;
+	}
+
 	function resolveItineraryItem(
 		item: CollectionItineraryItem,
 		collection: Collection
@@ -664,6 +758,8 @@
 	}
 
 	function groupItemsByDay(collection: Collection): DayGroup[] {
+		const globalByDate = getGlobalItemsByDate(collection);
+
 		// Build a map of date -> resolved items from existing itinerary entries
 		const grouped = new Map<string, ResolvedItineraryItem[]>();
 
@@ -702,6 +798,7 @@
 			const iso = dt.toISODate();
 			const items = (grouped.get(iso) || []).sort((a, b) => a.order - b.order);
 			const overnightLodging = getOvernightLodgingForDate(collection, iso);
+			const globalDatedItems = globalByDate.get(iso) || [];
 
 			// Find day metadata for this date
 			const dayMetadata = collection.itinerary_days?.find((d) => d.date === iso) || null;
@@ -711,6 +808,7 @@
 				displayDate: dt.toFormat('cccc, LLLL d, yyyy'),
 				items,
 				overnightLodging,
+				globalDatedItems,
 				dayMetadata
 			});
 		}
@@ -2141,44 +2239,106 @@
 						{/if}
 					</div>
 
-					<!-- Overnight Lodging Indicator -->
-					{#if day.overnightLodging.length > 0}
+					<!-- Overnight Lodging + Dated Trip-wide Indicators (share row to save space) -->
+					{#if day.overnightLodging.length > 0 || day.globalDatedItems.length > 0}
 						<div class="mt-4 pt-4 border-t border-base-300 border-dashed">
-							<div class="flex items-center gap-2 mb-2 opacity-70">
-								<Bed class="w-4 h-4" />
-								<span class="text-sm font-medium">{$t('itinerary.staying_overnight')}</span>
-							</div>
-							<div class="space-y-2">
-								{#each day.overnightLodging as lodging}
-									{@const checkOut = lodging.check_out
-										? DateTime.fromISO(lodging.check_out.split('T')[0]).toFormat('LLL d')
-										: null}
-									<div
-										class="flex items-center gap-3 bg-base-100 rounded-lg px-4 py-3 border border-base-300"
-									>
-										<div
-											class="flex items-center justify-center w-8 h-8 rounded-full bg-info/20 text-info"
-										>
+							<div class="flex flex-wrap gap-6 items-start">
+								{#if day.overnightLodging.length > 0}
+									<div class="space-y-2 min-w-[240px] flex-1">
+										<div class="flex items-center gap-2 mb-1 opacity-70">
 											<Bed class="w-4 h-4" />
+											<span class="text-sm font-medium">{$t('itinerary.staying_overnight')}</span>
 										</div>
-										<div class="flex-1 min-w-0">
-											<a
-												href={`/lodging/${lodging.id}`}
-												class="hover:text-primary transition-colors duration-200 line-clamp-2 text-md font-semibold"
-											>
-												{lodging.name}
-											</a>
-											{#if lodging.location}
-												<p class="text-xs opacity-60 truncate">{lodging.location}</p>
-											{/if}
+										<div class="space-y-2">
+											{#each day.overnightLodging as lodging}
+												{@const checkOut = lodging.check_out
+													? DateTime.fromISO(lodging.check_out.split('T')[0]).toFormat('LLL d')
+													: null}
+												<div
+													class="flex items-center gap-3 bg-base-100 rounded-lg px-4 py-3 border border-base-300"
+												>
+													<div
+														class="flex items-center justify-center w-8 h-8 rounded-full bg-info/20 text-info"
+													>
+														<Bed class="w-4 h-4" />
+													</div>
+													<div class="flex-1 min-w-0">
+														<a
+															href={`/lodging/${lodging.id}`}
+															class="hover:text-primary transition-colors duration-200 line-clamp-2 text-md font-semibold"
+														>
+															{lodging.name}
+														</a>
+														{#if lodging.location}
+															<p class="text-xs opacity-60 truncate">{lodging.location}</p>
+														{/if}
+													</div>
+													{#if checkOut}
+														<div class="badge badge-ghost badge-sm">
+															{$t('adventures.check_out')}: {checkOut}
+														</div>
+													{/if}
+												</div>
+											{/each}
 										</div>
-										{#if checkOut}
-											<div class="badge badge-ghost badge-sm">
-												{$t('adventures.check_out')}: {checkOut}
-											</div>
-										{/if}
 									</div>
-								{/each}
+								{/if}
+
+								{#if day.globalDatedItems.length > 0}
+									<div class="space-y-2 min-w-[220px] flex-1">
+										<div class="flex items-center gap-2 mb-1 opacity-70">
+											<Globe class="w-4 h-4" />
+											<span class="text-sm font-medium"
+												>{$t('itinerary.trip_wide_items') || 'Trip-wide'}</span
+											>
+										</div>
+										<div class="space-y-2">
+											{#each day.globalDatedItems as globalItem (globalItem.id)}
+												{@const type = globalItem.item?.type || ''}
+												{@const obj = globalItem.resolvedObject}
+												{@const name = obj?.name || globalItem.item?.type || 'Item'}
+												{@const secondary =
+													type === 'location'
+														? obj?.location
+														: type === 'transportation'
+															? obj?.to_location || obj?.from_location
+															: type === 'lodging'
+																? obj?.location
+																: type === 'note' || type === 'checklist'
+																	? obj?.name
+																	: null}
+												<div
+													class="flex items-center gap-3 bg-base-100 rounded-lg px-4 py-3 border border-base-300"
+												>
+													<div
+														class="flex items-center justify-center w-8 h-8 rounded-full bg-base-300 text-base-content"
+													>
+														{#if type === 'lodging'}
+															<Bed class="w-4 h-4" />
+														{:else if type === 'location'}
+															<!-- show category icon (emoji) when available, fallback to map marker -->
+															{#if obj?.category?.icon}
+																<span class="text-lg">{obj.category.icon}</span>
+															{:else}
+																<LocationMarker class="w-4 h-4" />
+															{/if}
+														{:else if type === 'transportation'}
+															<Car class="w-4 h-4" />
+														{:else}
+															<Info class="w-4 h-4" />
+														{/if}
+													</div>
+													<div class="flex-1 min-w-0">
+														<p class="text-md font-semibold line-clamp-2">{name}</p>
+														{#if secondary}
+															<p class="text-xs opacity-60 truncate">{secondary}</p>
+														{/if}
+													</div>
+												</div>
+											{/each}
+										</div>
+									</div>
+								{/if}
 							</div>
 						</div>
 					{/if}
