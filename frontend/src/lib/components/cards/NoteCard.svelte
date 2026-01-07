@@ -201,7 +201,7 @@
 											class="text-info flex items-center gap-2"
 										>
 											<Globe class="w-4 h-4 text-info" />
-											{$t('itinerary.move_to_trip_wide') || 'Move to Trip-wide'}
+											{$t('itinerary.move_to_trip_context') || 'Move to Trip Context'}
 										</button>
 									</li>
 								{/if}

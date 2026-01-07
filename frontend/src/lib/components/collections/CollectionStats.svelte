@@ -11,6 +11,8 @@
 	} from '$lib/types';
 	// @ts-ignore
 	import { DateTime } from 'luxon';
+	import { t } from 'svelte-i18n';
+	import { get } from 'svelte/store';
 	// lodging icons and helpers
 	import { LODGING_TYPES_ICONS, getActivityIcon, SPORT_TYPE_CHOICES } from '$lib';
 
@@ -245,13 +247,19 @@
 	})();
 
 	$: scopeLabel = (() => {
-		const dayPart = tripDurationDays
-			? `${tripDurationDays} ${tripDurationDays === 1 ? 'day' : 'days'}`
-			: '';
-		const countryPart = countriesVisited.length
-			? `${countriesVisited.length} ${countriesVisited.length === 1 ? 'country' : 'countries'}`
-			: '';
-		return [dayPart, countryPart].filter(Boolean).join(' in ');
+		const $t = get(t);
+		const dayCount = tripDurationDays || 0;
+		const dayUnit = dayCount === 1 ? $t('adventures.day') : $t('adventures.days');
+
+		const countryCount = countriesVisited.length || 0;
+		const countryUnit =
+			countryCount === 1 ? $t('adventures.country') : $t('adventures.countries') || 'countries';
+
+		const dayPart = dayCount ? `${dayCount} ${dayUnit}` : '';
+		const countryPart = countryCount ? `${countryCount} ${countryUnit}` : '';
+
+		const connector = $t('adventures.in') || 'in';
+		return [dayPart, countryPart].filter(Boolean).join(` ${connector} `);
 	})();
 
 	$: windowLabel =
@@ -413,7 +421,7 @@
 						{/if}
 					</div>
 				{:else}
-					<p class="text-sm opacity-70">📁 Folder view - showing all data</p>
+					<p class="text-sm opacity-70">📁 {$t('adventures.folder_view')}</p>
 				{/if}
 			</div>
 
@@ -421,36 +429,38 @@
 			<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
 				<div class="stat bg-base-100 rounded-lg shadow p-4 border border-info/20">
 					<div class="stat-figure text-info text-3xl">📍</div>
-					<div class="stat-title text-xs">Footprints</div>
+					<div class="stat-title text-xs">{$t('adventures.footprints')}</div>
 					<div class="stat-value text-info text-2xl">{visitedLocations.length}</div>
-					<div class="stat-desc">Locations visited</div>
+					<div class="stat-desc">{$t('adventures.locations_visited')}</div>
 				</div>
 
 				<div class="stat bg-base-100 rounded-lg shadow p-4 border border-success/20">
 					<div class="stat-figure text-success text-3xl">📸</div>
-					<div class="stat-title text-xs">Photos</div>
+					<div class="stat-title text-xs">{$t('adventures.photos')}</div>
 					<div class="stat-value text-success text-2xl">
 						{compactFormatter.format(imagesInRange)}
 					</div>
-					<div class="stat-desc">Images captured</div>
+					<div class="stat-desc">{$t('adventures.images_captured')}</div>
 				</div>
 
 				<div class="stat bg-base-100 rounded-lg shadow p-4 border border-warning/20">
 					<div class="stat-figure text-warning text-3xl">🗺️</div>
-					<div class="stat-title text-xs">Countries</div>
+					<div class="stat-title text-xs">{$t('adventures.countries')}</div>
 					<div class="stat-value text-warning text-2xl">{countriesVisited.length}</div>
 					<div class="stat-desc">
-						{regionsVisited.length} regions, {citiesVisited.length} cities
+						{regionsVisited.length}
+						{$t('adventures.regions')}, {citiesVisited.length}
+						{$t('adventures.cities')}
 					</div>
 				</div>
 
 				<div class="stat bg-base-100 rounded-lg shadow p-4 border border-accent/20">
 					<div class="stat-figure text-accent text-3xl">👥</div>
-					<div class="stat-title text-xs">Travelers</div>
+					<div class="stat-title text-xs">{$t('adventures.travelers')}</div>
 					<div class="stat-value text-accent text-2xl">
 						{collection.collaborators?.length || 0}
 					</div>
-					<div class="stat-desc">On this trip</div>
+					<div class="stat-desc">{$t('adventures.on_this_trip')}</div>
 				</div>
 			</div>
 		</div>
@@ -461,13 +471,14 @@
 		<div class="card-body space-y-4">
 			<h3 class="card-title text-xl flex items-center gap-2">
 				<span class="text-2xl">🌎</span>
-				Geographic Breakdown
+				{$t('adventures.geographic_breakdown')}
 			</h3>
 
 			{#if countriesVisited.length}
 				<div>
 					<h4 class="font-semibold mb-2 flex items-center gap-2">
-						<span>🏳️</span> Countries ({countriesVisited.length})
+						<span>🏳️</span>
+						{$t('adventures.countries')} ({countriesVisited.length})
 					</h4>
 					<div class="flex flex-wrap gap-2">
 						{#each countriesVisited as country}
@@ -485,7 +496,8 @@
 			{#if regionsVisited.length}
 				<div>
 					<h4 class="font-semibold mb-2 flex items-center gap-2">
-						<span>🗺️</span> Regions ({regionsVisited.length})
+						<span>🗺️</span>
+						{$t('adventures.regions')} ({regionsVisited.length})
 					</h4>
 					<div class="flex flex-wrap gap-2">
 						{#each regionsVisited.slice(0, 15) as region}
@@ -503,7 +515,8 @@
 			{#if citiesVisited.length}
 				<div>
 					<h4 class="font-semibold mb-2 flex items-center gap-2">
-						<span>🏙️</span> Cities ({citiesVisited.length})
+						<span>🏙️</span>
+						{$t('adventures.cities')} ({citiesVisited.length})
 					</h4>
 					<div class="flex flex-wrap gap-2">
 						{#each citiesVisited.slice(0, 20) as city}
@@ -525,28 +538,28 @@
 		<div class="card-body">
 			<h3 class="card-title text-xl flex items-center gap-2">
 				<span class="text-2xl">📆</span>
-				Trip Timeline
+				{$t('adventures.trip_timeline')}
 			</h3>
 			<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
 				<div class="stat bg-primary/10 rounded-lg p-4">
-					<div class="stat-title text-xs">Total Days</div>
+					<div class="stat-title text-xs">{$t('adventures.total_days')}</div>
 					<div class="stat-value text-primary text-2xl">{tripDurationDays ?? 'N/A'}</div>
-					<div class="stat-desc">Trip window</div>
+					<div class="stat-desc">{$t('adventures.trip_window')}</div>
 				</div>
 				<div class="stat bg-success/10 rounded-lg p-4">
-					<div class="stat-title text-xs">Active Days</div>
+					<div class="stat-title text-xs">{$t('adventures.active_days')}</div>
 					<div class="stat-value text-success text-2xl">{activeDayCount}</div>
-					<div class="stat-desc">With activities</div>
+					<div class="stat-desc">{$t('adventures.with_activities')}</div>
 				</div>
 				<div class="stat bg-info/10 rounded-lg p-4">
-					<div class="stat-title text-xs">Visits</div>
+					<div class="stat-title text-xs">{$t('adventures.visits')}</div>
 					<div class="stat-value text-info text-2xl">{visitsInRange.length}</div>
-					<div class="stat-desc">Total visits</div>
+					<div class="stat-desc">{$t('adventures.total_visits')}</div>
 				</div>
 				<div class="stat bg-warning/10 rounded-lg p-4">
-					<div class="stat-title text-xs">Nights</div>
+					<div class="stat-title text-xs">{$t('adventures.nights')}</div>
 					<div class="stat-value text-warning text-2xl">{lodgingNights}</div>
-					<div class="stat-desc">{lodgingStays.length} stays</div>
+					<div class="stat-desc">{lodgingStays.length} {$t('adventures.stays')}</div>
 				</div>
 			</div>
 		</div>
@@ -558,7 +571,7 @@
 			<div class="card-body">
 				<h3 class="card-title text-xl flex items-center gap-2 mb-2">
 					<span class="text-2xl">🛣️</span>
-					Distance Traveled
+					{$t('adventures.distance_traveled')}
 				</h3>
 
 				<div
@@ -568,7 +581,10 @@
 						<div class="text-5xl font-bold text-primary">
 							{numberFormatter.format(totalDistance)}
 						</div>
-						<div class="text-sm opacity-70 mt-1">{getDistanceUnitLong()} traveled</div>
+						<div class="text-sm opacity-70 mt-1">
+							{getDistanceUnitLong()}
+							{$t('adventures.traveled')}
+						</div>
 					</div>
 				</div>
 
@@ -595,19 +611,19 @@
 			<div class="card-body">
 				<h3 class="card-title text-xl flex items-center gap-2 mb-2">
 					<span class="text-2xl">🏃</span>
-					Physical Activities
+					{$t('adventures.physical_activities')}
 				</h3>
 
 				<div class="stats stats-vertical sm:stats-horizontal shadow mb-4">
 					<div class="stat bg-accent/10">
 						<div class="stat-figure text-accent text-3xl">🎯</div>
-						<div class="stat-title">Activities</div>
+						<div class="stat-title">{$t('adventures.activities')}</div>
 						<div class="stat-value text-accent">{activitiesInRange.length}</div>
-						<div class="stat-desc">Total recorded</div>
+						<div class="stat-desc">{$t('adventures.total_recorded')}</div>
 					</div>
 					<div class="stat bg-info/10">
 						<div class="stat-figure text-info text-3xl">📏</div>
-						<div class="stat-title">Distance</div>
+						<div class="stat-title">{$t('adventures.distance')}</div>
 						<div class="stat-value text-info">
 							{distanceFormatter.format(totalActivityDistance)}
 						</div>
@@ -615,19 +631,19 @@
 					</div>
 					<div class="stat bg-success/10">
 						<div class="stat-figure text-success text-3xl">⛰️</div>
-						<div class="stat-title">Elevation</div>
+						<div class="stat-title">{$t('adventures.elevation')}</div>
 						<div class="stat-value text-success">
 							{numberFormatter.format(totalActivityElevation)}
 						</div>
-						<div class="stat-desc">{getElevationUnitLong()} gained</div>
+						<div class="stat-desc">{getElevationUnitLong()} {$t('adventures.gained')}</div>
 					</div>
 					<div class="stat bg-warning/10">
 						<div class="stat-figure text-warning text-3xl">🔥</div>
-						<div class="stat-title">Calories</div>
+						<div class="stat-title">{$t('adventures.calories')}</div>
 						<div class="stat-value text-warning">
 							{compactFormatter.format(totalActivityCalories)}
 						</div>
-						<div class="stat-desc">burned</div>
+						<div class="stat-desc">{$t('adventures.burned')}</div>
 					</div>
 				</div>
 
@@ -654,7 +670,7 @@
 		<div class="card-body">
 			<h3 class="card-title text-xl flex items-center gap-2 mb-2">
 				<span class="text-2xl">📱</span>
-				Content & Media
+				{$t('adventures.content_media')}
 			</h3>
 
 			<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -662,56 +678,56 @@
 					class="stat bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg p-4 border border-primary/30"
 				>
 					<div class="stat-figure text-primary text-3xl">📸</div>
-					<div class="stat-title text-xs">Photos</div>
+					<div class="stat-title text-xs">{$t('adventures.photos')}</div>
 					<div class="stat-value text-primary text-2xl">
 						{numberFormatter.format(imagesInRange)}
 					</div>
-					<div class="stat-desc">Images</div>
+					<div class="stat-desc">{$t('adventures.images')}</div>
 				</div>
 
 				<div
 					class="stat bg-gradient-to-br from-secondary/20 to-secondary/5 rounded-lg p-4 border border-secondary/30"
 				>
 					<div class="stat-figure text-secondary text-3xl">📝</div>
-					<div class="stat-title text-xs">Notes</div>
+					<div class="stat-title text-xs">{$t('adventures.notes')}</div>
 					<div class="stat-value text-secondary text-2xl">{notesInRange.length}</div>
-					<div class="stat-desc">Written</div>
+					<div class="stat-desc">{$t('adventures.written')}</div>
 				</div>
 
 				<div
 					class="stat bg-gradient-to-br from-accent/20 to-accent/5 rounded-lg p-4 border border-accent/30"
 				>
 					<div class="stat-figure text-accent text-3xl">✅</div>
-					<div class="stat-title text-xs">Checklists</div>
+					<div class="stat-title text-xs">{$t('adventures.checklists')}</div>
 					<div class="stat-value text-accent text-2xl">{checklistsInRange.length}</div>
-					<div class="stat-desc">Lists</div>
+					<div class="stat-desc">{$t('adventures.lists')}</div>
 				</div>
 
 				<div
 					class="stat bg-gradient-to-br from-info/20 to-info/5 rounded-lg p-4 border border-info/30"
 				>
 					<div class="stat-figure text-info text-3xl">🚆</div>
-					<div class="stat-title text-xs">Transport</div>
+					<div class="stat-title text-xs">{$t('adventures.transportation')}</div>
 					<div class="stat-value text-info text-2xl">{transportSegments.length}</div>
-					<div class="stat-desc">Segments</div>
+					<div class="stat-desc">{$t('adventures.segments')}</div>
 				</div>
 
 				<div
 					class="stat bg-gradient-to-br from-success/20 to-success/5 rounded-lg p-4 border border-success/30"
 				>
 					<div class="stat-figure text-success text-3xl">🏨</div>
-					<div class="stat-title text-xs">Lodging</div>
+					<div class="stat-title text-xs">{$t('adventures.lodging')}</div>
 					<div class="stat-value text-success text-2xl">{lodgingStays.length}</div>
-					<div class="stat-desc">Places</div>
+					<div class="stat-desc">{$t('adventures.places')}</div>
 				</div>
 
 				<div
 					class="stat bg-gradient-to-br from-warning/20 to-warning/5 rounded-lg p-4 border border-warning/30"
 				>
 					<div class="stat-figure text-warning text-3xl">📍</div>
-					<div class="stat-title text-xs">Locations</div>
+					<div class="stat-title text-xs">{$t('locations.locations')}</div>
 					<div class="stat-value text-warning text-2xl">{visitedLocations.length}</div>
-					<div class="stat-desc">Visited</div>
+					<div class="stat-desc">{$t('adventures.visited')}</div>
 				</div>
 
 				{#if totalAttachments > 0}
@@ -719,33 +735,34 @@
 						class="stat bg-gradient-to-br from-error/20 to-error/5 rounded-lg p-4 border border-error/30"
 					>
 						<div class="stat-figure text-error text-3xl">📎</div>
-						<div class="stat-title text-xs">Attachments</div>
+						<div class="stat-title text-xs">{$t('adventures.attachments')}</div>
 						<div class="stat-value text-error text-2xl">{totalAttachments}</div>
-						<div class="stat-desc">Files</div>
+						<div class="stat-desc">{$t('adventures.files')}</div>
 					</div>
 				{/if}
 			</div>
 
 			<!-- Additional Stats Row -->
 			{#if averageLocationRating > 0 || checklistStats.total > 0 || lodgingTypeBreakdown.length > 0}
-				<div class="divider">More Details</div>
+				<div class="divider">{$t('adventures.more_details')}</div>
 				<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
 					{#if averageLocationRating > 0}
 						<div class="stat bg-base-300 rounded-lg p-4">
 							<div class="stat-figure text-2xl">⭐</div>
-							<div class="stat-title text-xs">Avg Rating</div>
+							<div class="stat-title text-xs">{$t('adventures.avg_rating')}</div>
 							<div class="stat-value text-lg">{averageLocationRating.toFixed(1)}</div>
-							<div class="stat-desc text-xs">of locations</div>
+							<div class="stat-desc text-xs">{$t('adventures.of_locations')}</div>
 						</div>
 					{/if}
 
 					{#if checklistStats.total > 0}
 						<div class="stat bg-base-300 rounded-lg p-4">
 							<div class="stat-figure text-2xl">✓</div>
-							<div class="stat-title text-xs">Tasks Done</div>
+							<div class="stat-title text-xs">{$t('adventures.tasks_done')}</div>
 							<div class="stat-value text-lg">{checklistStats.percentage}%</div>
 							<div class="stat-desc text-xs">
-								{checklistStats.checked}/{checklistStats.total} items
+								{checklistStats.checked}/{checklistStats.total}
+								{$t('adventures.items')}
 							</div>
 						</div>
 					{/if}
@@ -753,7 +770,7 @@
 					{#if lodgingTypeBreakdown.length > 0}
 						<div class="stat bg-base-300 rounded-lg p-4">
 							<div class="stat-figure text-2xl">🛏️</div>
-							<div class="stat-title text-xs">Lodging Types</div>
+							<div class="stat-title text-xs">{$t('adventures.lodging_types')}</div>
 							<div class="stat-value text-lg">{lodgingTypeBreakdown.length}</div>
 							<div class="stat-desc text-xs truncate">
 								{getLodgingIcon(lodgingTypeBreakdown[0][0])}
@@ -772,7 +789,7 @@
 			<div class="card-body">
 				<h3 class="card-title text-xl flex items-center gap-2">
 					<span class="text-2xl">🏷️</span>
-					Categories
+					{$t('adventures.categories')}
 				</h3>
 				<div class="flex flex-wrap gap-2">
 					{#each categoriesWithIcons as category}

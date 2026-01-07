@@ -10,6 +10,8 @@
 	import PinIcon from '~icons/mdi/map-marker';
 	import Clear from '~icons/mdi/close';
 	import NewLocationModal from '$lib/components/locations/LocationModal.svelte';
+	import { t } from 'svelte-i18n';
+	import { get as getStore } from 'svelte/store';
 	import type { Collection, Location, User } from '$lib/types';
 
 	export let collection: Collection;
@@ -564,15 +566,16 @@
 	}
 
 	function getTypeLabel(props: MarkerProperties) {
-		if (props.type === 'lodging') return 'Lodging';
+		const $t = getStore(t);
+		if (props.type === 'lodging') return $t('adventures.lodging');
 		if (props.type === 'transportation') {
 			return props.transportRole === 'origin'
-				? 'Transport • Start'
+				? $t('adventures.transport_start')
 				: props.transportRole === 'destination'
-					? 'Transport • End'
-					: 'Transport';
+					? $t('adventures.transport_end')
+					: $t('adventures.transportation');
 		}
-		return props.visitStatus === 'visited' ? 'Visited' : 'Planned';
+		return props.visitStatus === 'visited' ? $t('adventures.visited') : $t('adventures.planned');
 	}
 
 	function canNavigate(props: MarkerProperties) {
@@ -604,21 +607,23 @@
 					<Plus class="w-4 h-4" />
 				</span>
 				<div class="min-w-0">
-					<p class="text-sm font-semibold leading-tight truncate">Add to this collection</p>
+					<p class="text-sm font-semibold leading-tight truncate">
+						{$t('adventures.add_to_collection')}
+					</p>
 					<p class="text-xs text-base-content/60 leading-tight truncate">
-						Click the map to drop a marker, then add it here.
+						{$t('adventures.click_map_add_marker')}
 					</p>
 				</div>
 			</div>
 			<div class="flex items-center gap-2">
 				<button type="button" class="btn btn-primary btn-xs" on:click={openCreateModal}>
 					<Plus class="w-4 h-4" />
-					Add
+					{$t('adventures.add')}
 				</button>
 				{#if newMarker}
 					<button type="button" class="btn btn-ghost btn-xs" on:click={clearNewMarker}>
 						<Clear class="w-4 h-4" />
-						Clear
+						{$t('adventures.clear')}
 					</button>
 				{/if}
 			</div>
@@ -641,7 +646,7 @@
 						on:click={openCreateModal}
 					>
 						<Plus class="w-3 h-3 sm:w-4 sm:h-4" />
-						Add here
+						{$t('adventures.add_here')}
 					</button>
 					<button type="button" class="btn btn-ghost btn-xxs sm:btn-xs" on:click={clearNewMarker}>
 						<Clear class="w-3 h-3 sm:w-4 sm:h-4" />
@@ -669,7 +674,7 @@
 					on:click={() => (showFilters = !showFilters)}
 				>
 					<span class="font-medium leading-tight"
-						>{showFilters ? 'Hide Filters' : 'Show Filters'}</span
+						>{showFilters ? $t('adventures.hide_filters') : $t('adventures.show_filters')}</span
 					>
 					<ChevronDown
 						class="w-4 h-4 shrink-0 transition-transform {showFilters ? 'rotate-180' : ''}"
@@ -679,11 +684,12 @@
 
 			<div class="flex items-center gap-2">
 				<div class="badge badge-ghost badge-sm">
-					{visiblePinCount}/{totalPinCount} pins
+					{visiblePinCount}/{totalPinCount}
+					{$t('adventures.pins')}
 				</div>
 				{#if !filtersPristine}
 					<button type="button" class="btn btn-xs btn-ghost" on:click={resetFilters}>
-						Reset
+						{$t('adventures.reset_filters')}
 					</button>
 				{/if}
 			</div>
@@ -699,7 +705,7 @@
 					<input
 						type="text"
 						class="grow"
-						placeholder="Search locations, lodging, transport..."
+						placeholder={$t('map.search_locations')}
 						bind:value={searchQuery}
 					/>
 					{#if searchQuery}
@@ -707,7 +713,7 @@
 							type="button"
 							class="btn btn-ghost btn-xs btn-circle"
 							on:click={() => (searchQuery = '')}
-							aria-label="Clear search"
+							aria-label={$t('adventures.clear_search')}
 						>
 							✕
 						</button>
@@ -723,7 +729,7 @@
 							✓
 						</div>
 						<div class="flex flex-col">
-							<span class="text-xs uppercase text-base-content/60">Visited</span>
+							<span class="text-xs uppercase text-base-content/60">{$t('adventures.visited')}</span>
 							<span class="font-semibold text-sm">{filteredVisitedCount}</span>
 						</div>
 						<label class="label cursor-pointer gap-2 p-0 ml-auto">
@@ -738,7 +744,7 @@
 							○
 						</div>
 						<div class="flex flex-col">
-							<span class="text-xs uppercase text-base-content/60">Planned</span>
+							<span class="text-xs uppercase text-base-content/60">{$t('adventures.planned')}</span>
 							<span class="font-semibold text-sm">{filteredPlannedCount}</span>
 						</div>
 						<label class="label cursor-pointer gap-2 p-0 ml-auto">
@@ -756,7 +762,8 @@
 							📍
 						</div>
 						<div class="flex flex-col">
-							<span class="text-xs uppercase text-base-content/60">Locations</span>
+							<span class="text-xs uppercase text-base-content/60">{$t('locations.locations')}</span
+							>
 							<span class="font-semibold text-sm">{locationFeatures.length}</span>
 						</div>
 						<label class="label cursor-pointer gap-2 p-0 ml-auto">
@@ -776,7 +783,9 @@
 								🏨
 							</div>
 							<div class="flex flex-col">
-								<span class="text-xs uppercase text-base-content/60">Lodging</span>
+								<span class="text-xs uppercase text-base-content/60"
+									>{$t('adventures.lodging')}</span
+								>
 								<span class="font-semibold text-sm">{lodgingFeatures.length}</span>
 							</div>
 							<label class="label cursor-pointer gap-2 p-0 ml-auto">
@@ -797,7 +806,9 @@
 								✈️
 							</div>
 							<div class="flex flex-col">
-								<span class="text-xs uppercase text-base-content/60">Transport</span>
+								<span class="text-xs uppercase text-base-content/60"
+									>{$t('adventures.transportation')}</span
+								>
 								<span class="font-semibold text-sm">{transportationFeatures.length / 2}</span>
 							</div>
 							<label class="label cursor-pointer gap-2 p-0 ml-auto">
@@ -815,14 +826,14 @@
 				{#if categoryOptions.length}
 					<div class="space-y-2">
 						<div class="flex items-center justify-between">
-							<span class="text-sm font-medium">Categories</span>
+							<span class="text-sm font-medium">{$t('adventures.categories')}</span>
 							{#if hasActiveCategoryFilter}
 								<button
 									type="button"
 									class="btn btn-ghost btn-xs"
 									on:click={() => (selectedCategories = new Set())}
 								>
-									Clear
+									{$t('adventures.clear')}
 								</button>
 							{/if}
 						</div>
@@ -845,7 +856,7 @@
 				<!-- Date Range Filter -->
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 					<label class="form-control">
-						<span class="label label-text text-xs">Start Date</span>
+						<span class="label label-text text-xs">{$t('adventures.start_date')}</span>
 						<input
 							type="date"
 							bind:value={startDateFilter}
@@ -855,7 +866,7 @@
 						/>
 					</label>
 					<label class="form-control">
-						<span class="label label-text text-xs">End Date</span>
+						<span class="label label-text text-xs">{$t('adventures.end_date')}</span>
 						<input
 							type="date"
 							bind:value={endDateFilter}
@@ -869,7 +880,7 @@
 				<!-- Routes & Activities Filter -->
 				<div class="space-y-2">
 					<div class="flex items-center justify-between">
-						<span class="text-sm font-medium">Routes & Activities</span>
+						<span class="text-sm font-medium">{$t('adventures.routes_and_activities')}</span>
 					</div>
 					<div class="flex items-center gap-3 rounded-box border border-base-300 p-3">
 						<div
@@ -878,8 +889,12 @@
 							🗺️
 						</div>
 						<div class="flex flex-col flex-1">
-							<span class="text-xs uppercase text-base-content/60">GPX Routes</span>
-							<span class="text-xs text-base-content/70">Transport & activity paths</span>
+							<span class="text-xs uppercase text-base-content/60"
+								>{$t('adventures.gpx_routes')}</span
+							>
+							<span class="text-xs text-base-content/70"
+								>{$t('adventures.transport_activity_paths')}</span
+							>
 						</div>
 						<label class="label cursor-pointer gap-2 p-0 ml-auto">
 							<input type="checkbox" bind:checked={showLines} class="toggle toggle-sm" />
@@ -976,11 +991,7 @@
 												class="btn btn-xs btn-primary"
 												on:click|stopPropagation={() => goto(getNavigationUrl(markerProps))}
 											>
-												Open {markerProps.type === 'location'
-													? 'Location'
-													: markerProps.type === 'lodging'
-														? 'Lodging'
-														: 'Transportation'}
+												{$t('adventures.open_details')}
 											</button>
 										</div>
 									{/if}

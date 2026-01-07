@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Collection, User, ContentImage } from '$lib/types';
 	import { onMount } from 'svelte';
+	import { t } from 'svelte-i18n';
 	import { DefaultMarker, MapLibre, Popup } from 'svelte-maplibre';
 	import { getBasemapUrl } from '$lib';
 	import MagnifyIcon from '~icons/mdi/magnify';
@@ -22,7 +23,6 @@
 	export let collection: Collection;
 	export let user: User | null;
 	// Whether the current user can modify this collection (owner or shared user)
-	export let canModify: boolean = false;
 
 	type RecommendationResult = {
 		name: string;
@@ -269,7 +269,7 @@
 		<div class="card-body">
 			<h2 class="card-title text-2xl mb-4">
 				<Compass class="w-8 h-8" />
-				Discover Places
+				{$t('recomendations.discover_places')}
 			</h2>
 
 			<!-- Search Options -->
@@ -278,10 +278,12 @@
 				{#if locationsWithCoords.length > 0}
 					<div class="form-control">
 						<label class="label">
-							<span class="label-text font-semibold">Search Around Location</span>
+							<span class="label-text font-semibold"
+								>{$t('recomendations.search_around_location')}</span
+							>
 						</label>
 						<select class="select select-bordered w-full" bind:value={selectedLocationId}>
-							<option value={null}>Use search instead...</option>
+							<option value={null}>{$t('recomendations.use_search_instead')}...</option>
 							{#each locationsWithCoords as location}
 								<option value={location.id}>{location.name}</option>
 							{/each}
@@ -292,13 +294,11 @@
 				<!-- Search Input -->
 				<div class="form-control">
 					<label class="label">
-						<span class="label-text font-semibold">
-							{locationsWithCoords.length > 0 ? 'Or Search by Address' : 'Search by Address'}
-						</span>
+						<span class="label-text font-semibold">{$t('recomendations.search_by_address')}</span>
 					</label>
 					<input
 						type="text"
-						placeholder="Enter city, address, or place..."
+						placeholder={$t('adventures.search_placeholder')}
 						class="input input-bordered w-full"
 						bind:value={searchQuery}
 						disabled={selectedLocationId !== null}
@@ -309,19 +309,21 @@
 				<!-- Category Selector -->
 				<div class="form-control">
 					<label class="label">
-						<span class="label-text font-semibold">Category</span>
+						<span class="label-text font-semibold">{$t('adventures.category')}</span>
 					</label>
 					<select class="select select-bordered w-full" bind:value={selectedCategory}>
-						<option value="tourism">🏛️ Tourist Attractions</option>
-						<option value="lodging">🏨 Hotels & Lodging</option>
-						<option value="food">🍴 Restaurants & Food</option>
+						<option value="tourism">🏛️ {$t('recomendations.tourism')}</option>
+						<option value="lodging">🏨 {$t('recomendations.lodging')}</option>
+						<option value="food">🍴 {$t('recomendations.food')}</option>
 					</select>
 				</div>
 
 				<!-- Radius Selector -->
 				<div class="form-control">
 					<label class="label">
-						<span class="label-text font-semibold">Search Radius: {radiusDisplay}</span>
+						<span class="label-text font-semibold"
+							>{$t('recomendations.search_radius_label')} {radiusDisplay}</span
+						>
 					</label>
 					<select class="select select-bordered w-full" bind:value={radiusValue}>
 						{#each radiusOptions as option}
@@ -336,28 +338,28 @@
 				<button class="btn btn-primary flex-1" on:click={searchRecommendations} disabled={loading}>
 					{#if loading}
 						<span class="loading loading-spinner loading-sm"></span>
-						Searching...
+						{$t('recomendations.searching')}
 					{:else}
 						<MagnifyIcon class="w-5 h-5" />
-						Search
+						{$t('navbar.search')}
 					{/if}
 				</button>
 				<button class="btn btn-ghost" on:click={() => (showFilters = !showFilters)}>
 					<TuneVariant class="w-5 h-5" />
-					Filters
+					{$t('adventures.filter')}
 				</button>
 			</div>
 
 			<!-- Advanced Filters -->
 			{#if showFilters}
-				<div class="divider">Filters</div>
+				<div class="divider">{$t('adventures.filter')}</div>
 				<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 					<div class="form-control">
 						<label class="label">
-							<span class="label-text">Minimum Rating</span>
+							<span class="label-text">{$t('recomendations.minimum_rating')}</span>
 						</label>
 						<select class="select select-bordered select-sm" bind:value={minRating}>
-							<option value={0}>Any</option>
+							<option value={0}>{$t('recomendations.any')}</option>
 							<option value={3}>3+ ⭐</option>
 							<option value={3.5}>3.5+ ⭐</option>
 							<option value={4}>4+ ⭐</option>
@@ -366,11 +368,12 @@
 					</div>
 
 					<div class="form-control">
+						<!-- svelte-ignore a11y-label-has-associated-control -->
 						<label class="label">
-							<span class="label-text">Minimum Reviews</span>
+							<span class="label-text">{$t('recomendations.minimum_reviews')}</span>
 						</label>
 						<select class="select select-bordered select-sm" bind:value={minReviews}>
-							<option value={0}>Any</option>
+							<option value={0}>{$t('recomendations.any')}</option>
 							<option value={10}>10+</option>
 							<option value={50}>50+</option>
 							<option value={100}>100+</option>
@@ -380,7 +383,7 @@
 
 					<div class="form-control">
 						<label class="label cursor-pointer">
-							<span class="label-text">Open Now Only</span>
+							<span class="label-text">{$t('recomendations.open_now_only')}</span>
 							<input type="checkbox" class="toggle toggle-primary" bind:checked={showOpenOnly} />
 						</label>
 					</div>
@@ -406,11 +409,11 @@
 		<!-- Results Stats -->
 		<div class="stats shadow w-full">
 			<div class="stat">
-				<div class="stat-title">Total Results</div>
+				<div class="stat-title">{$t('recomendations.total_results')}</div>
 				<div class="stat-value text-primary">{filteredResults.length}</div>
 			</div>
 			<div class="stat">
-				<div class="stat-title">Average Rating</div>
+				<div class="stat-title">{$t('recomendations.average_rating')}</div>
 				<div class="stat-value text-secondary">
 					{(
 						filteredResults.filter((r) => r.rating).reduce((sum, r) => sum + (r.rating || 0), 0) /
@@ -420,7 +423,7 @@
 				</div>
 			</div>
 			<div class="stat">
-				<div class="stat-title">Search Radius</div>
+				<div class="stat-title">{$t('recomendations.search_radius_label')}</div>
 				<div class="stat-value text-accent">{radiusDisplay}</div>
 			</div>
 		</div>
@@ -428,7 +431,7 @@
 		<!-- Map View -->
 		<div class="card bg-base-200 shadow-xl">
 			<div class="card-body">
-				<h3 class="card-title text-xl mb-4">📍 Map View</h3>
+				<h3 class="card-title text-xl mb-4">📍 {$t('recomendations.map_view')}</h3>
 				<div class="rounded-lg overflow-hidden shadow-lg">
 					<MapLibre
 						style={getBasemapUrl()}
@@ -650,10 +653,8 @@
 		<div class="card bg-base-200 shadow-xl">
 			<div class="card-body text-center py-12">
 				<MagnifyIcon class="w-24 h-24 mx-auto opacity-30 mb-4" />
-				<h3 class="text-2xl font-bold mb-2">No Results Yet</h3>
-				<p class="opacity-70">
-					Select a location or enter a search query to discover amazing places nearby!
-				</p>
+				<h3 class="text-2xl font-bold mb-2">{$t('recomendations.no_results_yet')}</h3>
+				<p class="opacity-70">{$t('recomendations.select_location_or_query')}</p>
 			</div>
 		</div>
 	{/if}

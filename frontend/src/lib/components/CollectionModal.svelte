@@ -413,78 +413,84 @@
 				{/if}
 
 				<!-- Cover Image Selection -->
-				<div class="card bg-base-100 border border-base-300 shadow-lg">
-					<div class="card-body p-6 space-y-4">
-						<div class="flex items-center gap-3">
-							<div class="p-2 bg-primary/10 rounded-lg">
-								<ImageIcon class="w-5 h-5 text-primary" />
+				{#if collection.id}
+					<div class="card bg-base-100 border border-base-300 shadow-lg">
+						<div class="card-body p-6 space-y-4">
+							<div class="flex items-center gap-3">
+								<div class="p-2 bg-primary/10 rounded-lg">
+									<ImageIcon class="w-5 h-5 text-primary" />
+								</div>
+								<div>
+									<h3 class="text-lg font-semibold">
+										{$t('collection.cover_image') ?? 'Cover image'}
+									</h3>
+									<p class="text-sm text-base-content/60">
+										{$t('collection.cover_image_hint') ??
+											'Choose a cover from images in this collection.'}
+									</p>
+								</div>
 							</div>
-							<div>
-								<h3 class="text-lg font-semibold">
-									{$t('collection.cover_image') ?? 'Cover image'}
-								</h3>
-								<p class="text-sm text-base-content/60">
-									{$t('collection.cover_image_hint') ??
-										'Choose a cover from images in this collection.'}
-								</p>
-							</div>
-						</div>
 
-						{#if availableImages.length === 0}
-							<div class="alert alert-info shadow-sm">
-								<span>
-									{$t('collection.no_images_available') ??
-										'No images available from linked locations yet.'}
-								</span>
-							</div>
-						{:else}
-							<div class="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-								{#each availableImages as image (image.id)}
+							{#if availableImages.length === 0}
+								<div class="alert alert-info shadow-sm">
+									<span>
+										{$t('collection.no_images_available') ??
+											'No images available from linked locations yet.'}
+									</span>
+								</div>
+							{:else}
+								<div class="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+									{#each availableImages as image (image.id)}
+										<button
+											type="button"
+											class="relative group rounded-xl overflow-hidden border border-base-300 bg-base-200/30 hover:border-primary transition shadow-sm {coverImageId ===
+											image.id
+												? 'ring-2 ring-primary ring-offset-2 ring-offset-base-100'
+												: ''}"
+											on:click={() => selectCover(image.id)}
+											aria-pressed={coverImageId === image.id}
+										>
+											<img
+												src={image.image}
+												alt="Cover candidate"
+												class="w-full h-32 object-cover"
+											/>
+											<div
+												class="absolute inset-0 bg-gradient-to-t from-base-300/60 to-transparent opacity-0 group-hover:opacity-100 transition"
+											/>
+											{#if coverImageId === image.id}
+												<div class="absolute top-2 left-2 badge badge-primary gap-2 shadow">
+													{$t('collection.cover') ?? 'Cover'}
+												</div>
+											{:else if image.is_primary}
+												<div class="absolute top-2 left-2 badge badge-ghost shadow">
+													{$t('collection.location_primary') ?? 'Location cover'}
+												</div>
+											{/if}
+											<div
+												class="absolute bottom-2 right-2 btn btn-xs btn-ghost bg-base-100/90 shadow"
+											>
+												{coverImageId === image.id
+													? ($t('collection.cover') ?? 'Cover')
+													: ($t('collection.set_cover') ?? 'Set cover')}
+											</div>
+										</button>
+									{/each}
+								</div>
+								<div class="flex justify-end">
 									<button
 										type="button"
-										class="relative group rounded-xl overflow-hidden border border-base-300 bg-base-200/30 hover:border-primary transition shadow-sm {coverImageId ===
-										image.id
-											? 'ring-2 ring-primary ring-offset-2 ring-offset-base-100'
-											: ''}"
-										on:click={() => selectCover(image.id)}
-										aria-pressed={coverImageId === image.id}
+										class="btn btn-ghost btn-sm"
+										on:click={() => selectCover(null)}
 									>
-										<img src={image.image} alt="Cover candidate" class="w-full h-32 object-cover" />
-										<div
-											class="absolute inset-0 bg-gradient-to-t from-base-300/60 to-transparent opacity-0 group-hover:opacity-100 transition"
-										/>
-										{#if coverImageId === image.id}
-											<div class="absolute top-2 left-2 badge badge-primary gap-2 shadow">
-												{$t('collection.cover') ?? 'Cover'}
-											</div>
-										{:else if image.is_primary}
-											<div class="absolute top-2 left-2 badge badge-ghost shadow">
-												{$t('collection.location_primary') ?? 'Location cover'}
-											</div>
-										{/if}
-										<div
-											class="absolute bottom-2 right-2 btn btn-xs btn-ghost bg-base-100/90 shadow"
-										>
-											{coverImageId === image.id
-												? ($t('collection.cover') ?? 'Cover')
-												: ($t('collection.set_cover') ?? 'Set cover')}
-										</div>
+										<CloseIcon class="w-4 h-4" />
+										<span>{$t('collection.clear_cover') ?? 'Clear cover'}</span>
 									</button>
-								{/each}
-							</div>
-							<div class="flex justify-end">
-								<button
-									type="button"
-									class="btn btn-ghost btn-sm"
-									on:click={() => selectCover(null)}
-								>
-									<CloseIcon class="w-4 h-4" />
-									<span>{$t('collection.clear_cover') ?? 'Clear cover'}</span>
-								</button>
-							</div>
-						{/if}
+								</div>
+							{/if}
+						</div>
 					</div>
-				</div>
+				{/if}
 
 				<!-- Share Link Section (only if public and has ID) -->
 				{#if collection.is_public && collection.id}

@@ -1179,11 +1179,7 @@
 
 				<!-- Recommendations View -->
 				{#if currentView === 'recommendations'}
-					<CollectionRecommendationView
-						{collection}
-						user={data.user}
-						canModify={canModifyCollection}
-					/>
+					<CollectionRecommendationView {collection} user={data.user} />
 				{/if}
 			</div>
 

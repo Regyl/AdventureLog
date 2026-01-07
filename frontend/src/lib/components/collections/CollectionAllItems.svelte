@@ -8,6 +8,7 @@
 	import ChecklistCard from '$lib/components/cards/ChecklistCard.svelte';
 	import Magnify from '~icons/mdi/magnify';
 	import ClipboardList from '~icons/mdi/clipboard-list';
+	import { t } from 'svelte-i18n';
 
 	const dispatch = createEventDispatcher();
 
@@ -138,7 +139,8 @@
 			<div class="card-body">
 				<div class="flex flex-wrap justify-between items-center gap-4 mb-6">
 					<h2 class="card-title text-2xl">
-						📍 Locations ({sortedLocations.length}/{collection.locations.length})
+						📍 {$t('locations.locations') || 'Locations'} ({sortedLocations.length}/{collection
+							.locations.length})
 					</h2>
 
 					{#if isFolderView}
@@ -194,7 +196,8 @@
 			<div class="card-body">
 				<div class="flex flex-wrap justify-between items-center gap-4 mb-6">
 					<h2 class="card-title text-2xl">
-						✈️ Transportation ({filteredTransportations.length}/{collection.transportations.length})
+						✈️ {$t('adventures.transportation') || 'Transportation'} ({filteredTransportations.length}/{collection
+							.transportations.length})
 					</h2>
 
 					{#if isFolderView}
@@ -241,7 +244,8 @@
 			<div class="card-body">
 				<div class="flex flex-wrap justify-between items-center gap-4 mb-6">
 					<h2 class="card-title text-2xl">
-						🏨 Lodging ({filteredLodging.length}/{collection.lodging.length})
+						🏨 {$t('adventures.lodging') || 'Lodging'} ({filteredLodging.length}/{collection.lodging
+							.length})
 					</h2>
 
 					{#if isFolderView}

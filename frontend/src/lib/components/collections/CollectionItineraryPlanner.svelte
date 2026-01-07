@@ -215,10 +215,10 @@
 				.map((it) => resolveItineraryItem(it, collection))
 				.sort((a, b) => a.order - b.order);
 
-			addToast('success', `Moved to trip-wide items`);
+			addToast('success', $t('itinerary.moved_to_trip_context'));
 		} catch (error) {
-			console.error('Error moving item to global:', error);
-			addToast('error', 'Failed to move item to trip-wide');
+			console.error('Error moving item to context:', error);
+			addToast('error', $t('itinerary.failed_to_move_to_trip_context'));
 		}
 	}
 
@@ -235,7 +235,7 @@
 			);
 
 			if (alreadyGlobal) {
-				addToast('info', 'Item already in trip-wide view');
+				addToast('info', $t('itinerary.item_already_in_trip_context'));
 				return;
 			}
 
@@ -266,10 +266,10 @@
 				.map((it) => resolveItineraryItem(it, collection))
 				.sort((a, b) => a.order - b.order);
 
-			addToast('success', `Added to trip-wide items`);
+			addToast('success', $t('itinerary.added_to_trip_context'));
 		} catch (error) {
 			console.error('Error adding item to global:', error);
-			addToast('error', 'Failed to add item to trip-wide');
+			addToast('error', $t('itinerary.failed_to_add_to_trip_context'));
 		}
 	}
 
@@ -1613,58 +1613,18 @@
 							<CalendarBlank class="w-4 h-4" />
 						</div>
 						<h3 class="text-xl font-bold">
-							{$t('itinerary.trip_wide_items') || 'Trip-wide Items'}
+							{$t('itinerary.trip_context') || 'Trip Context'}
 						</h3>
-						{#if canModify}
-							<div class="dropdown z-30 ml-auto">
-								<button
-									type="button"
-									class="btn btn-square btn-sm btn-outline p-1"
-									aria-haspopup="menu"
-									aria-expanded="false"
-									title={$t('adventures.add')}
-								>
-									<Plus class="w-5 h-5" />
-								</button>
-								<ul
-									class="dropdown-content menu p-2 shadow bg-base-300 rounded-box w-72"
-									role="menu"
-								>
-									{#if unscheduledItems.length > 0}
-										<li class="menu-title">
-											<span>{$t('itinerary.add_to_trip_wide') || 'Add Unscheduled Items'}</span>
-										</li>
-										{#each unscheduledItems as unscheduledItem (unscheduledItem.item.id)}
-											<li>
-												<button
-													type="button"
-													on:click={() => {
-														addUnscheduledItemToGlobal(
-															unscheduledItem.type,
-															unscheduledItem.item.id
-														);
-													}}
-													class="text-xs py-1"
-												>
-													<span class="truncate">{unscheduledItem.item.name}</span>
-													<span class="badge badge-xs badge-ghost">
-														{unscheduledItem.type}
-													</span>
-												</button>
-											</li>
-										{/each}
-										<li class="divider my-1"></li>
-									{/if}
-									<li class="text-xs opacity-70 px-2 py-1 select-none">
-										{#if unscheduledItems.length === 0}
-											All items are scheduled or in trip-wide view
-										{:else}
-											Or drag items from unscheduled below
-										{/if}
-									</li>
-								</ul>
-							</div>
-						{/if}
+						<!-- Info bubble explaining trip context -->
+						<div class="ml-2 tooltip tooltip-right" data-tip={$t('itinerary.trip_context_info')}>
+							<button
+								type="button"
+								class="btn btn-ghost btn-sm btn-square p-1"
+								aria-label="Trip context info"
+							>
+								<Info class="w-4 h-4" />
+							</button>
+						</div>
 					</div>
 
 					{#if globalItems.length === 0}
@@ -1674,7 +1634,7 @@
 							<div class="card-body p-2">
 								<CalendarBlank class="w-8 h-8 mx-auto mb-2 opacity-40" />
 								<p class="opacity-70">
-									{$t('itinerary.no_trip_wide_items') || 'No trip-wide items yet'}
+									{$t('itinerary.no_trip_context_items')}
 								</p>
 							</div>
 						</div>
@@ -1901,7 +1861,7 @@
 										? ''
 										: 'opacity-40 hover:opacity-70 focus:opacity-100'}"
 									rows="2"
-									placeholder="+ Add description..."
+									placeholder={'+ ' + $t('itinerary.add_description') + '...'}
 									value={day.dayMetadata?.description || ''}
 									on:blur={(e) => {
 										const newDesc = e.currentTarget.value.trim() || null;
@@ -2289,7 +2249,7 @@
 										<div class="flex items-center gap-2 mb-1 opacity-70">
 											<Globe class="w-4 h-4" />
 											<span class="text-sm font-medium"
-												>{$t('itinerary.trip_wide_items') || 'Trip-wide'}</span
+												>{$t('itinerary.trip_context') || 'Trip Context'}</span
 											>
 										</div>
 										<div class="space-y-2">
