@@ -1,6 +1,8 @@
 from django.db.models import Q, Prefetch
 from django.db.models.functions import Lower
 from django.db import transaction
+from django.http import HttpResponse
+from django.utils.text import slugify
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -9,6 +11,7 @@ from adventures.permissions import CollectionShared
 from adventures.serializers import CollectionSerializer, CollectionInviteSerializer, UltraSlimCollectionSerializer, CollectionItineraryItemSerializer, CollectionItineraryDaySerializer
 from users.models import CustomUser as User
 from adventures.utils import pagination
+from adventures.utils.pdf_export import render_collection_pdf
 from users.serializers import CustomUserDetailsSerializer as UserSerializer
 
 
@@ -233,6 +236,39 @@ class CollectionViewSet(viewsets.ModelViewSet):
         data['itinerary_days'] = days_serializer.data
 
         return Response(data)
+
+    @action(detail=True, methods=['get'], url_path='export-pdf')
+    def export_pdf(self, request, pk=None):
+        """Export the collection overview and itinerary as a PDF for offline use."""
+        collection = self.get_object()
+        # Permission: allow export if collection is public, or the requesting user
+        # is the owner, or is in the collection.shared_with list.
+        allowed = False
+        if getattr(collection, 'is_public', False):
+            allowed = True
+        else:
+            user = request.user
+            if user and user.is_authenticated:
+                if collection.user == user:
+                    allowed = True
+                else:
+                    # Try DB lookup for shared users (recommended path)
+                    try:
+                        if collection.shared_with.filter(id=user.id).exists():
+                            allowed = True
+                    except Exception:
+                        # Fallback: shared_with may be a simple list of identifiers
+                        if hasattr(collection, 'shared_with') and user.username in (collection.shared_with or []):
+                            allowed = True
+
+        if not allowed:
+            return Response({"detail": "You do not have permission to export this collection."}, status=403)
+
+        pdf_bytes = render_collection_pdf(collection, request.user)
+        filename = slugify(collection.name or "collection") or "collection"
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}-itinerary.pdf"'
+        return response
     
     # this make the is_public field of the collection cascade to the locations
     @transaction.atomic
