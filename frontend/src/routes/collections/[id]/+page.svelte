@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Collection, ContentImage, Location, Collaborator } from '$lib/types';
+	import type { Collection, ContentImage, Location, Collaborator, Lodging } from '$lib/types';
 	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
@@ -235,12 +235,25 @@
 	$: collectionEvents = buildCollectionEvents(timezoneMode);
 
 	$: if (!calendarInitialDate && collectionEvents.length) {
-		const earliest = collectionEvents
-			.map((ev) => DateTime.fromISO(ev.start))
-			.filter((dt) => dt.isValid)
-			.sort((a, b) => a.toMillis() - b.toMillis())[0];
+		const collectionRangeStart = collection?.start_date
+			? DateTime.fromISO(collection.start_date)
+			: null;
+		const collectionRangeEnd = collection?.end_date ? DateTime.fromISO(collection.end_date) : null;
 
-		calendarInitialDate = earliest?.toISODate() || calendarInitialDate;
+		const validEvents = collectionEvents
+			.map((ev) => ({ date: DateTime.fromISO(ev.start), event: ev }))
+			.filter(({ date }) => date.isValid)
+			.sort((a, b) => a.date.toMillis() - b.date.toMillis());
+
+		const inCollectionRange = validEvents.filter(({ date }) => {
+			if (collectionRangeStart?.isValid && date < collectionRangeStart.startOf('day')) return false;
+			if (collectionRangeEnd?.isValid && date > collectionRangeEnd.endOf('day')) return false;
+			return true;
+		});
+
+		const chosenDate = (inCollectionRange[0] || validEvents[0])?.date;
+
+		calendarInitialDate = chosenDate?.toISODate() || calendarInitialDate;
 	}
 
 	function buildCollectionEvents(mode: TimezoneMode) {
@@ -333,9 +346,11 @@
 			const start = stay.check_in || stay.check_out;
 			if (!start) return;
 
+			const calendarEnd = getLodgingCalendarEndDate(stay);
+
 			const times = buildEventTimes({
 				start,
-				end: stay.check_out || stay.check_in || start,
+				end: calendarEnd || start,
 				timezone: stay.timezone,
 				mode,
 				allDay: true
@@ -360,6 +375,7 @@
 					isAllDay: true,
 					formattedStart: times.formattedStart,
 					formattedEnd: times.formattedEnd,
+					checkoutDate: stay.check_out || null,
 					location: stay.location || '',
 					description: stay.description || ''
 				}
@@ -479,6 +495,26 @@
 		});
 
 		return entries;
+	}
+
+	function getLodgingCalendarEndDate(stay: Lodging): string | null {
+		const { check_in, check_out } = stay;
+		if (!check_out) return check_in || null;
+		if (!check_in) return check_out;
+
+		const checkInDate = new Date(check_in.split('T')[0]);
+		const checkOutDate = new Date(check_out.split('T')[0]);
+
+		if (Number.isNaN(checkInDate.getTime()) || Number.isNaN(checkOutDate.getTime())) {
+			return check_out;
+		}
+
+		if (checkOutDate <= checkInDate) {
+			return check_out;
+		}
+
+		checkOutDate.setDate(checkOutDate.getDate() - 1);
+		return checkOutDate.toISOString().split('T')[0];
 	}
 
 	function summarizeCostEntries(

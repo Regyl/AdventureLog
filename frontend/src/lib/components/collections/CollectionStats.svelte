@@ -140,7 +140,14 @@
 		const start = DateTime.fromISO(stay.check_in);
 		const end = DateTime.fromISO(stay.check_out);
 		if (!start.isValid || !end.isValid) return sum;
-		const diff = Math.max(1, Math.floor(end.diff(start, 'days').days));
+
+		const startDay = start.startOf('day');
+		const endDay = end.startOf('day');
+		let diff = endDay.diff(startDay, 'days').days;
+
+		if (!Number.isFinite(diff)) return sum;
+		if (diff <= 0) diff = 1;
+
 		return sum + diff;
 	}, 0);
 
@@ -252,16 +259,52 @@
 			? `${tripStart.toLocaleString(DateTime.DATE_MED)} - ${tripEnd.toLocaleString(DateTime.DATE_MED)}`
 			: null;
 
+	function normalizeTransportType(type?: string | null): string {
+		return (type || 'other').trim().toLowerCase();
+	}
+
+	function getTransportMeta(type?: string | null) {
+		const normalized = normalizeTransportType(type);
+
+		if (
+			normalized.includes('flight') ||
+			normalized.includes('plane') ||
+			normalized.includes('air')
+		) {
+			return { key: 'flight', icon: '✈️', label: 'Flights' };
+		}
+		if (normalized.includes('train') || normalized.includes('rail')) {
+			return { key: 'train', icon: '🚆', label: 'Trains' };
+		}
+		if (normalized.includes('bus')) {
+			return { key: 'bus', icon: '🚌', label: 'Bus' };
+		}
+		if (
+			normalized.includes('boat') ||
+			normalized.includes('ferry') ||
+			normalized.includes('ship')
+		) {
+			return { key: 'boat', icon: '🚢', label: 'Boat' };
+		}
+		if (normalized.includes('walk')) {
+			return { key: 'walk', icon: '🚶', label: 'Walking' };
+		}
+		if (normalized.includes('bike') || normalized.includes('cycle')) {
+			return { key: 'bike', icon: '🚴', label: 'Cycling' };
+		}
+		if (normalized.includes('drive') || normalized.includes('car')) {
+			return { key: 'car', icon: '🚗', label: 'Car' };
+		}
+
+		return {
+			key: normalized || 'other',
+			icon: '🧭',
+			label: capitalize(type) || 'Other'
+		};
+	}
+
 	function getTransportIcon(type?: string | null) {
-		const normalized = (type || '').toLowerCase();
-		if (normalized.includes('flight') || normalized.includes('plane') || normalized.includes('air'))
-			return '✈️';
-		if (normalized.includes('train') || normalized.includes('rail')) return '🚆';
-		if (normalized.includes('bus')) return '🚌';
-		if (normalized.includes('car') || normalized.includes('drive')) return '🚗';
-		if (normalized.includes('boat') || normalized.includes('ferry') || normalized.includes('ship'))
-			return '🚢';
-		return '🚗';
+		return getTransportMeta(type).icon;
 	}
 
 	function capitalize(text?: string | null) {
@@ -277,13 +320,31 @@
 	}
 
 	$: distanceByTransportType = (() => {
-		const types = new Map<string, number>();
+		const types = new Map<
+			string,
+			{
+				icon: string;
+				label: string;
+				distance: number;
+			}
+		>();
+
 		transportSegments.forEach((segment) => {
-			const icon = getTransportIcon(segment.type);
+			const meta = getTransportMeta(segment.type);
 			const distance = convertDistance(segment.distance || 0);
-			types.set(icon, (types.get(icon) || 0) + distance);
+			const existing = types.get(meta.key);
+			if (existing) {
+				existing.distance += distance;
+			} else {
+				types.set(meta.key, {
+					icon: meta.icon,
+					label: meta.label,
+					distance
+				});
+			}
 		});
-		return Array.from(types.entries()).sort((a, b) => b[1] - a[1]);
+
+		return Array.from(types.values()).sort((a, b) => b.distance - a.distance);
 	})();
 
 	$: averageLocationRating = (() => {
@@ -376,7 +437,7 @@
 
 				<div class="stat bg-base-100 rounded-lg shadow p-4 border border-warning/20">
 					<div class="stat-figure text-warning text-3xl">🗺️</div>
-					<div class="stat-title text-xs">Places</div>
+					<div class="stat-title text-xs">Countries</div>
 					<div class="stat-value text-warning text-2xl">{countriesVisited.length}</div>
 					<div class="stat-desc">
 						{regionsVisited.length} regions, {citiesVisited.length} cities
@@ -513,10 +574,13 @@
 
 				{#if distanceByTransportType.length > 0}
 					<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-						{#each distanceByTransportType as [icon, distance]}
+						{#each distanceByTransportType as type}
 							<div class="stat bg-base-300 rounded-lg p-3">
-								<div class="stat-figure text-3xl">{icon}</div>
-								<div class="stat-value text-lg">{numberFormatter.format(distance)}</div>
+								<div class="stat-figure text-3xl">{type.icon}</div>
+								<div class="stat-title text-xs">{type.label}</div>
+								<div class="stat-value text-lg">
+									{distanceFormatter.format(type.distance)}
+								</div>
 								<div class="stat-desc text-xs">{getDistanceUnitLong()}</div>
 							</div>
 						{/each}

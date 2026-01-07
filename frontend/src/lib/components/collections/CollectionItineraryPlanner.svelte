@@ -2316,7 +2316,6 @@
 														{#if type === 'lodging'}
 															<Bed class="w-4 h-4" />
 														{:else if type === 'location'}
-															<!-- show category icon (emoji) when available, fallback to map marker -->
 															{#if obj?.category?.icon}
 																<span class="text-lg">{obj.category.icon}</span>
 															{:else}
@@ -2329,7 +2328,27 @@
 														{/if}
 													</div>
 													<div class="flex-1 min-w-0">
-														<p class="text-md font-semibold line-clamp-2">{name}</p>
+														{#if type === 'location' && obj?.id}
+															<a
+																href={`/locations/${obj.id}`}
+																class="hover:text-primary transition-colors text-md font-semibold line-clamp-2 block"
+																>{name}</a
+															>
+														{:else if type === 'lodging' && obj?.id}
+															<a
+																href={`/lodging/${obj.id}`}
+																class="hover:text-primary transition-colors text-md font-semibold line-clamp-2 block"
+																>{name}</a
+															>
+														{:else if type === 'transportation' && obj?.id}
+															<a
+																href={`/transportations/${obj.id}`}
+																class="hover:text-primary transition-colors text-md font-semibold line-clamp-2 block"
+																>{name}</a
+															>
+														{:else}
+															<p class="text-md font-semibold line-clamp-2">{name}</p>
+														{/if}
 														{#if secondary}
 															<p class="text-xs opacity-60 truncate">{secondary}</p>
 														{/if}
