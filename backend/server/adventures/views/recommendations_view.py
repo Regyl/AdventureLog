@@ -335,12 +335,12 @@ class RecommendationsViewSet(viewsets.ViewSet):
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 504:
                 logger.warning(f"Overpass API 504 Gateway Timeout for {category}")
-                return {"error": f"OpenStreetMap server is overloaded. Try again later or use Google source.", "results": []}
+                return {"error": "OpenStreetMap server is overloaded. Try again later or use Google source.", "results": []}
             logger.warning(f"Overpass API HTTP error: {e}")
-            return {"error": f"OpenStreetMap error: {str(e)}", "results": []}
+            return {"error": f"OpenStreetMap error: please try again later.", "results": []}
         except requests.exceptions.RequestException as e:
             logger.warning(f"Overpass API error: {e}")
-            return {"error": f"OpenStreetMap temporarily unavailable: {str(e)}", "results": []}
+            return {"error": f"OpenStreetMap temporarily unavailable: please try again later.", "results": []}
         except ValueError as e:
             logger.error(f"Invalid JSON response from Overpass: {e}")
             return {"error": "Invalid response from OpenStreetMap.", "results": []}
