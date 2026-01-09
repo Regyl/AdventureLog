@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { addToast } from '$lib/toasts';
 	import type { Checklist, Collection, User } from '$lib/types';
-	import { createEventDispatcher } from 'svelte';
+	import { createEventDispatcher, onMount } from 'svelte';
 	const dispatch = createEventDispatcher();
 	import { t } from 'svelte-i18n';
 
@@ -17,6 +17,32 @@
 	import Close from '~icons/mdi/close';
 	import Globe from '~icons/mdi/globe';
 	import type { CollectionItineraryItem } from '$lib/types';
+
+	let isActionsMenuOpen = false;
+	let actionsMenuRef: HTMLDivElement | null = null;
+	const ACTIONS_CLOSE_EVENT = 'card-actions-close';
+	const handleCloseEvent = () => (isActionsMenuOpen = false);
+
+	function handleDocumentClick(event: MouseEvent) {
+		if (!isActionsMenuOpen) return;
+		const target = event.target as Node | null;
+		if (actionsMenuRef && target && !actionsMenuRef.contains(target)) {
+			isActionsMenuOpen = false;
+		}
+	}
+
+	function closeAllChecklistMenus() {
+		window.dispatchEvent(new CustomEvent(ACTIONS_CLOSE_EVENT));
+	}
+
+	onMount(() => {
+		document.addEventListener('click', handleDocumentClick);
+		window.addEventListener(ACTIONS_CLOSE_EVENT, handleCloseEvent);
+		return () => {
+			document.removeEventListener('click', handleDocumentClick);
+			window.removeEventListener(ACTIONS_CLOSE_EVENT, handleCloseEvent);
+		};
+	});
 
 	export let checklist: Checklist;
 	export let user: User | null = null;
@@ -257,15 +283,38 @@
 				</button>
 
 				{#if canEdit}
-					<details class="dropdown dropdown-end relative z-50">
-						<summary class="btn btn-square btn-sm p-1 text-base-content">
+					<div
+						class="dropdown dropdown-end relative z-50"
+						class:dropdown-open={isActionsMenuOpen}
+						bind:this={actionsMenuRef}
+					>
+						<button
+							type="button"
+							class="btn btn-square btn-sm p-1 text-base-content"
+							aria-haspopup="menu"
+							on:click|stopPropagation={() => {
+								if (isActionsMenuOpen) {
+									isActionsMenuOpen = false;
+									return;
+								}
+								closeAllChecklistMenus();
+								isActionsMenuOpen = true;
+							}}
+						>
 							<DotsHorizontal class="w-5 h-5" />
-						</summary>
+						</button>
 						<ul
+							tabindex="-1"
 							class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow-lg border border-base-300"
 						>
 							<li>
-								<button on:click={editChecklist} class="flex items-center gap-2">
+								<button
+									on:click={() => {
+										isActionsMenuOpen = false;
+										editChecklist();
+									}}
+									class="flex items-center gap-2"
+								>
 									<FileDocumentEdit class="w-4 h-4" />
 									{$t('lodging.edit')}
 								</button>
@@ -275,8 +324,10 @@
 								{#if !itineraryItem.is_global}
 									<li>
 										<button
-											on:click={() =>
-												dispatch('moveToGlobal', { type: 'checklist', id: checklist.id })}
+											on:click={() => {
+												isActionsMenuOpen = false;
+												dispatch('moveToGlobal', { type: 'checklist', id: checklist.id });
+											}}
 											class="flex items-center gap-2"
 										>
 											<Globe class="w-4 h-4" />
@@ -284,7 +335,13 @@
 										</button>
 									</li>
 									<li>
-										<button on:click={() => changeDay()} class=" flex items-center gap-2">
+										<button
+											on:click={() => {
+												isActionsMenuOpen = false;
+												changeDay();
+											}}
+											class=" flex items-center gap-2"
+										>
 											<Calendar class="w-4 h-4 text" />
 											{$t('itinerary.change_day')}
 										</button>
@@ -292,7 +349,10 @@
 								{/if}
 								<li>
 									<button
-										on:click={() => removeFromItinerary()}
+										on:click={() => {
+											isActionsMenuOpen = false;
+											removeFromItinerary();
+										}}
 										class="text-error flex items-center gap-2"
 									>
 										<CalendarRemove class="w-4 h-4 text-error" />
@@ -308,14 +368,17 @@
 							<li>
 								<button
 									class="text-error flex items-center gap-2"
-									on:click={() => (isWarningModalOpen = true)}
+									on:click={() => {
+										isActionsMenuOpen = false;
+										isWarningModalOpen = true;
+									}}
 								>
 									<TrashCan class="w-4 h-4" />
 									{$t('adventures.delete')}
 								</button>
 							</li>
 						</ul>
-					</details>
+					</div>
 				{/if}
 			</div>
 		</div>

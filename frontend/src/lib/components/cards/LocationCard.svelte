@@ -42,7 +42,7 @@
 	let copied: boolean = false;
 	let isActionsMenuOpen: boolean = false;
 	let actionsMenuRef: HTMLDivElement | null = null;
-	const ACTIONS_CLOSE_EVENT = 'location-card-close-actions';
+	const ACTIONS_CLOSE_EVENT = 'card-actions-close';
 	const handleCloseEvent = () => (isActionsMenuOpen = false);
 
 	function handleDocumentClick(event: MouseEvent) {

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
+	import { createEventDispatcher, onMount } from 'svelte';
 	import TrashCanOutline from '~icons/mdi/trash-can-outline';
 	import FileDocumentEdit from '~icons/mdi/file-document-edit';
 	import type { Collection, Transportation, User } from '$lib/types';
@@ -24,6 +24,32 @@
 	import Globe from '~icons/mdi/globe';
 	import { goto } from '$app/navigation';
 	import type { CollectionItineraryItem } from '$lib/types';
+
+	let isActionsMenuOpen = false;
+	let actionsMenuRef: HTMLDivElement | null = null;
+	const ACTIONS_CLOSE_EVENT = 'card-actions-close';
+	const handleCloseEvent = () => (isActionsMenuOpen = false);
+
+	function handleDocumentClick(event: MouseEvent) {
+		if (!isActionsMenuOpen) return;
+		const target = event.target as Node | null;
+		if (actionsMenuRef && target && !actionsMenuRef.contains(target)) {
+			isActionsMenuOpen = false;
+		}
+	}
+
+	function closeAllTransportationMenus() {
+		window.dispatchEvent(new CustomEvent(ACTIONS_CLOSE_EVENT));
+	}
+
+	onMount(() => {
+		document.addEventListener('click', handleDocumentClick);
+		window.addEventListener(ACTIONS_CLOSE_EVENT, handleCloseEvent);
+		return () => {
+			document.removeEventListener('click', handleDocumentClick);
+			window.removeEventListener(ACTIONS_CLOSE_EVENT, handleCloseEvent);
+		};
+	});
 
 	function getTransportationIcon(type: string) {
 		if (type in TRANSPORTATION_TYPES_ICONS) {
@@ -217,15 +243,38 @@
 				</button>
 
 				{#if !readOnly && (transportation.user === user?.uuid || (collection && user && collection.shared_with?.includes(user.uuid)))}
-					<details class="dropdown dropdown-end relative z-50">
-						<summary class="btn btn-square btn-sm p-1 text-base-content">
+					<div
+						class="dropdown dropdown-end relative z-50"
+						class:dropdown-open={isActionsMenuOpen}
+						bind:this={actionsMenuRef}
+					>
+						<button
+							type="button"
+							class="btn btn-square btn-sm p-1 text-base-content"
+							aria-haspopup="menu"
+							on:click|stopPropagation={() => {
+								if (isActionsMenuOpen) {
+									isActionsMenuOpen = false;
+									return;
+								}
+								closeAllTransportationMenus();
+								isActionsMenuOpen = true;
+							}}
+						>
 							<DotsHorizontal class="w-5 h-5" />
-						</summary>
+						</button>
 						<ul
+							tabindex="-1"
 							class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow-lg border border-base-300"
 						>
 							<li>
-								<button on:click={editTransportation} class="flex items-center gap-2">
+								<button
+									on:click={() => {
+										isActionsMenuOpen = false;
+										editTransportation();
+									}}
+									class="flex items-center gap-2"
+								>
 									<FileDocumentEdit class="w-4 h-4" />
 									{$t('transportation.edit')}
 								</button>
@@ -235,8 +284,10 @@
 								{#if !itineraryItem.is_global}
 									<li>
 										<button
-											on:click={() =>
-												dispatch('moveToGlobal', { type: 'transportation', id: transportation.id })}
+											on:click={() => {
+												isActionsMenuOpen = false;
+												dispatch('moveToGlobal', { type: 'transportation', id: transportation.id });
+											}}
 											class=" flex items-center gap-2"
 										>
 											<Globe class="w-4 h-4 " />
@@ -244,7 +295,13 @@
 										</button>
 									</li>
 									<li>
-										<button on:click={() => changeDay()} class=" flex items-center gap-2">
+										<button
+											on:click={() => {
+												isActionsMenuOpen = false;
+												changeDay();
+											}}
+											class=" flex items-center gap-2"
+										>
 											<Calendar class="w-4 h-4 text" />
 											{$t('itinerary.change_day')}
 										</button>
@@ -252,7 +309,10 @@
 								{/if}
 								<li>
 									<button
-										on:click={() => removeFromItinerary()}
+										on:click={() => {
+											isActionsMenuOpen = false;
+											removeFromItinerary();
+										}}
 										class="text-error flex items-center gap-2"
 									>
 										<CalendarRemove class="w-4 h-4 text-error" />
@@ -268,14 +328,17 @@
 							<li>
 								<button
 									class="text-error flex items-center gap-2"
-									on:click={() => (isWarningModalOpen = true)}
+									on:click={() => {
+										isActionsMenuOpen = false;
+										isWarningModalOpen = true;
+									}}
 								>
 									<TrashCanOutline class="w-4 h-4" />
 									{$t('adventures.delete')}
 								</button>
 							</li>
 						</ul>
-					</details>
+					</div>
 				{/if}
 			</div>
 		</div>
