@@ -549,7 +549,17 @@
     "countries": "Countries",
     "regions": "Regions",
     "cities": "Cities",
-    "stays": "Stays"
+    "stays": "Stays",
+    "airport_search_mode": "Airport Search Mode",
+    "location_search_mode": "Location Search Mode",
+    "departure_airport": "Departure Airport",
+    "start_location": "Start Location",
+    "arrival_airport": "Arrival Airport",
+    "end_location": "End Location",
+    "route_selected": "Route Selected",
+    "search_start_end_locations": "Search start and end locations",
+    "search_start_location": "Search start location",
+    "search_end_location": "Search end location"
   },
   "worldtravel": {
     "country_list": "Country List",
