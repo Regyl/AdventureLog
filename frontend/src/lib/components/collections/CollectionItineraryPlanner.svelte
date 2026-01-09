@@ -2390,13 +2390,14 @@
 					<!-- Unscheduled Items List -->
 					<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
 						{#each unscheduledItems as { type, item }}
-							<div class="relative opacity-60 hover:opacity-100 transition-opacity h-full">
+							<div class="relative group opacity-60 hover:opacity-100 transition-opacity h-full">
 								<!-- "Add to itinerary" indicator -->
 								{#if canModify}
-									<div class="absolute -right-2 top-2 z-10">
-										<div class="join">
+									<div class="absolute left-2 top-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+										<div class="join bg-base-100/80 rounded-md p-1 shadow-sm backdrop-blur-sm border border-base-300">
 											<button
-												class="btn btn-circle btn-sm btn-primary join-item"
+												aria-label="Add to day"
+												class="btn btn-circle btn-xs btn-primary join-item shadow-sm"
 												title="Add to day"
 												on:click={() => handleOpenDayPickerForItem(type, item)}
 											>
@@ -2416,7 +2417,8 @@
 												</svg>
 											</button>
 											<button
-												class="btn btn-circle btn-sm btn-outline join-item"
+												aria-label="Add to trip-wide"
+												class="btn btn-circle btn-xs btn-outline join-item shadow-sm"
 												title="Add to trip-wide"
 												on:click={() => addGlobalItineraryItemForObject(type, item.id)}
 											>
@@ -2440,15 +2442,46 @@
 
 								<!-- Display the appropriate card -->
 								{#if type === 'location'}
-									<LocationCard adventure={item} {user} collection={null} />
+									<LocationCard
+										adventure={item}
+										on:edit={handleEditLocation}
+										on:delete={handleItemDelete}
+										{user}
+										{collection}
+										compact={true}
+									/>
 								{:else if type === 'transportation'}
-									<TransportationCard transportation={item} {user} {collection} />
+									<TransportationCard
+										transportation={item}
+										{user}
+										{collection}
+										on:delete={handleItemDelete}
+										on:edit={handleEditTransportation}
+									/>
 								{:else if type === 'lodging'}
-									<LodgingCard lodging={item} {user} {collection} />
+									<LodgingCard
+										lodging={item}
+										{user}
+										{collection}
+										on:delete={handleItemDelete}
+										on:edit={handleEditLodging}
+									/>
 								{:else if type === 'note'}
-									<NoteCard note={item} {user} {collection} />
+									<NoteCard
+										note={item}
+										{user}
+										{collection}
+										on:delete={handleItemDelete}
+										on:edit={handleEditNote}
+									/>
 								{:else if type === 'checklist'}
-									<ChecklistCard checklist={item} {user} {collection} />
+									<ChecklistCard
+										checklist={item}
+										{user}
+										{collection}
+										on:delete={handleItemDelete}
+										on:edit={handleEditChecklist}
+									/>
 								{/if}
 							</div>
 						{/each}
