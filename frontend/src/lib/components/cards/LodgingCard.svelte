@@ -209,20 +209,24 @@
 											{$t('itinerary.move_to_trip_context') || 'Move to Trip Context'}
 										</button>
 									</li>
+									<li>
+										<button on:click={() => changeDay()} class=" flex items-center gap-2">
+											<Calendar class="w-4 h-4 text" />
+											{$t('itinerary.change_day')}
+										</button>
+									</li>
 								{/if}
-								<li>
-									<button on:click={() => changeDay()} class=" flex items-center gap-2">
-										<Calendar class="w-4 h-4 text" />
-										{$t('itinerary.change_day')}
-									</button>
-								</li>
 								<li>
 									<button
 										on:click={() => removeFromItinerary()}
 										class="text-error flex items-center gap-2"
 									>
 										<CalendarRemove class="w-4 h-4 text-error" />
-										{$t('itinerary.remove_from_itinerary')}
+										{#if itineraryItem.is_global}
+											{$t('itinerary.remove_from_trip_context') || 'Remove from Trip Context'}
+										{:else}
+											{$t('itinerary.remove_from_itinerary')}
+										{/if}
 									</button>
 								</li>
 							{/if}

@@ -113,7 +113,7 @@
 									disabled={isScheduled}
 									on:click={() => handleDaySelect(day.date, true)}
 								>
-									{isScheduled ? 'Already scheduled' : 'Update to this day'}
+									{isScheduled ? 'Already scheduled' : 'Move to this day'}
 								</button>
 							</div>
 						</div>

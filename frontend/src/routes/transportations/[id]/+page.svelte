@@ -629,6 +629,78 @@
 									<MapMarker class="w-5 h-5" />
 									{getRouteLabel()}
 								</p>
+
+								<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+									{#if transportation.from_location}
+										<div class="rounded-lg p-3 bg-gradient-to-br from-primary/10 to-secondary/10">
+											<p class="flex items-center gap-2 text-sm mb-2">
+												<MapMarker class="w-4 h-4" />
+												{transportation.from_location}
+											</p>
+											<div class="grid grid-cols-3 gap-2">
+												<a
+													class="btn btn-sm btn-outline hover:btn-neutral"
+													href={`https://maps.apple.com/?q=${encodeURIComponent(transportation.from_location)}`}
+													target="_blank"
+													rel="noopener noreferrer"
+												>
+													🍎 Apple
+												</a>
+												<a
+													class="btn btn-sm btn-outline hover:btn-accent"
+													href={`https://maps.google.com/?q=${encodeURIComponent(transportation.from_location)}`}
+													target="_blank"
+													rel="noopener noreferrer"
+												>
+													🌍 Google
+												</a>
+												<a
+													class="btn btn-sm btn-outline hover:btn-primary"
+													href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(transportation.from_location)}`}
+													target="_blank"
+													rel="noopener noreferrer"
+												>
+													🗺️ OSM
+												</a>
+											</div>
+										</div>
+									{/if}
+
+									{#if transportation.to_location}
+										<div class="rounded-lg p-3 bg-gradient-to-br from-primary/10 to-secondary/10">
+											<p class="flex items-center gap-2 text-sm mb-2">
+												<MapMarker class="w-4 h-4" />
+												{transportation.to_location}
+											</p>
+											<div class="grid grid-cols-3 gap-2">
+												<a
+													class="btn btn-sm btn-outline hover:btn-neutral"
+													href={`https://maps.apple.com/?q=${encodeURIComponent(transportation.to_location)}`}
+													target="_blank"
+													rel="noopener noreferrer"
+												>
+													🍎 Apple
+												</a>
+												<a
+													class="btn btn-sm btn-outline hover:btn-accent"
+													href={`https://maps.google.com/?q=${encodeURIComponent(transportation.to_location)}`}
+													target="_blank"
+													rel="noopener noreferrer"
+												>
+													🌍 Google
+												</a>
+												<a
+													class="btn btn-sm btn-outline hover:btn-primary"
+													href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(transportation.to_location)}`}
+													target="_blank"
+													rel="noopener noreferrer"
+												>
+													🗺️ OSM
+												</a>
+											</div>
+										</div>
+									{/if}
+								</div>
 							{/if}
 						</div>
 					</div>

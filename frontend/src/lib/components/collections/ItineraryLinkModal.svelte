@@ -11,7 +11,7 @@
 	import LodgingCard from '$lib/components/cards/LodgingCard.svelte';
 	import NoteCard from '$lib/components/cards/NoteCard.svelte';
 	import ChecklistCard from '$lib/components/cards/ChecklistCard.svelte';
-	import { t } from 'svelte-i18n';
+	import { date, t } from 'svelte-i18n';
 
 	const dispatch = createEventDispatcher();
 
@@ -254,6 +254,7 @@
 						<CalendarBlank class="w-5 h-5 text-primary" />
 						Already added on this day
 					</h4>
+					<p class="text-sm opacity-60 mb-4">These items are already scheduled for this day.</p>
 					<div class="grid grid-cols-1 md:grid-cols-3 gap-2">
 						{#each groupedItems.scheduledOnThisDay as { type, item, dates }}
 							<div class="card bg-base-100 border border-base-300 shadow-sm">
@@ -282,10 +283,8 @@
 											<ChecklistCard checklist={item} {user} {collection} readOnly={true} />
 										{/if}
 									</div>
-									<div class="text-xs opacity-70 mb-2">Already on: {(dates || []).join(', ')}</div>
-									<div class="text-2xs opacity-50">
-										Use "Items on other days" or "Add as is" to duplicate onto this date.
-									</div>
+									<div class="text-xs opacity-70 mb-2">Already on this day</div>
+									<button class="btn btn-xs btn-disabled w-full" disabled> Already Added </button>
 								</div>
 							</div>
 						{/each}
@@ -301,8 +300,8 @@
 				<div class="mb-4">
 					<h4 class="text-lg font-semibold mb-3 opacity-70">Already added on other days</h4>
 					<p class="text-sm opacity-60 mb-4">
-						These items are already in your itinerary on a different date — you can add them again
-						to this day or update their date.
+						These items are scheduled on different dates. Adding them here will update their date or
+						add them as-is.
 					</p>
 					<div class="grid grid-cols-1 md:grid-cols-3 gap-2">
 						{#each groupedItems.scheduledOtherDays as { type, item, dates }}
@@ -334,13 +333,13 @@
 									</div>
 									<div class="text-xs opacity-70 mb-2">On: {(dates || []).join(', ')}</div>
 									<div class="flex gap-2">
-										<button
+										<!-- <button
 											class="btn btn-outline btn-xs flex-1"
-											on:click={() => handleAddItem(type, item.id, false)}>Add to This Day</button
-										>
+											on:click={() => handleAddItem(type, item.id, false)}>Add (Keep Date)</button
+										> -->
 										<button
 											class="btn btn-primary btn-xs flex-1"
-											on:click={() => handleAddItem(type, item.id, true)}>Add & Update Date</button
+											on:click={() => handleAddItem(type, item.id, true)}>Add Here</button
 										>
 									</div>
 								</div>
@@ -387,17 +386,17 @@
 										{/if}
 									</div>
 									<div class="flex gap-2">
-										<button
+										<!-- <button
 											class="btn btn-outline btn-xs flex-1"
 											on:click={() => handleAddItem(type, item.id, false)}
 										>
 											Add as is
-										</button>
+										</button> -->
 										<button
 											class="btn btn-primary btn-xs flex-1"
 											on:click={() => handleAddItem(type, item.id, true)}
 										>
-											Add & Update Date
+											Add Here
 										</button>
 									</div>
 								</div>

@@ -417,10 +417,38 @@
 								</MapLibre>
 							</div>
 							{#if lodging.location}
-								<p class="mt-4 text-base-content/70 flex items-center gap-2">
-									<MapMarker class="w-5 h-5" />
-									{lodging.location}
-								</p>
+								<div class="rounded-lg p-3 mb-3 bg-gradient-to-br from-primary/10 to-secondary/10">
+									<p class="flex items-center gap-2 text-sm mb-2">
+										<MapMarker class="w-4 h-4" />
+										{lodging.location}
+									</p>
+									<div class="grid grid-cols-3 gap-2">
+										<a
+											class="btn btn-sm btn-outline hover:btn-neutral"
+											href={`https://maps.apple.com/?q=${encodeURIComponent(lodging.location)}`}
+											target="_blank"
+											rel="noopener noreferrer"
+										>
+											🍎 Apple
+										</a>
+										<a
+											class="btn btn-sm btn-outline hover:btn-accent"
+											href={`https://maps.google.com/?q=${encodeURIComponent(lodging.location)}`}
+											target="_blank"
+											rel="noopener noreferrer"
+										>
+											🌍 Google
+										</a>
+										<a
+											class="btn btn-sm btn-outline hover:btn-primary"
+											href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(lodging.location)}`}
+											target="_blank"
+											rel="noopener noreferrer"
+										>
+											🗺️ OSM
+										</a>
+									</div>
+								</div>
 							{/if}
 						</div>
 					</div>

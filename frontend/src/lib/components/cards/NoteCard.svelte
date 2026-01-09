@@ -111,7 +111,7 @@
 					type="button"
 					class="btn btn-circle btn-ghost btn-sm"
 					on:click={() => (isDetailsOpen = false)}
-					aria-label={$t('adventures.close')}
+					aria-label={$t('about.close')}
 				>
 					<Close class="w-4 h-4" />
 				</button>
@@ -198,26 +198,30 @@
 									<li>
 										<button
 											on:click={() => dispatch('moveToGlobal', { type: 'note', id: note.id })}
-											class="text-info flex items-center gap-2"
+											class=" flex items-center gap-2"
 										>
-											<Globe class="w-4 h-4 text-info" />
-											{$t('itinerary.move_to_trip_context') || 'Move to Trip Context'}
+											<Globe class="w-4 h-4 " />
+											{$t('itinerary.move_to_trip_context')}
+										</button>
+									</li>
+									<li>
+										<button on:click={() => changeDay()} class=" flex items-center gap-2">
+											<CalendarRemove class="w-4 h-4 text" />
+											{$t('itinerary.change_day')}
 										</button>
 									</li>
 								{/if}
-								<li>
-									<button on:click={() => changeDay()} class=" flex items-center gap-2">
-										<CalendarRemove class="w-4 h-4 text" />
-										{$t('itinerary.change_day')}
-									</button>
-								</li>
 								<li>
 									<button
 										on:click={() => removeFromItinerary()}
 										class="text-error flex items-center gap-2"
 									>
 										<CalendarRemove class="w-4 h-4 text-error" />
-										{$t('itinerary.remove_from_itinerary')}
+										{#if itineraryItem.is_global}
+											{$t('itinerary.remove_from_trip_context') || 'Remove from Trip Context'}
+										{:else}
+											{$t('itinerary.remove_from_itinerary')}
+										{/if}
 									</button>
 								</li>
 							{/if}

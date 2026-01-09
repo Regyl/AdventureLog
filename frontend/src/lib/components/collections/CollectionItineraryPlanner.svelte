@@ -174,9 +174,9 @@
 				.filter((it) => it.object_id === objectId && it.date && !it.is_global)
 				.map((it) => it.id);
 
-			// Delete the dated entries
+			// Delete the dated entries, but preserve visits
 			for (const entryId of entriesToRemove) {
-				await fetch(`/api/itineraries/${entryId}`, { method: 'DELETE' });
+				await fetch(`/api/itineraries/${entryId}?preserve_visits=true`, { method: 'DELETE' });
 			}
 
 			// Add as global if not already there
@@ -358,6 +358,7 @@
 	let dayPickItemToAdd: { type: string; item: any } | null = null;
 	let dayPickScheduledDates: string[] = [];
 	let dayPickSourceVisit: { id: string; start_date: string } | null = null;
+	let dayPickSourceItineraryItemId: string | null = null; // Track which specific itinerary item is being moved
 
 	// When opening a "create new item" modal we store the target date here
 	let pendingAddDate: string | null = null;
@@ -1064,6 +1065,16 @@
 			.filter((it) => it.object_id === item.id && it.date && !it.is_global)
 			.map((it) => it.date as string);
 
+		// If moving from a specific itinerary date, track which itinerary item it is
+		if (currentItineraryDate) {
+			const sourceItineraryItem = (collection.itinerary || []).find(
+				(it) => it.object_id === item.id && it.date === currentItineraryDate && !it.is_global
+			);
+			dayPickSourceItineraryItemId = sourceItineraryItem?.id || null;
+		} else {
+			dayPickSourceItineraryItemId = null;
+		}
+
 		if (type === 'location') {
 			// For locations, prefer the visit matching the current itinerary date
 			let matchedVisit = null;
@@ -1225,32 +1236,36 @@
 				}
 			}
 
-			// If we are moving the item (user chose to update the underlying date or an existing dated entry exists),
-			// remove old dated itinerary entries for this object on other dates.
-			// This ensures the item is moved rather than duplicated across days.
-			const toRemove = existingDatedItems.filter((it) => it.date !== selectedDate);
-			for (const oldItem of toRemove) {
+			// Only remove the specific itinerary entry being moved, not all occurrences
+			if (updateDate && dayPickSourceItineraryItemId) {
+				// Only delete the specific itinerary item that was being moved
 				try {
-					await fetch(`/api/itineraries/${oldItem.id}`, { method: 'DELETE' });
+					await fetch(`/api/itineraries/${dayPickSourceItineraryItemId}`, { method: 'DELETE' });
+					// Update local state to reflect removal
+					collection.itinerary = (collection.itinerary || []).filter(
+						(it) => it.id !== dayPickSourceItineraryItemId
+					);
+					days = groupItemsByDay(collection);
 				} catch (e) {
-					console.error('Failed to remove old itinerary item', oldItem.id, e);
+					console.error('Failed to remove source itinerary item', dayPickSourceItineraryItemId, e);
 				}
-			}
-
-			if (toRemove.length > 0) {
-				// Update local state to reflect removals
-				collection.itinerary = (collection.itinerary || []).filter(
-					(it) => !toRemove.some((r) => r.id === it.id)
-				);
-				days = groupItemsByDay(collection);
 			}
 		} finally {
 			// Reset state regardless of success/failure
 			dayPickItemToAdd = null;
 			dayPickScheduledDates = [];
 			dayPickSourceVisit = null;
+			dayPickSourceItineraryItemId = null;
 			isDayPickModalOpen = false;
 		}
+	}
+
+	// Helper: validate UUID format to avoid sending temporary IDs to backend
+	function isValidUUID(id: string | undefined | null): boolean {
+		if (!id) return false;
+		const uuidRegex =
+			/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
+		return uuidRegex.test(id);
 	}
 
 	// Add an itinerary item locally and attempt to persist to backend
@@ -1289,10 +1304,10 @@
 					date: dateISO,
 					order,
 					update_item_date: updateItemDate,
-					// Prefer updating an existing Visit when moving a location
+					// Pass source visit ID so backend can update the existing visit
 					source_visit_id:
-						objectType === 'location' && updateItemDate && dayPickSourceVisit?.id
-							? dayPickSourceVisit.id
+						objectType === 'location' && updateItemDate && isValidUUID(dayPickSourceVisit?.id)
+							? dayPickSourceVisit!.id
 							: undefined
 				})
 			});
@@ -1324,41 +1339,65 @@
 			} else if (updateItemDate) {
 				// Fallback: if server didn't return updated_object, do manual update for other types
 				const isoDate = `${dateISO}T00:00:00`;
-				const nextDayISO = DateTime.fromISO(dateISO).plus({ days: 1 }).toISODate();
 
 				if (objectType === 'location') {
-					// For locations, update existing source visit when available; otherwise append a new visit
-					const sourceId = dayPickSourceVisit?.id;
+					// Shift the existing visit dates locally to match the new itinerary date
 					if (collection.locations) {
 						collection.locations = collection.locations.map((loc) => {
 							if (loc.id !== objectId) return loc;
-							const visits = [...(loc.visits || [])];
-							if (sourceId) {
-								const idx = visits.findIndex((v) => v.id === sourceId);
-								if (idx !== -1) {
-									visits[idx] = {
-										...visits[idx],
-										start_date: `${dateISO}T00:00:00`,
-										end_date: `${dateISO}T23:59:59`
-									};
-									return { ...loc, visits };
-								}
+
+							const visits = loc.visits || [];
+							// Prefer matching by visit id (source_visit) then by old date
+							const sourceId = dayPickSourceVisit?.id;
+							const oldDate = dayPickSourceVisit?.start_date
+								? dayPickSourceVisit.start_date.split('T')[0]
+								: null;
+							let idx = sourceId ? visits.findIndex((v) => v.id === sourceId) : -1;
+							if (idx === -1 && oldDate) {
+								idx = visits.findIndex((v) => v.start_date?.startsWith(oldDate));
 							}
 
-							// No source visit to update; append a new one
-							const newVisit = {
-								id: `temp-visit-${Date.now()}`,
-								location: objectId,
-								start_date: `${dateISO}T00:00:00`,
-								end_date: `${dateISO}T23:59:59`,
-								notes: $t('itinerary.visit_created_via_itinerary'),
-								created_at: new Date().toISOString(),
-								updated_at: new Date().toISOString(),
-								images: [],
-								attachments: []
-							};
-							return { ...loc, visits: [...(loc.visits || []), newVisit] };
+							if (idx === -1) return loc;
+
+							const v = visits[idx];
+							const startDT = v.start_date ? DateTime.fromISO(v.start_date) : null;
+							const endDT = v.end_date ? DateTime.fromISO(v.end_date) : null;
+							const baseStart = DateTime.fromISO(dateISO);
+							const newStart = startDT
+								? baseStart
+										.set({
+											second: startDT.second,
+											minute: startDT.minute,
+											hour: startDT.hour,
+											millisecond: startDT.millisecond
+										})
+										.toISO()
+								: `${dateISO}T00:00:00`;
+							const newEnd = endDT
+								? DateTime.fromISO(dateISO)
+										.set({
+											second: endDT.second,
+											minute: endDT.minute,
+											hour: endDT.hour,
+											millisecond: endDT.millisecond
+										})
+										.toISO()
+								: `${dateISO}T23:59:59`;
+
+							const nextVisits = [...visits];
+							nextVisits[idx] = { ...v, start_date: newStart, end_date: newEnd };
+							return { ...loc, visits: nextVisits };
 						});
+					}
+				} else if (objectType === 'lodging') {
+					if (collection.lodging) {
+						// Set check_in to selected day, check_out to next day
+						const checkOutDate = DateTime.fromISO(dateISO).plus({ days: 1 }).toISODate();
+						collection.lodging = collection.lodging.map((l) =>
+							l.id === objectId
+								? { ...l, check_in: `${dateISO}T00:00:00`, check_out: `${checkOutDate}T00:00:00` }
+								: l
+						);
 					}
 				} else if (objectType === 'note') {
 					if (collection.notes) {
@@ -1558,6 +1597,7 @@
 			dayPickItemToAdd = null;
 			dayPickScheduledDates = [];
 			dayPickSourceVisit = null;
+			dayPickSourceItineraryItemId = null;
 		}}
 	/>
 {/if}
@@ -2129,7 +2169,8 @@
 															handleOpenDayPickerForItem(
 																e.detail.type,
 																e.detail.item,
-																e.detail.forcePicker
+																e.detail.forcePicker,
+																day.date
 															)}
 													/>
 												{:else if objectType === 'lodging'}
@@ -2146,7 +2187,8 @@
 															handleOpenDayPickerForItem(
 																e.detail.type,
 																e.detail.item,
-																e.detail.forcePicker
+																e.detail.forcePicker,
+																day.date
 															)}
 													/>
 												{:else if objectType === 'note'}
@@ -2164,7 +2206,8 @@
 															handleOpenDayPickerForItem(
 																e.detail.type,
 																e.detail.item,
-																e.detail.forcePicker
+																e.detail.forcePicker,
+																day.date
 															)}
 													/>
 												{:else if objectType === 'checklist'}
@@ -2182,7 +2225,8 @@
 															handleOpenDayPickerForItem(
 																e.detail.type,
 																e.detail.item,
-																e.detail.forcePicker
+																e.detail.forcePicker,
+																day.date
 															)}
 													/>
 												{/if}

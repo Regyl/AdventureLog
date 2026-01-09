@@ -1196,7 +1196,8 @@
     "item_singular": "item",
     "item_plural": "items",
     "already_scheduled": "Already scheduled",
-    "update_to_this_day": "Update to this day"
+    "update_to_this_day": "Update to this day",
+    "remove_from_trip_context": "Remove from Context"
   },
   "common": {
     "show_less": "Hide details",

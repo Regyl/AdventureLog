@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
+	import { createEventDispatcher, onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import type { Location, Collection, User } from '$lib/types';
 	const dispatch = createEventDispatcher();
@@ -40,6 +40,31 @@
 	let isCollectionModalOpen: boolean = false;
 	let isWarningModalOpen: boolean = false;
 	let copied: boolean = false;
+	let isActionsMenuOpen: boolean = false;
+	let actionsMenuRef: HTMLDivElement | null = null;
+	const ACTIONS_CLOSE_EVENT = 'location-card-close-actions';
+	const handleCloseEvent = () => (isActionsMenuOpen = false);
+
+	function handleDocumentClick(event: MouseEvent) {
+		if (!isActionsMenuOpen) return;
+		const target = event.target as Node | null;
+		if (actionsMenuRef && target && !actionsMenuRef.contains(target)) {
+			isActionsMenuOpen = false;
+		}
+	}
+
+	function closeAllLocationMenus() {
+		window.dispatchEvent(new CustomEvent(ACTIONS_CLOSE_EVENT));
+	}
+
+	onMount(() => {
+		document.addEventListener('click', handleDocumentClick);
+		window.addEventListener(ACTIONS_CLOSE_EVENT, handleCloseEvent);
+		return () => {
+			document.removeEventListener('click', handleDocumentClick);
+			window.removeEventListener(ACTIONS_CLOSE_EVENT, handleCloseEvent);
+		};
+	});
 
 	async function copyLink() {
 		try {
@@ -326,15 +351,39 @@
 				</button>
 				{#if !readOnly}
 					{#if (adventure.user && adventure.user.uuid == user?.uuid) || (collection && user && collection.shared_with?.includes(user.uuid)) || (collection && user && collection.user == user.uuid)}
-						<details class="dropdown dropdown-end relative z-50">
-							<summary class="btn btn-square btn-sm p-1 text-base-content">
+						<div
+							class="dropdown dropdown-end relative z-50"
+							class:dropdown-open={isActionsMenuOpen}
+							bind:this={actionsMenuRef}
+						>
+							<button
+								type="button"
+								class="btn btn-square btn-sm p-1 text-base-content"
+								aria-haspopup="menu"
+								aria-label={$t('adventures.location_actions') || 'Location actions'}
+								on:click|stopPropagation={() => {
+									if (isActionsMenuOpen) {
+										isActionsMenuOpen = false;
+										return;
+									}
+									closeAllLocationMenus();
+									isActionsMenuOpen = true;
+								}}
+							>
 								<DotsHorizontal class="w-5 h-5" />
-							</summary>
+							</button>
 							<ul
+								tabindex="-1"
 								class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow-lg border border-base-300"
 							>
 								<li>
-									<button on:click={editAdventure} class="flex items-center gap-2">
+									<button
+										on:click={() => {
+											isActionsMenuOpen = false;
+											editAdventure();
+										}}
+										class="flex items-center gap-2"
+									>
 										<FileDocumentEdit class="w-4 h-4" />
 										{$t('adventures.edit_location')}
 									</button>
@@ -342,7 +391,10 @@
 								{#if user?.uuid == adventure.user?.uuid}
 									<li>
 										<button
-											on:click={() => (isCollectionModalOpen = true)}
+											on:click={() => {
+												isActionsMenuOpen = false;
+												isCollectionModalOpen = true;
+											}}
 											class="flex items-center gap-2"
 										>
 											<Plus class="w-4 h-4" />
@@ -352,8 +404,10 @@
 								{:else if collection && user && collection.user == user.uuid}
 									<li>
 										<button
-											on:click={() =>
-												removeFromCollection(new CustomEvent('unlink', { detail: collection.id }))}
+											on:click={() => {
+												isActionsMenuOpen = false;
+												removeFromCollection(new CustomEvent('unlink', { detail: collection.id }));
+											}}
 											class="flex items-center gap-2"
 										>
 											<LinkVariantRemove class="w-4 h-4" />
@@ -364,7 +418,13 @@
 
 								{#if adventure.is_public}
 									<li>
-										<button on:click={copyLink} class="flex items-center gap-2">
+										<button
+											on:click={() => {
+												isActionsMenuOpen = false;
+												copyLink();
+											}}
+											class="flex items-center gap-2"
+										>
 											{#if copied}
 												<Check class="w-4 h-4 text-success" />
 												<span>{$t('adventures.link_copied')}</span>
@@ -381,30 +441,55 @@
 									{#if !itineraryItem.is_global}
 										<li>
 											<button
-												on:click={() =>
-													dispatch('moveToGlobal', { type: 'location', id: adventure.id })}
+												on:click={() => {
+													isActionsMenuOpen = false;
+													dispatch('moveToGlobal', { type: 'location', id: adventure.id });
+												}}
 												class=" flex items-center gap-2"
 											>
 												<Globe class="w-4 h-4" />
 												{$t('itinerary.move_to_trip_context') || 'Move to Trip Context'}
 											</button>
 										</li>
+										<li>
+											<button
+												on:click={() => {
+													isActionsMenuOpen = false;
+													changeDay();
+												}}
+												class=" flex items-center gap-2"
+											>
+												<Calendar class="w-4 h-4" />
+												{$t('itinerary.change_day')}
+											</button>
+										</li>
+										<li>
+											<button
+												on:click={() => {
+													isActionsMenuOpen = false;
+													removeFromItinerary();
+												}}
+												class="text-error flex items-center gap-2"
+											>
+												<CalendarRemove class="w-4 h-4 text-error" />
+												{$t('itinerary.remove_from_itinerary')}
+											</button>
+										</li>
 									{/if}
-									<li>
-										<button on:click={() => changeDay()} class=" flex items-center gap-2">
-											<Calendar class="w-4 h-4" />
-											{$t('itinerary.change_day')}
-										</button>
-									</li>
-									<li>
-										<button
-											on:click={() => removeFromItinerary()}
-											class="text-error flex items-center gap-2"
-										>
-											<CalendarRemove class="w-4 h-4 text-error" />
-											{$t('itinerary.remove_from_itinerary')}
-										</button>
-									</li>
+									{#if itineraryItem.is_global}
+										<li>
+											<button
+												on:click={() => {
+													isActionsMenuOpen = false;
+													removeFromItinerary();
+												}}
+												class="text-error flex items-center gap-2"
+											>
+												<CalendarRemove class="w-4 h-4 text-error" />
+												{$t('itinerary.remove_from_trip_context')}
+											</button>
+										</li>
+									{/if}
 								{/if}
 
 								{#if user.uuid == adventure.user?.uuid}
@@ -414,7 +499,10 @@
 											id="delete_adventure"
 											data-umami-event="Delete Adventure"
 											class="text-error flex items-center gap-2"
-											on:click={() => (isWarningModalOpen = true)}
+											on:click={() => {
+												isActionsMenuOpen = false;
+												isWarningModalOpen = true;
+											}}
 										>
 											<TrashCan class="w-4 h-4" />
 											{$t('adventures.delete')}
@@ -422,7 +510,7 @@
 									</li>
 								{/if}
 							</ul>
-						</details>
+						</div>
 					{/if}
 				{/if}
 			</div>

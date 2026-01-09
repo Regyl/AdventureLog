@@ -152,10 +152,12 @@ class ItineraryViewSet(viewsets.ModelViewSet):
                                 new_start = None
                                 new_end = None
 
-                        # If we have valid bounds, update an existing Visit when provided, else create if none overlaps.
-                        # This keeps linked data (attachments, comments) on the same Visit object.
+                        # Update existing visit or create new one
+                        # When moving between days, update the existing visit to preserve visit ID and data
                         if new_start and new_end:
                             source_visit_id = data.get('source_visit_id')
+                            
+                            # If source visit provided, update it
                             if source_visit_id:
                                 try:
                                     source_visit = Visit.objects.get(id=source_visit_id, location=content_object)
@@ -163,21 +165,36 @@ class ItineraryViewSet(viewsets.ModelViewSet):
                                     source_visit.end_date = new_end
                                     source_visit.save(update_fields=['start_date', 'end_date'])
                                 except Visit.DoesNotExist:
-                                    # Fall back to create-or-skip logic below
+                                    # Fall back to create logic below
                                     pass
-
-                            if not data.get('source_visit_id'):
-                                # Overlap condition: existing.start_date <= new_end AND existing.end_date >= new_start
-                                overlap_q = Q(start_date__lte=new_end) & Q(end_date__gte=new_start)
-                                existing = Visit.objects.filter(location=content_object).filter(overlap_q)
-                                if not existing.exists():
-                                    Visit.objects.create(
-                                        location=content_object,
-                                        start_date=new_start,
-                                        end_date=new_end,
-                                        notes="Created from itinerary planning"
-                                    )
-                                # else: an overlapping visit already exists — skip creating a duplicate
+                            
+                            # If no source visit or update failed, check for overlapping visits
+                            if not source_visit_id:
+                                # Check for exact match to avoid duplicates
+                                exact_match = Visit.objects.filter(
+                                    location=content_object,
+                                    start_date=new_start,
+                                    end_date=new_end
+                                ).exists()
+                                
+                                if not exact_match:
+                                    # Check for any overlapping visits
+                                    overlap_q = Q(start_date__lte=new_end) & Q(end_date__gte=new_start)
+                                    existing = Visit.objects.filter(location=content_object).filter(overlap_q).first()
+                                    
+                                    if existing:
+                                        # Update existing overlapping visit
+                                        existing.start_date = new_start
+                                        existing.end_date = new_end
+                                        existing.save(update_fields=['start_date', 'end_date'])
+                                    else:
+                                        # Create new visit
+                                        Visit.objects.create(
+                                            location=content_object,
+                                            start_date=new_start,
+                                            end_date=new_end,
+                                            notes="Created from itinerary planning"
+                                        )
                     else:
                         # For other item types, update their date field and preserve duration
                         if content_type_val == 'transportation':
@@ -219,9 +236,9 @@ class ItineraryViewSet(viewsets.ModelViewSet):
                                     # Apply same duration to new check_in
                                     new_check_out = new_check_in + duration
                                 else:
-                                    # No original check_out, set to same as check_in
+                                    # No original dates: check_in at midnight on selected day, check_out at midnight next day
                                     new_check_in = datetime.datetime.combine(parse_date(clean_date), datetime.time.min)
-                                    new_check_out = new_check_in
+                                    new_check_out = new_check_in + datetime.timedelta(days=1)
                                 
                                 content_object.check_in = new_check_in
                                 content_object.check_out = new_check_out
@@ -334,12 +351,16 @@ class ItineraryViewSet(viewsets.ModelViewSet):
         
         When removing a location from the itinerary, any PLANNED visits (future visits) at 
         that location on the same date as the itinerary item should also be removed.
+        
+        If preserve_visits=true query parameter is provided, visits will NOT be deleted.
+        This is useful when moving items to global/trip context where we want to keep the visits.
         """
         instance = self.get_object()
+        preserve_visits = request.query_params.get('preserve_visits', 'false').lower() == 'true'
         
         # Check if this is a location type itinerary item
         location_ct = ContentType.objects.get_for_model(Location)
-        if instance.content_type == location_ct and instance.object_id:
+        if instance.content_type == location_ct and instance.object_id and not preserve_visits:
             try:
                 location = Location.objects.get(id=instance.object_id)
                 itinerary_date = instance.date
@@ -349,14 +370,11 @@ class ItineraryViewSet(viewsets.ModelViewSet):
                     if isinstance(itinerary_date, str):
                         itinerary_date = parse_date(itinerary_date)
                     
-                    # Find visits at this location on this date that are in the future (planned visits)
-                    # A visit is considered "planned" if its start_date is in the future
-                    now = timezone.now()
-                    
+                    # Find and delete visits at this location on this date
+                    # When removing from itinerary, we remove the associated visit
                     visits_to_delete = Visit.objects.filter(
                         location=location,
-                        start_date__date=itinerary_date,
-                        start_date__gt=now  # Only delete future/planned visits
+                        start_date__date=itinerary_date
                     )
                     
                     deleted_count = visits_to_delete.count()
