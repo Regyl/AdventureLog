@@ -1,8 +1,0 @@
-# AdventureLog cron jobs
-SHELL=/bin/sh
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-
-# Run sync_visited_regions daily at midnight
-0 0 * * * cd /code && /usr/local/bin/python3 manage.py sync_visited_regions >> /var/log/cron.log 2>&1
-
-# Empty line required at end of cron file

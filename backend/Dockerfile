@@ -41,7 +41,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install runtime dependencies (including GDAL and cron)
+# Install runtime dependencies (including GDAL)
 RUN apt-get update && apt-get install -y --no-install-recommends \
       postgresql-client \
       gdal-bin \
@@ -49,7 +49,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       nginx \
       memcached \
       supervisor \
-      cron \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy Python packages from builder
@@ -61,12 +60,8 @@ COPY ./server /code/
 COPY ./nginx.conf /etc/nginx/nginx.conf
 COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY ./entrypoint.sh /code/entrypoint.sh
-COPY ./crontab /etc/cron.d/adventurelog-cron
 RUN chmod +x /code/entrypoint.sh \
-    && mkdir -p /code/static /code/media \
-    && chmod 0644 /etc/cron.d/adventurelog-cron \
-    && crontab /etc/cron.d/adventurelog-cron \
-    && touch /var/log/cron.log
+    && mkdir -p /code/static /code/media
 
 # Collect static files
 RUN python3 manage.py collectstatic --noinput --verbosity 2
@@ -74,5 +69,8 @@ RUN python3 manage.py collectstatic --noinput --verbosity 2
 # Expose ports
 EXPOSE 80 8000
 
-# Start Supervisor
+# Start with an entrypoint that runs init tasks then starts supervisord
+ENTRYPOINT ["/code/entrypoint.sh"]
+
+# Start supervisord to manage processes
 CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
