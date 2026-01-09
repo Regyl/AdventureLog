@@ -922,7 +922,11 @@
     "enter_from_location": "Enter from location",
     "enter_to_location": "Enter to location",
     "arrival_code": "Arrival Code",
-    "departure_code": "Departure Code"
+    "departure_code": "Departure Code",
+    "arrival_date": "Arrival Date",
+    "departure_timezone": "Departure Timezone",
+    "arrival_timezone": "Arrival Timezone",
+    "departure_date": "Departure Date"
   },
   "lodging": {
     "new_lodging": "New Lodging",

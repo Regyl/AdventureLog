@@ -63,7 +63,7 @@ def run_sync():
 
 def main():
     """Main loop - run sync every INTERVAL_SECONDS."""
-    logger.info(f"Starting periodic sync (interval: {INTERVAL_SECONDS}s)")
+    logger.info(f"Starting periodic sync worker for midnight background jobs...")
 
     # Install signal handlers so supervisord (or other process managers)
     # can request a clean shutdown using SIGTERM/SIGINT.
@@ -76,7 +76,7 @@ def main():
             wait_seconds = _seconds_until_next_midnight()
             hours = wait_seconds / 3600.0
             logger.info(
-                f"Next sync scheduled in {wait_seconds:.0f}s (~{hours:.2f}h) at local midnight"
+                f"Next sync scheduled in {wait_seconds:.0f}s (~{hours:.2f}h) at UTC midnight"
             )
             # Sleep until midnight or until stop event is set
             if _stop_event.wait(wait_seconds):

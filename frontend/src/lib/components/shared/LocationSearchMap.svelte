@@ -78,31 +78,39 @@
 
 	// track previous airport mode to detect toggles
 	let prevAirportMode = airportMode;
+	let airportModeInitialized = false;
 
-	// Clear inputs/selections when airportMode is toggled
+	// Clear inputs/selections when airportMode is toggled (but not during initial setup)
 	$: if (prevAirportMode !== airportMode) {
 		prevAirportMode = airportMode;
-		// clear single-location search state
-		searchQuery = '';
-		searchResults = [];
-		selectedLocation = null;
-		selectedMarker = null;
-		locationData = null;
 
-		// clear transportation-mode search state
-		startSearchQuery = '';
-		endSearchQuery = '';
-		startSearchResults = [];
-		endSearchResults = [];
-		selectedStartLocation = null;
-		selectedEndLocation = null;
-		startMarker = null;
-		endMarker = null;
-		mapBounds = null;
-		startLocationData = null;
-		startCode = null;
-		endCode = null;
-		endLocationData = null;
+		// Only clear if this is not the first time airportMode is being set
+		// This prevents wiping out initial location data when editing existing plane transportations
+		if (airportModeInitialized) {
+			// clear single-location search state
+			searchQuery = '';
+			searchResults = [];
+			selectedLocation = null;
+			selectedMarker = null;
+			locationData = null;
+
+			// clear transportation-mode search state
+			startSearchQuery = '';
+			endSearchQuery = '';
+			startSearchResults = [];
+			endSearchResults = [];
+			selectedStartLocation = null;
+			selectedEndLocation = null;
+			startMarker = null;
+			endMarker = null;
+			mapBounds = null;
+			startLocationData = null;
+			startCode = null;
+			endCode = null;
+			endLocationData = null;
+		}
+
+		airportModeInitialized = true;
 	}
 
 	// Transportation mode variables

@@ -181,10 +181,14 @@
 	const regionClusterOptions: ClusterOptions = { radius: 300, maxZoom: 8, minPoints: 1 };
 
 	let regionsGeoJson: RegionFeatureCollection = { type: 'FeatureCollection', features: [] };
-	$: regionsGeoJson = {
-		type: 'FeatureCollection',
-		features: regions.map((r) => regionToFeature(r)).filter((f): f is RegionFeature => f !== null)
-	};
+	$: {
+		// Explicitly depend on visitedRegions to trigger reactivity when visit status changes
+		visitedRegions;
+		regionsGeoJson = {
+			type: 'FeatureCollection',
+			features: regions.map((r) => regionToFeature(r)).filter((f): f is RegionFeature => f !== null)
+		};
+	}
 
 	function getMarkerProps(feature: any): RegionFeatureProperties | null {
 		return feature && feature.properties ? feature.properties : null;
