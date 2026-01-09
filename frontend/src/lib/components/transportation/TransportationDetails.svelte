@@ -26,6 +26,7 @@
 
 	let isReverseGeocoding = false;
 	let airportMode = false;
+	let previousTransportationType: string | null = null;
 
 	let initialSelection: {
 		name: string;
@@ -141,6 +142,36 @@
 		return trimmed.slice(0, 5);
 	}
 
+	function clearAirportCodes() {
+		startCodeField = '';
+		endCodeField = '';
+		transportation.start_code = null;
+		transportation.end_code = null;
+	}
+
+	// Track previous airport mode to detect when user disables it
+	let prevAirportMode = airportMode;
+	$: if (prevAirportMode !== airportMode) {
+		prevAirportMode = airportMode;
+		// When airport mode is disabled, clear airport codes
+		if (!airportMode) {
+			clearAirportCodes();
+		}
+	}
+
+	// Auto-enable airport mode only when transportation type CHANGES to plane
+	// Do not continuously re-enable - respect user's manual toggle
+	$: if (
+		transportation.type === 'plane' &&
+		previousTransportationType !== 'plane' &&
+		!airportMode
+	) {
+		previousTransportationType = transportation.type;
+		airportMode = true;
+	} else if (transportation.type !== previousTransportationType) {
+		previousTransportationType = transportation.type;
+	}
+
 	// Reactive constraints
 	$: constraintStartDate = allDay
 		? fullStartDate && fullStartDate.includes('T')
@@ -161,15 +192,15 @@
 	) {
 		const { start, end } = event.detail;
 
-		// Update from location
-		transportation.from_location = start.location;
+		// Update from location - use name (e.g., "John F. Kennedy International Airport") not location (full address)
+		transportation.from_location = start.name;
 		transportation.origin_latitude = start.lat;
 		transportation.origin_longitude = start.lng;
 		transportation.start_code = normalizeCode(start.code || '');
 		startCodeField = startCodeField || transportation.start_code || '';
 
-		// Update to location
-		transportation.to_location = end.location;
+		// Update to location - use name (e.g., "Zurich Airport") not location (full address)
+		transportation.to_location = end.name;
 		transportation.destination_latitude = end.lat;
 		transportation.destination_longitude = end.lng;
 		transportation.end_code = normalizeCode(end.code || '');
@@ -637,40 +668,42 @@
 						</div>
 
 						<!-- Start/End Codes -->
-						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-							<div class="form-control">
-								<label class="label" for="start_code">
-									<span class="label-text font-medium"
-										>{$t('transportation.departure_code') || 'Departure code'}</span
-									>
-								</label>
-								<input
-									type="text"
-									id="start_code"
-									value={startCodeField}
-									on:input={handleStartCodeEvent}
-									class="input input-bordered bg-base-100/80 focus:bg-base-100 uppercase"
-									maxlength="5"
-									placeholder={airportMode ? 'JFK' : 'Code'}
-								/>
+						{#if transportation.type === 'plane' || airportMode}
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+								<div class="form-control">
+									<label class="label" for="start_code">
+										<span class="label-text font-medium"
+											>{$t('transportation.departure_code') || 'Departure code'}</span
+										>
+									</label>
+									<input
+										type="text"
+										id="start_code"
+										value={startCodeField}
+										on:input={handleStartCodeEvent}
+										class="input input-bordered bg-base-100/80 focus:bg-base-100 uppercase"
+										maxlength="5"
+										placeholder={airportMode ? 'JFK' : 'Code'}
+									/>
+								</div>
+								<div class="form-control">
+									<label class="label" for="end_code">
+										<span class="label-text font-medium"
+											>{$t('transportation.arrival_code') || 'Arrival code'}</span
+										>
+									</label>
+									<input
+										type="text"
+										id="end_code"
+										value={endCodeField}
+										on:input={handleEndCodeEvent}
+										class="input input-bordered bg-base-100/80 focus:bg-base-100 uppercase"
+										maxlength="5"
+										placeholder={airportMode ? 'LHR' : 'Code'}
+									/>
+								</div>
 							</div>
-							<div class="form-control">
-								<label class="label" for="end_code">
-									<span class="label-text font-medium"
-										>{$t('transportation.arrival_code') || 'Arrival code'}</span
-									>
-								</label>
-								<input
-									type="text"
-									id="end_code"
-									value={endCodeField}
-									on:input={handleEndCodeEvent}
-									class="input input-bordered bg-base-100/80 focus:bg-base-100 uppercase"
-									maxlength="5"
-									placeholder={airportMode ? 'LHR' : 'Code'}
-								/>
-							</div>
-						</div>
+						{/if}
 
 						<!-- Rating Field -->
 						<div class="form-control">

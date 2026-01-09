@@ -70,6 +70,7 @@
 	let searchTimeout: ReturnType<typeof setTimeout>;
 	let initialApplied = false;
 	let initialTransportationApplied = false;
+	let isInitializing = false;
 
 	// Track any provided codes (airport / station / etc)
 	let startCode: string | null = null;
@@ -131,6 +132,8 @@
 	}
 
 	async function applyInitialTransportationLocations() {
+		isInitializing = true;
+
 		if (initialStartLocation) {
 			selectedStartLocation = {
 				name: initialStartLocation.name,
@@ -147,11 +150,8 @@
 				startCode = null;
 				startSearchQuery = initialStartLocation.location || initialStartLocation.name;
 			}
-			await performDetailedReverseGeocode(
-				initialStartLocation.lat,
-				initialStartLocation.lng,
-				'start'
-			);
+			// Never perform reverse geocoding when we have initial location data
+			// to avoid overwriting airport names with generic locations
 		}
 
 		if (initialEndLocation) {
@@ -169,11 +169,17 @@
 				endCode = null;
 				endSearchQuery = initialEndLocation.location || initialEndLocation.name;
 			}
-			await performDetailedReverseGeocode(initialEndLocation.lat, initialEndLocation.lng, 'end');
+			// Never perform reverse geocoding when we have initial location data
+			// to avoid overwriting airport names with generic locations
 		}
 
 		updateMapBounds();
 		emitTransportationUpdate();
+
+		// Small delay to ensure all reactive updates complete before allowing searches
+		setTimeout(() => {
+			isInitializing = false;
+		}, 100);
 	}
 
 	async function searchLocations(query: string) {
@@ -276,6 +282,7 @@
 	}
 
 	function handleSearchInput() {
+		if (isInitializing) return;
 		clearTimeout(searchTimeout);
 		searchTimeout = setTimeout(() => {
 			searchLocations(searchQuery);
@@ -283,6 +290,7 @@
 	}
 
 	function handleStartSearchInput() {
+		if (isInitializing) return;
 		clearTimeout(startSearchTimeout);
 		startSearchTimeout = setTimeout(() => {
 			searchStartLocation(startSearchQuery);
@@ -290,6 +298,7 @@
 	}
 
 	function handleEndSearchInput() {
+		if (isInitializing) return;
 		clearTimeout(endSearchTimeout);
 		endSearchTimeout = setTimeout(() => {
 			searchEndLocation(endSearchQuery);
