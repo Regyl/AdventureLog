@@ -627,7 +627,7 @@
 								id="name"
 								bind:value={transportation.name}
 								class="input input-bordered bg-base-100/80 focus:bg-base-100"
-								placeholder="Enter transportation name"
+								placeholder={$t('transportation.enter_transportation_name')}
 								required
 							/>
 						</div>
@@ -663,7 +663,7 @@
 								id="flight_number"
 								bind:value={transportation.flight_number}
 								class="input input-bordered bg-base-100/80 focus:bg-base-100"
-								placeholder="Enter flight number"
+								placeholder={$t('transportation.enter_flight_number')}
 							/>
 						</div>
 
@@ -683,7 +683,7 @@
 										on:input={handleStartCodeEvent}
 										class="input input-bordered bg-base-100/80 focus:bg-base-100 uppercase"
 										maxlength="5"
-										placeholder={airportMode ? 'JFK' : 'Code'}
+										placeholder={airportMode ? 'JFK' : $t('transportation.departure_code')}
 									/>
 								</div>
 								<div class="form-control">
@@ -699,7 +699,7 @@
 										on:input={handleEndCodeEvent}
 										class="input input-bordered bg-base-100/80 focus:bg-base-100 uppercase"
 										maxlength="5"
-										placeholder={airportMode ? 'LHR' : 'Code'}
+										placeholder={airportMode ? 'LHR' : $t('transportation.arrival_code')}
 									/>
 								</div>
 							</div>
@@ -757,7 +757,7 @@
 								id="link"
 								bind:value={transportation.link}
 								class="input input-bordered bg-base-100/80 focus:bg-base-100"
-								placeholder="https://example.com"
+								placeholder={$t('transportation.enter_link')}
 							/>
 						</div>
 

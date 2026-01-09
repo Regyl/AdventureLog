@@ -36,6 +36,12 @@
 
 	$: groupedItems = getUnscheduledItemsForDate(collection, targetDate);
 
+	$: availableCount =
+		(groupedItems.scheduledOnThisDay.length || 0) +
+		(groupedItems.onThisDay.length || 0) +
+		(groupedItems.scheduledOtherDays.length || 0) +
+		(groupedItems.otherDays.length || 0);
+
 	function getUnscheduledItemsForDate(collection: Collection, targetDate: string): GroupedItems {
 		const itinerary = collection.itinerary || [];
 		const scheduledMap = new Map<string, string[]>();
@@ -180,14 +186,13 @@
 					</div>
 					<div>
 						<h1 class="text-2xl font-bold text-primary bg-clip-text">
-							Link Items to {displayDate}
+							{$t('adventures.itinerary_link_modal.title').replace('{date}', displayDate)}
 						</h1>
 						<p class="text-xs text-base-content/60">
-							{groupedItems.scheduledOnThisDay.length +
-								groupedItems.onThisDay.length +
-								groupedItems.scheduledOtherDays.length +
-								groupedItems.otherDays.length}
-							items available to link
+							{$t('adventures.itinerary_link_modal.items_available').replace(
+								'{count}',
+								String(availableCount)
+							)}
 						</p>
 					</div>
 				</div>
@@ -205,7 +210,7 @@
 				<div class="mb-4">
 					<h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
 						<CalendarBlank class="w-5 h-5 text-primary" />
-						Items on this day
+						{$t('adventures.itinerary_link_modal.items_on_this_day')}
 					</h4>
 					<div class="grid grid-cols-1 md:grid-cols-3 gap-2">
 						{#each groupedItems.onThisDay as { type, item }}
@@ -239,7 +244,7 @@
 										class="btn btn-primary btn-xs w-full"
 										on:click={() => handleAddItem(type, item.id, false)}
 									>
-										Add to Itinerary
+										{$t('adventures.itinerary_link_modal.add_to_itinerary')}
 									</button>
 								</div>
 							</div>
@@ -252,9 +257,11 @@
 				<div class="mb-4">
 					<h4 class="text-lg font-semibold mb-3 flex items-center gap-2">
 						<CalendarBlank class="w-5 h-5 text-primary" />
-						Already added on this day
+						{$t('adventures.itinerary_link_modal.already_added_on_this_day')}
 					</h4>
-					<p class="text-sm opacity-60 mb-4">These items are already scheduled for this day.</p>
+					<p class="text-sm opacity-60 mb-4">
+						{$t('adventures.itinerary_link_modal.already_added_on_this_day_desc')}
+					</p>
 					<div class="grid grid-cols-1 md:grid-cols-3 gap-2">
 						{#each groupedItems.scheduledOnThisDay as { type, item, dates }}
 							<div class="card bg-base-100 border border-base-300 shadow-sm">
@@ -283,8 +290,12 @@
 											<ChecklistCard checklist={item} {user} {collection} readOnly={true} />
 										{/if}
 									</div>
-									<div class="text-xs opacity-70 mb-2">Already on this day</div>
-									<button class="btn btn-xs btn-disabled w-full" disabled> Already Added </button>
+									<div class="text-xs opacity-70 mb-2">
+										{$t('adventures.itinerary_link_modal.already_added_on_this_day')}
+									</div>
+									<button class="btn btn-xs btn-disabled w-full" disabled>
+										{$t('adventures.itinerary_link_modal.already_added')}
+									</button>
 								</div>
 							</div>
 						{/each}
@@ -298,10 +309,11 @@
 
 			{#if groupedItems.scheduledOtherDays.length > 0}
 				<div class="mb-4">
-					<h4 class="text-lg font-semibold mb-3 opacity-70">Already added on other days</h4>
+					<h4 class="text-lg font-semibold mb-3 opacity-70">
+						{$t('adventures.itinerary_link_modal.already_added_other_days')}
+					</h4>
 					<p class="text-sm opacity-60 mb-4">
-						These items are scheduled on different dates. Adding them here will update their date or
-						add them as-is.
+						{$t('adventures.itinerary_link_modal.already_added_other_days_desc')}
 					</p>
 					<div class="grid grid-cols-1 md:grid-cols-3 gap-2">
 						{#each groupedItems.scheduledOtherDays as { type, item, dates }}
@@ -335,11 +347,12 @@
 									<div class="flex gap-2">
 										<!-- <button
 											class="btn btn-outline btn-xs flex-1"
-											on:click={() => handleAddItem(type, item.id, false)}>Add (Keep Date)</button
+											on:click={() => handleAddItem(type, item.id, false)}>{$t('adventures.itinerary_link_modal.add_here_keep_date')}</button
 										> -->
 										<button
 											class="btn btn-primary btn-xs flex-1"
-											on:click={() => handleAddItem(type, item.id, true)}>Add Here</button
+											on:click={() => handleAddItem(type, item.id, true)}
+											>{$t('adventures.itinerary_link_modal.add_here')}</button
 										>
 									</div>
 								</div>
@@ -352,10 +365,11 @@
 			<!-- Items on other days -->
 			{#if groupedItems.otherDays.length > 0}
 				<div class="mb-4">
-					<h4 class="text-lg font-semibold mb-3 opacity-70">Items on other days</h4>
+					<h4 class="text-lg font-semibold mb-3 opacity-70">
+						{$t('adventures.itinerary_link_modal.items_on_other_days')}
+					</h4>
 					<p class="text-sm opacity-60 mb-4">
-						These items have different dates. You can add them and optionally update their date to
-						match.
+						{$t('adventures.itinerary_link_modal.items_on_other_days_desc')}
 					</p>
 					<div class="grid grid-cols-1 md:grid-cols-3 gap-2">
 						{#each groupedItems.otherDays as { type, item }}
@@ -396,7 +410,7 @@
 											class="btn btn-primary btn-xs flex-1"
 											on:click={() => handleAddItem(type, item.id, true)}
 										>
-											Add Here
+											{$t('adventures.itinerary_link_modal.add_here')}
 										</button>
 									</div>
 								</div>
@@ -410,9 +424,11 @@
 				<div class="card bg-base-200">
 					<div class="card-body text-center py-8">
 						<CalendarBlank class="w-12 h-12 mx-auto mb-3 opacity-30" />
-						<p class="text-md font-semibold opacity-70">No unscheduled items available</p>
+						<p class="text-md font-semibold opacity-70">
+							{$t('adventures.itinerary_link_modal.no_unscheduled_items')}
+						</p>
 						<p class="text-xs opacity-60 mt-1">
-							All items have been added to the itinerary or there are no items to add.
+							{$t('adventures.itinerary_link_modal.no_unscheduled_items_desc')}
 						</p>
 					</div>
 				</div>
@@ -425,10 +441,10 @@
 		>
 			<div class="flex items-center justify-between">
 				<div class="text-xs text-base-content/60">
-					{groupedItems.scheduledOnThisDay.length +
-						groupedItems.onThisDay.length +
-						groupedItems.scheduledOtherDays.length +
-						groupedItems.otherDays.length} items available to link
+					{$t('adventures.itinerary_link_modal.items_available').replace(
+						'{count}',
+						String(availableCount)
+					)}
 				</div>
 				<button class="btn btn-primary gap-2" on:click={close}>
 					<Link class="w-4 h-4" />

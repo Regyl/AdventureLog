@@ -1702,11 +1702,11 @@
 										{#if canModify}
 											<div
 												class="absolute left-2 top-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-												title="Drag to reorder"
+												title={$t('itinerary.drag_to_reorder')}
 											>
 												<div
 													class="itinerary-drag-handle btn btn-circle btn-xs btn-ghost bg-base-100/80 backdrop-blur-sm shadow-sm hover:bg-base-200 cursor-grab active:cursor-grabbing"
-													aria-label="Drag to reorder"
+													aria-label={$t('itinerary.drag_to_reorder')}
 													role="button"
 													tabindex="0"
 												>
@@ -2074,11 +2074,11 @@
 											{#if canModify}
 												<div
 													class="absolute left-2 top-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-													title="Drag to reorder"
+													title={$t('itinerary.drag_to_reorder')}
 												>
 													<div
 														class="itinerary-drag-handle btn btn-circle btn-xs btn-ghost bg-base-100/80 backdrop-blur-sm shadow-sm hover:bg-base-200 cursor-grab active:cursor-grabbing"
-														aria-label="Drag to reorder"
+														aria-label={$t('itinerary.drag_to_reorder')}
 														role="button"
 														tabindex="0"
 													>
@@ -2393,12 +2393,16 @@
 							<div class="relative group opacity-60 hover:opacity-100 transition-opacity h-full">
 								<!-- "Add to itinerary" indicator -->
 								{#if canModify}
-									<div class="absolute left-2 top-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-										<div class="join bg-base-100/80 rounded-md p-1 shadow-sm backdrop-blur-sm border border-base-300">
+									<div
+										class="absolute left-2 top-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+									>
+										<div
+											class="join bg-base-100/80 rounded-md p-1 shadow-sm backdrop-blur-sm border border-base-300"
+										>
 											<button
-												aria-label="Add to day"
+												aria-label={$t('itinerary.add_to_day')}
 												class="btn btn-circle btn-xs btn-primary join-item shadow-sm"
-												title="Add to day"
+												title={$t('itinerary.add_to_day')}
 												on:click={() => handleOpenDayPickerForItem(type, item)}
 											>
 												<svg
@@ -2417,9 +2421,9 @@
 												</svg>
 											</button>
 											<button
-												aria-label="Add to trip-wide"
+												aria-label={$t('itinerary.add_to_trip_context')}
 												class="btn btn-circle btn-xs btn-outline join-item shadow-sm"
-												title="Add to trip-wide"
+												title={$t('itinerary.add_to_trip_context')}
 												on:click={() => addGlobalItineraryItemForObject(type, item.id)}
 											>
 												<svg

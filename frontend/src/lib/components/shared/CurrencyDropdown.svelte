@@ -2,6 +2,7 @@
 	import { tick } from 'svelte';
 	import { createEventDispatcher } from 'svelte';
 	import { CURRENCY_LABELS, CURRENCY_OPTIONS } from '$lib/money';
+	import { t } from 'svelte-i18n';
 
 	type CurrencyOption = { code: string; label?: string };
 
@@ -15,7 +16,7 @@
 
 	export let value: Props['value'] = null;
 	export let options: string[] = CURRENCY_OPTIONS;
-	export let placeholder = 'Select currency';
+	export let placeholder = '';
 	export let disabled = false;
 	export let id: string | undefined;
 
@@ -29,7 +30,7 @@
 
 	$: normalizedOptions = options.map((code) => ({
 		code,
-		label: CURRENCY_LABELS[code]
+		label: $t(`currencies.${code}`) || CURRENCY_LABELS[code]
 	}));
 
 	$: filteredOptions = normalizedOptions.filter((option) => {
@@ -104,9 +105,13 @@
 		{id}
 	>
 		<span class="flex items-center gap-2 truncate">
-			<span class="font-mono text-sm">{value || placeholder}</span>
-			{#if value && CURRENCY_LABELS[value]}
-				<span class="text-xs text-base-content/70 truncate">{CURRENCY_LABELS[value]}</span>
+			<span class="font-mono text-sm"
+				>{value || $t('currencies.select_currency') || placeholder}</span
+			>
+			{#if value}
+				<span class="text-xs text-base-content/70 truncate"
+					>{$t(`currencies.${value}`) || CURRENCY_LABELS[value]}</span
+				>
 			{/if}
 		</span>
 		<svg
@@ -144,10 +149,10 @@
 					<input
 						class="grow"
 						type="search"
-						placeholder="Search currency"
+						placeholder={$t('currencies.search') || 'Search currency'}
 						bind:value={search}
 						on:keydown={handleSearchKeydown}
-						aria-label="Search currency"
+						aria-label={$t('currencies.search') || 'Search currency'}
 						bind:this={searchInput}
 					/>
 				</label>
@@ -180,7 +185,9 @@
 						{/each}
 					</ul>
 				{:else}
-					<div class="text-sm text-base-content/70 px-3 py-2">No matches</div>
+					<div class="text-sm text-base-content/70 px-3 py-2">
+						{$t('currencies.no_matches') || 'No matches'}
+					</div>
 				{/if}
 			</div>
 		</div>

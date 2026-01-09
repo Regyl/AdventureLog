@@ -687,7 +687,7 @@
 					id="location-display"
 					bind:value={displayName}
 					class="input input-bordered bg-base-100/80 focus:bg-base-100"
-					placeholder={displayNamePlaceholder || 'Enter location display name'}
+					placeholder={displayNamePlaceholder || $t('adventures.enter_location_display_name')}
 				/>
 			</div>
 		{/if}
@@ -710,7 +710,9 @@
 						id="search-start-location"
 						bind:value={startSearchQuery}
 						on:input={handleStartSearchInput}
-						placeholder={airportMode ? 'JFK, LAX, LHR...' : 'Enter start location...'}
+						placeholder={airportMode
+							? $t('adventures.airport_code_examples')
+							: $t('transportation.enter_from_location')}
 						class="input input-bordered w-full pl-10 pr-4 bg-base-100/80 focus:bg-base-100"
 						class:input-success={selectedStartLocation}
 					/>
@@ -774,7 +776,9 @@
 						id="search-end-location"
 						bind:value={endSearchQuery}
 						on:input={handleEndSearchInput}
-						placeholder={airportMode ? 'JFK, LAX, LHR...' : 'Enter end location...'}
+						placeholder={airportMode
+							? $t('adventures.airport_code_examples')
+							: $t('transportation.enter_to_location')}
 						class="input input-bordered w-full pl-10 pr-4 bg-base-100/80 focus:bg-base-100"
 						class:input-error={selectedEndLocation}
 					/>
@@ -888,7 +892,7 @@
 						id="search-location"
 						bind:value={searchQuery}
 						on:input={handleSearchInput}
-						placeholder="Enter city, location, or landmark..."
+						placeholder={$t('adventures.search_placeholder')}
 						class="input input-bordered w-full pl-10 pr-4 bg-base-100/80 focus:bg-base-100"
 						class:input-primary={selectedLocation}
 					/>
@@ -956,7 +960,7 @@
 						id="location-display-after"
 						bind:value={displayName}
 						class="input input-bordered bg-base-100/80 focus:bg-base-100"
-						placeholder={displayNamePlaceholder || 'Enter location display name'}
+						placeholder={displayNamePlaceholder || $t('adventures.enter_location_display_name')}
 					/>
 				</div>
 			{/if}

@@ -486,7 +486,7 @@
 								id="name"
 								bind:value={lodging.name}
 								class="input input-bordered bg-base-100/80 focus:bg-base-100"
-								placeholder="Enter lodging name"
+								placeholder={$t('lodging.enter_lodging_name')}
 								required
 							/>
 						</div>
@@ -569,7 +569,7 @@
 								id="reservation"
 								bind:value={lodging.reservation_number}
 								class="input input-bordered bg-base-100/80 focus:bg-base-100"
-								placeholder="Enter reservation/confirmation number"
+								placeholder={$t('lodging.enter_reservation_number')}
 							/>
 						</div>
 					</div>
@@ -586,7 +586,7 @@
 								id="link"
 								bind:value={lodging.link}
 								class="input input-bordered bg-base-100/80 focus:bg-base-100"
-								placeholder="https://example.com"
+								placeholder={$t('transportation.enter_link')}
 							/>
 						</div>
 
