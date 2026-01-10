@@ -550,6 +550,7 @@
 		"password": "Password",
 		"forgot_password": "Forgot Password?",
 		"signup": "Signup",
+		"user_email_verification_required": "Email verification required. Please check your email for a verification link.",
 		"login_error": "Unable to login with the provided credentials.",
 		"login": "Login",
 		"email": "Email",
