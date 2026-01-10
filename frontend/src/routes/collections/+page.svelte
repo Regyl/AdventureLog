@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import CollectionCard from '$lib/components/cards/CollectionCard.svelte';
@@ -117,6 +118,23 @@
 		if (data.props.adventures) {
 			collections = data.props.adventures;
 		}
+	}
+
+	let importInputEl: HTMLInputElement | null = null;
+	let importFormEl: HTMLFormElement | null = null;
+	let isImporting: boolean = false;
+
+	function triggerImport() {
+		importInputEl?.click();
+	}
+
+	async function handleImportFileChange(event: Event) {
+		const target = event.currentTarget as HTMLInputElement;
+		const file = target.files && target.files[0];
+		if (!file) return;
+		isImporting = true;
+		// Submit the hidden form to server action
+		importFormEl?.requestSubmit();
 	}
 
 	function deleteCollection(event: CustomEvent<string>) {
@@ -327,6 +345,21 @@
 		on:saveEdit={saveEdit}
 		on:save={saveOrCreate}
 	/>
+{/if}
+
+<!-- Import progress modal -->
+{#if isImporting}
+	<dialog id="import_modal" class="modal modal-open">
+		<div class="modal-box">
+			<h3 class="font-bold text-lg">{$t('adventures.importing') || 'Importing collection...'}</h3>
+			<div class="mt-4 flex items-center gap-3">
+				<span class="loading loading-dots loading-md"></span>
+				<span class="text-sm text-base-content/70"
+					>{$t('adventures.in_progress') || 'In progress'}</span
+				>
+			</div>
+		</div>
+	</dialog>
 {/if}
 
 <div class="min-h-screen bg-gradient-to-br from-base-200 via-base-100 to-base-200">
@@ -764,6 +797,40 @@
 						<CollectionIcon class="w-5 h-5" />
 						{$t(`adventures.collection`)}
 					</button>
+					<div class="divider my-2"></div>
+					<button class="btn btn-neutral gap-2 w-full" on:click={triggerImport}>
+						<Archive class="w-5 h-5" />
+						{$t('adventures.import_from_file')}
+					</button>
+					<form
+						bind:this={importFormEl}
+						method="POST"
+						action="?/restoreData"
+						enctype="multipart/form-data"
+						use:enhance={({}) => {
+							return ({ result }) => {
+								isImporting = false;
+								if (result?.type === 'success') {
+									addToast('success', $t('adventures.import_success') || 'Imported collection');
+									// Delay refresh by 1 second to let the success state be visible
+									setTimeout(() => {
+										window.location.reload();
+									}, 1000);
+								} else if (result?.type === 'failure') {
+									addToast('error', $t('adventures.import_failed') || 'Import failed');
+								}
+							};
+						}}
+					>
+						<input
+							bind:this={importInputEl}
+							type="file"
+							name="file"
+							accept=".zip"
+							class="hidden"
+							on:change={handleImportFileChange}
+						/>
+					</form>
 				</ul>
 			</div>
 		</div>

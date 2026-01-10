@@ -18,7 +18,6 @@
 	import OpenIdConnect from '~icons/mdi/openid';
 
 	import { page } from '$app/stores';
-	import { gsap } from 'gsap';
 	import { onMount } from 'svelte';
 
 	function handleEnhanceSubmit() {
@@ -34,15 +33,6 @@
 			}
 		};
 	}
-
-	onMount(() => {
-		// Minimal fade-in only
-		gsap.fromTo(
-			'.main-container',
-			{ opacity: 0 },
-			{ opacity: 1, duration: 0.6, ease: 'power2.out' }
-		);
-	});
 
 	import ImageInfoModal from '$lib/components/ImageInfoModal.svelte';
 	import type { Background } from '$lib/types.js';

@@ -4,7 +4,16 @@ from django.db import transaction
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from adventures.models import Collection, Location, Transportation, Note, Checklist, CollectionInvite, ContentImage, CollectionItineraryItem, Lodging, CollectionItineraryDay
+from rest_framework.parsers import MultiPartParser
+from rest_framework import status
+from django.http import HttpResponse
+from django.conf import settings
+import io
+import os
+import json
+import zipfile
+import tempfile
+from adventures.models import Collection, Location, Transportation, Note, Checklist, CollectionInvite, ContentImage, CollectionItineraryItem, Lodging, CollectionItineraryDay, ContentAttachment, Category
 from adventures.permissions import CollectionShared
 from adventures.serializers import CollectionSerializer, CollectionInviteSerializer, UltraSlimCollectionSerializer, CollectionItineraryItemSerializer, CollectionItineraryDaySerializer
 from users.models import CustomUser as User
@@ -527,6 +536,323 @@ class CollectionViewSet(viewsets.ModelViewSet):
             success_message += f" and removed {removed_count} location(s) you owned from the collection"
         
         return Response({"success": success_message})
+
+    @action(detail=True, methods=['get'], url_path='export')
+    def export_collection(self, request, pk=None):
+        """Export a single collection and its related content as a ZIP file."""
+        collection = self.get_object()
+
+        export_data = {
+            'version': getattr(settings, 'ADVENTURELOG_RELEASE_VERSION', 'unknown'),
+            # Omit export_date to keep template-friendly exports (no dates)
+            'collection': {
+                'id': str(collection.id),
+                'name': collection.name,
+                'description': collection.description,
+                'is_public': collection.is_public,
+                # Omit start/end dates
+                'link': collection.link,
+            },
+            'locations': [],
+            'transportation': [],
+            'notes': [],
+            'checklists': [],
+            'lodging': [],
+            # Omit itinerary_items entirely
+            'images': [],
+            'attachments': [],
+            'primary_image_ref': None,
+        }
+
+        image_export_map = {}
+
+        for loc in collection.locations.all().select_related('city', 'region', 'country'):
+            loc_entry = {
+                'id': str(loc.id),
+                'name': loc.name,
+                'description': loc.description,
+                'location': loc.location,
+                'tags': loc.tags or [],
+                'rating': loc.rating,
+                'link': loc.link,
+                'is_public': loc.is_public,
+                'longitude': float(loc.longitude) if loc.longitude is not None else None,
+                'latitude': float(loc.latitude) if loc.latitude is not None else None,
+                'city': loc.city.name if loc.city else None,
+                'region': loc.region.name if loc.region else None,
+                'country': loc.country.name if loc.country else None,
+                'images': [],
+                'attachments': [],
+            }
+
+            for img in loc.images.all():
+                img_export_id = f"img_{len(export_data['images'])}"
+                image_export_map[str(img.id)] = img_export_id
+                export_data['images'].append({
+                    'export_id': img_export_id,
+                    'id': str(img.id),
+                    'name': os.path.basename(getattr(img.image, 'name', 'image')),
+                    'is_primary': getattr(img, 'is_primary', False),
+                })
+                loc_entry['images'].append(img_export_id)
+
+            for att in loc.attachments.all():
+                att_export_id = f"att_{len(export_data['attachments'])}"
+                export_data['attachments'].append({
+                    'export_id': att_export_id,
+                    'id': str(att.id),
+                    'name': os.path.basename(getattr(att.file, 'name', 'attachment')),
+                })
+                loc_entry['attachments'].append(att_export_id)
+
+            export_data['locations'].append(loc_entry)
+
+        if collection.primary_image:
+            export_data['primary_image_ref'] = image_export_map.get(str(collection.primary_image.id))
+
+        # Related content (if models have FK to collection)
+        for t in Transportation.objects.filter(collection=collection):
+            export_data['transportation'].append({
+                'id': str(t.id),
+                'type': getattr(t, 'transportation_type', None),
+                'name': getattr(t, 'name', None),
+                # Omit date
+                'notes': getattr(t, 'notes', None),
+            })
+        for n in Note.objects.filter(collection=collection):
+            export_data['notes'].append({
+                'id': str(n.id),
+                'title': getattr(n, 'title', None),
+                'content': getattr(n, 'content', ''),
+                # Omit created_at
+            })
+        for c in Checklist.objects.filter(collection=collection):
+            items = []
+            if hasattr(c, 'items'):
+                items = [
+                    {
+                        'name': getattr(item, 'name', None),
+                        'completed': getattr(item, 'completed', False),
+                    } for item in c.items.all()
+                ]
+            export_data['checklists'].append({
+                'id': str(c.id),
+                'name': getattr(c, 'name', None),
+                'items': items,
+            })
+        for l in Lodging.objects.filter(collection=collection):
+            export_data['lodging'].append({
+                'id': str(l.id),
+                'type': getattr(l, 'lodging_type', None),
+                'name': getattr(l, 'name', None),
+                # Omit start_date/end_date
+                'notes': getattr(l, 'notes', None),
+            })
+        # Intentionally omit itinerary_items from export
+
+        # Create ZIP in temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
+            with zipfile.ZipFile(tmp_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                zipf.writestr('metadata.json', json.dumps(export_data, indent=2))
+
+                # Write image files
+                for loc in collection.locations.all():
+                    for img in loc.images.all():
+                        export_id = image_export_map.get(str(img.id))
+                        if not export_id:
+                            continue
+                        try:
+                            file_name = os.path.basename(getattr(img.image, 'name', 'image'))
+                            storage = getattr(img.image, 'storage', None)
+                            if storage:
+                                with storage.open(img.image.name, 'rb') as f:
+                                    zipf.writestr(f'images/{export_id}-{file_name}', f.read())
+                            elif hasattr(img.image, 'path'):
+                                with open(img.image.path, 'rb') as f:
+                                    zipf.writestr(f'images/{export_id}-{file_name}', f.read())
+                        except Exception:
+                            continue
+
+                # Write attachment files
+                for loc in collection.locations.all():
+                    for att in loc.attachments.all():
+                        try:
+                            file_name = os.path.basename(getattr(att.file, 'name', 'attachment'))
+                            storage = getattr(att.file, 'storage', None)
+                            if storage:
+                                with storage.open(att.file.name, 'rb') as f:
+                                    zipf.writestr(f'attachments/{file_name}', f.read())
+                            elif hasattr(att.file, 'path'):
+                                with open(att.file.path, 'rb') as f:
+                                    zipf.writestr(f'attachments/{file_name}', f.read())
+                        except Exception:
+                            continue
+
+            with open(tmp_file.name, 'rb') as fh:
+                data = fh.read()
+            os.unlink(tmp_file.name)
+
+        filename = f"collection-{collection.name.replace(' ', '_')}.zip"
+        response = HttpResponse(data, content_type='application/zip')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    @action(detail=False, methods=['post'], url_path='import', parser_classes=[MultiPartParser])
+    def import_collection(self, request):
+        """Import a single collection from a ZIP file. Handles name conflicts by appending (n)."""
+        upload = request.FILES.get('file')
+        if not upload:
+            return Response({'detail': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Read zip
+        file_bytes = upload.read()
+        with zipfile.ZipFile(io.BytesIO(file_bytes), 'r') as zipf:
+            try:
+                metadata = json.loads(zipf.read('metadata.json').decode('utf-8'))
+            except KeyError:
+                return Response({'detail': 'metadata.json missing'}, status=status.HTTP_400_BAD_REQUEST)
+
+            base_name = (metadata.get('collection') or {}).get('name') or 'Imported Collection'
+
+            # Ensure unique name per user
+            existing_names = set(request.user.collection_set.values_list('name', flat=True))
+            unique_name = base_name
+            if unique_name in existing_names:
+                i = 1
+                while True:
+                    candidate = f"{base_name} ({i})"
+                    if candidate not in existing_names:
+                        unique_name = candidate
+                        break
+                    i += 1
+
+            new_collection = Collection.objects.create(
+                user=request.user,
+                name=unique_name,
+                description=(metadata.get('collection') or {}).get('description'),
+                is_public=(metadata.get('collection') or {}).get('is_public', False),
+                start_date=__import__('datetime').date.fromisoformat((metadata.get('collection') or {}).get('start_date')) if (metadata.get('collection') or {}).get('start_date') else None,
+                end_date=__import__('datetime').date.fromisoformat((metadata.get('collection') or {}).get('end_date')) if (metadata.get('collection') or {}).get('end_date') else None,
+                link=(metadata.get('collection') or {}).get('link'),
+            )
+
+            image_export_map = {img['export_id']: img for img in metadata.get('images', [])}
+            attachment_export_map = {att['export_id']: att for att in metadata.get('attachments', [])}
+
+            # Import locations
+            for loc_data in metadata.get('locations', []):
+                cat_obj = None
+                if loc_data.get('category'):
+                    cat_obj, _ = Category.objects.get_or_create(user=request.user, name=loc_data['category'])
+                # Attempt to find a very similar existing location for this user
+                from difflib import SequenceMatcher
+
+                def _ratio(a, b):
+                    a = (a or '').strip().lower()
+                    b = (b or '').strip().lower()
+                    if not a and not b:
+                        return 1.0
+                    return SequenceMatcher(None, a, b).ratio()
+
+                def _coords_close(lat1, lon1, lat2, lon2, threshold=0.02):
+                    try:
+                        if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
+                            return False
+                        return abs(float(lat1) - float(lat2)) <= threshold and abs(float(lon1) - float(lon2)) <= threshold
+                    except Exception:
+                        return False
+
+                incoming_name = loc_data.get('name') or 'Untitled'
+                incoming_location_text = loc_data.get('location')
+                incoming_lat = loc_data.get('latitude')
+                incoming_lon = loc_data.get('longitude')
+
+                existing_loc = None
+                best_score = 0.0
+                for cand in Location.objects.filter(user=request.user):
+                    name_score = _ratio(incoming_name, cand.name)
+                    loc_text_score = _ratio(incoming_location_text, getattr(cand, 'location', None))
+                    close_coords = _coords_close(incoming_lat, incoming_lon, cand.latitude, cand.longitude)
+                    # Define "very similar": strong name match OR decent name with location/coords match
+                    combined_score = max(name_score, (name_score + loc_text_score) / 2.0)
+                    if close_coords:
+                        combined_score = max(combined_score, name_score + 0.1)  # small boost for coord proximity
+                    if combined_score > best_score and (
+                        name_score >= 0.92 or (name_score >= 0.85 and (loc_text_score >= 0.85 or close_coords))
+                    ):
+                        best_score = combined_score
+                        existing_loc = cand
+
+                if existing_loc:
+                    # Link existing location to the new collection, skip creating a duplicate
+                    loc = existing_loc
+                    loc.collections.add(new_collection)
+                    created_new_loc = False
+                else:
+                    # Create a brand-new location
+                    loc = Location.objects.create(
+                        user=request.user,
+                        name=incoming_name,
+                        description=loc_data.get('description'),
+                        location=incoming_location_text,
+                        tags=loc_data.get('tags') or [],
+                        rating=loc_data.get('rating'),
+                        link=loc_data.get('link'),
+                        is_public=bool(loc_data.get('is_public', False)),
+                        longitude=incoming_lon,
+                        latitude=incoming_lat,
+                        category=cat_obj,
+                    )
+                    loc.collections.add(new_collection)
+                    created_new_loc = True
+
+                # Images
+                # Only import images for newly created locations to avoid duplicating user content
+                if created_new_loc:
+                    for export_id in loc_data.get('images', []):
+                        img_meta = image_export_map.get(export_id)
+                        if not img_meta:
+                            continue
+                        prefix = f"images/{export_id}-"
+                        member = next((m for m in zipf.namelist() if m.startswith(prefix)), None)
+                        if not member:
+                            continue
+                        file_bytes_img = zipf.read(member)
+                        file_name_img = os.path.basename(member)
+                        from django.core.files.base import ContentFile
+                        image_obj = ContentImage(
+                            user=request.user,
+                            image=ContentFile(file_bytes_img, name=file_name_img),
+                        )
+                        # Assign to the generic relation for Location
+                        image_obj.content_object = loc
+                        image_obj.save()
+                        if img_meta.get('is_primary'):
+                            new_collection.primary_image = image_obj
+                            new_collection.save(update_fields=['primary_image'])
+
+                # Attachments
+                if created_new_loc:
+                    for export_id in loc_data.get('attachments', []):
+                        att_meta = attachment_export_map.get(export_id)
+                        if not att_meta:
+                            continue
+                        file_name_att = att_meta.get('name', '')
+                        member = next((m for m in zipf.namelist() if m == f"attachments/{file_name_att}"), None)
+                        if not member:
+                            continue
+                        file_bytes_att = zipf.read(member)
+                        from django.core.files.base import ContentFile
+                        attachment_obj = ContentAttachment(
+                            user=request.user,
+                            file=ContentFile(file_bytes_att, name=file_name_att),
+                        )
+                        # Assign to the generic relation for Location
+                        attachment_obj.content_object = loc
+                        attachment_obj.save()
+
+            serializer = self.get_serializer(new_collection)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def perform_create(self, serializer):
         # This is ok because you cannot share a collection when creating it

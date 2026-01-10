@@ -1,4 +1,4 @@
-import { redirect } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 const PUBLIC_SERVER_URL = process.env['PUBLIC_SERVER_URL'];
 import type { Location, Collection, SlimCollection } from '$lib/types';
@@ -78,3 +78,55 @@ export const load = (async (event) => {
 		return redirect(302, '/login');
 	}
 }) satisfies PageServerLoad;
+
+export const actions: Actions = {
+	
+	restoreData: async (event) => {
+		if (!event.locals.user) {
+			return redirect(302, '/');
+		}
+		let sessionId = event.cookies.get('sessionid');
+		if (!sessionId) {
+			return redirect(302, '/');
+		}
+		try {
+			const formData = await event.request.formData();
+			const file = formData.get('file') as File | null | undefined;
+
+			if (!file || file.size === 0) {
+				return fail(400, { message: 'settings.no_file_selected' });
+			}
+
+			let csrfToken = await fetchCSRFToken();
+
+			// Create FormData for the API request
+			const apiFormData = new FormData();
+			apiFormData.append('file', file);
+
+			let res = await fetch(`${serverEndpoint}/api/collections/import/`, {
+				method: 'POST',
+				headers: {
+					Referer: event.url.origin,
+					Cookie: `sessionid=${sessionId}; csrftoken=${csrfToken}`,
+					'X-CSRFToken': csrfToken
+				},
+				body: apiFormData
+			});
+
+			if (!res.ok) {
+				const errorData = await res.json();
+				return fail(res.status, {
+					message: errorData.code
+						? `settings.restore_error_${errorData.code}`
+						: 'settings.generic_error',
+					details: errorData
+				});
+			}
+
+			return { success: true };
+		} catch (error) {
+			console.error('Restore error:', error);
+			return fail(500, { message: 'settings.generic_error' });
+		}
+	}
+};

@@ -26,6 +26,7 @@
 	import Check from '~icons/mdi/check';
 	import MapMarker from '~icons/mdi/map-marker-multiple';
 	import LinkIcon from '~icons/mdi/link';
+	import DownloadIcon from '~icons/mdi/download';
 
 	const dispatch = createEventDispatcher();
 
@@ -48,6 +49,26 @@
 
 	function editAdventure() {
 		dispatch('edit', collection);
+	}
+
+	async function exportCollectionZip() {
+		try {
+			const res = await fetch(`/api/collections/${collection.id}/export`);
+			if (!res.ok) {
+				addToast('error', $t('adventures.export_failed') || 'Export failed');
+				return;
+			}
+			const blob = await res.blob();
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `collection-${String(collection.name).replace(/\s+/g, '_')}.zip`;
+			a.click();
+			URL.revokeObjectURL(url);
+			addToast('success', $t('adventures.export_success') || 'Exported collection');
+		} catch (e) {
+			addToast('error', $t('adventures.export_failed') || 'Export failed');
+		}
 	}
 
 	async function archiveCollection(is_archived: boolean) {
@@ -341,6 +362,12 @@
 											</button>
 										</li>
 									{/if}
+									<li>
+										<button class="flex items-center gap-2" on:click={exportCollectionZip}>
+											<DownloadIcon class="w-4 h-4" />
+											{$t('adventures.export_zip')}
+										</button>
+									</li>
 									<div class="divider my-1"></div>
 									<li>
 										<button
