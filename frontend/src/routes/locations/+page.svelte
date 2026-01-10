@@ -490,7 +490,7 @@
 	</div>
 
 	<!-- Floating Action Button -->
-	<div class="fixed bottom-6 right-6 z-40">
+	<div class="fixed bottom-6 right-6 z-[999]">
 		<div class="dropdown dropdown-top dropdown-end">
 			<div
 				tabindex="0"

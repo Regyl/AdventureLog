@@ -1526,80 +1526,80 @@
 
 <!-- Floating Action Button (FAB) - Only shown if user can modify collection -->
 {#if collection && canModifyCollection && !collection.is_archived}
-	<div class="fixed bottom-4 right-4 z-[999]">
-		<div class="flex flex-row items-center justify-center gap-4">
-			<div class="dropdown dropdown-top dropdown-end z-[999]">
-				<div tabindex="0" role="button" class="btn m-1 size-16 btn-primary">
-					<Plus class="w-8 h-8" />
-				</div>
-				<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
-				<ul
-					tabindex="0"
-					class="dropdown-content z-[1] menu p-4 shadow bg-base-300 text-base-content rounded-box w-52 gap-4"
-				>
-					<p class="text-center font-bold text-lg">{$t('adventures.link_new')}</p>
-					<!-- Link existing location to collection -->
-					<button
-						class="btn btn-primary"
-						on:click={() => {
-							isLocationLinkModalOpen = true;
-						}}
-					>
-						{$t('locations.location')}
-					</button>
-
-					<p class="text-center font-bold text-lg">{$t('adventures.add_new')}</p>
-					<button
-						class="btn btn-primary"
-						on:click={() => {
-							isLocationModalOpen = true;
-							adventureToEdit = null;
-						}}
-					>
-						{$t('locations.location')}
-					</button>
-
-					<button
-						class="btn btn-primary"
-						on:click={() => {
-							transportationToEdit = null;
-							isTransportationModalOpen = true;
-						}}
-					>
-						{$t('adventures.transportation')}
-					</button>
-
-					<button
-						class="btn btn-primary"
-						on:click={() => {
-							isNoteModalOpen = true;
-							noteToEdit = null;
-						}}
-					>
-						{$t('adventures.note')}
-					</button>
-
-					<button
-						class="btn btn-primary"
-						on:click={() => {
-							checklistToEdit = null;
-							isChecklistModalOpen = true;
-						}}
-					>
-						{$t('adventures.checklist')}
-					</button>
-
-					<button
-						class="btn btn-primary"
-						on:click={() => {
-							lodgingToEdit = null;
-							isLodgingModalOpen = true;
-						}}
-					>
-						{$t('adventures.lodging')}
-					</button>
-				</ul>
+	<div class="fixed bottom-6 right-6 z-[999]">
+		<div class="dropdown dropdown-top dropdown-end">
+			<div
+				tabindex="0"
+				role="button"
+				class="btn btn-primary btn-circle w-16 h-16 shadow-2xl hover:shadow-primary/25 transition-all duration-200"
+			>
+				<Plus class="w-8 h-8" />
 			</div>
+			<ul
+				class="dropdown-content z-[1] menu p-4 shadow bg-base-300 text-base-content rounded-box w-52 gap-4"
+			>
+				<p class="text-center font-bold text-lg">{$t('adventures.link_new')}</p>
+				<!-- Link existing location to collection -->
+				<button
+					class="btn btn-primary"
+					on:click={() => {
+						isLocationLinkModalOpen = true;
+					}}
+				>
+					{$t('locations.location')}
+				</button>
+
+				<p class="text-center font-bold text-lg">{$t('adventures.add_new')}</p>
+				<button
+					class="btn btn-primary"
+					on:click={() => {
+						isLocationModalOpen = true;
+						adventureToEdit = null;
+					}}
+				>
+					{$t('locations.location')}
+				</button>
+
+				<button
+					class="btn btn-primary"
+					on:click={() => {
+						transportationToEdit = null;
+						isTransportationModalOpen = true;
+					}}
+				>
+					{$t('adventures.transportation')}
+				</button>
+
+				<button
+					class="btn btn-primary"
+					on:click={() => {
+						isNoteModalOpen = true;
+						noteToEdit = null;
+					}}
+				>
+					{$t('adventures.note')}
+				</button>
+
+				<button
+					class="btn btn-primary"
+					on:click={() => {
+						checklistToEdit = null;
+						isChecklistModalOpen = true;
+					}}
+				>
+					{$t('adventures.checklist')}
+				</button>
+
+				<button
+					class="btn btn-primary"
+					on:click={() => {
+						lodgingToEdit = null;
+						isLodgingModalOpen = true;
+					}}
+				>
+					{$t('adventures.lodging')}
+				</button>
+			</ul>
 		</div>
 	</div>
 {/if}
