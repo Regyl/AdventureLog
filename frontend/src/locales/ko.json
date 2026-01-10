@@ -636,7 +636,8 @@
     },
     "users": "사용자",
     "admin_panel": "관리자 패널",
-    "navigation": "항해"
+    "navigation": "항해",
+    "worldtravel": "세계여행"
   },
   "notes": {
     "content": "콘텐츠",

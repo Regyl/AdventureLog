@@ -477,7 +477,8 @@
     "support": "Steun",
     "calendar": "Kalender",
     "admin_panel": "Admin -paneel",
-    "navigation": "Navigatie"
+    "navigation": "Navigatie",
+    "worldtravel": "Wereldreizen"
   },
   "auth": {
     "confirm_password": "Bevestig wachtwoord",

@@ -2,15 +2,12 @@
 	import LocationCard from '$lib/components/cards/LocationCard.svelte';
 	import type { PageData } from './$types';
 	import { t } from 'svelte-i18n';
-	import { onMount } from 'svelte';
-	import { gsap } from 'gsap';
 
 	// Icons
 	import FlagCheckeredVariantIcon from '~icons/mdi/flag-checkered-variant';
 	import Airplane from '~icons/mdi/airplane';
 	import CityVariantOutline from '~icons/mdi/city-variant-outline';
 	import MapMarkerStarOutline from '~icons/mdi/map-marker-star-outline';
-	import TrendingUp from '~icons/mdi/trending-up';
 	import CalendarClock from '~icons/mdi/calendar-clock';
 	import Plus from '~icons/mdi/plus';
 

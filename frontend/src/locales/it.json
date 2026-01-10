@@ -477,7 +477,8 @@
     "support": "Supporto",
     "calendar": "Calendario",
     "admin_panel": "Pannello di amministrazione",
-    "navigation": "Navigazione"
+    "navigation": "Navigazione",
+    "worldtravel": "Viaggio nel mondo"
   },
   "auth": {
     "confirm_password": "Conferma password",

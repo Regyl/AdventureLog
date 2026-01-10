@@ -476,7 +476,8 @@
     "support": "Unterstützung",
     "calendar": "Kalender",
     "admin_panel": "Administration",
-    "navigation": "Navigation"
+    "navigation": "Navigation",
+    "worldtravel": "Weltreisen"
   },
   "auth": {
     "confirm_password": "Passwort bestätigen",
