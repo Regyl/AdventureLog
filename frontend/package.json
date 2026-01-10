@@ -54,12 +54,16 @@
 	},
 	"overrides": {
 		"esbuild": "^0.25.12",
-		"glob": "10.5.0"
+		"glob": "10.5.0",
+		"stdlib": "1.24.8",
+		"printing": "1.24.11"
 	},
 	"pnpm": {
 		"overrides": {
 			"esbuild": "^0.25.12",
-			"glob": "10.5.0"
+			"glob": "10.5.0",
+			"stdlib": "1.24.8",
+			"printing": "1.24.11"
 		}
 	}
 }
