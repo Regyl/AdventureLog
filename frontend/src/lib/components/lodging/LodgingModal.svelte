@@ -72,7 +72,7 @@
 	// This prevents stale values when the parent reuses `bind:lodging`.
 	// Only runs when actually switching to a different lodging, not on every reactive update.
 	$: {
-		const currentLodgingId = lodgingToEdit?.id || null;
+		const currentLodgingId = lodgingToEdit?.id ?? null;
 
 		if (currentLodgingId !== previousLodgingId) {
 			previousLodgingId = currentLodgingId;
@@ -247,7 +247,31 @@
 				}}
 				on:save={(e) => {
 					// Update the entire lodging object with all saved data
-					lodging = { ...lodging, ...e.detail };
+					const detail = e.detail || {};
+					const previousImages = lodging.images || [];
+					const previousAttachments = lodging.attachments || [];
+					lodging = { ...lodging, ...detail };
+					// Preserve any prefilled 'rec-' images or attachments if the server returned an empty array
+					if (Array.isArray(detail.images)) {
+						if (
+							detail.images.length === 0 &&
+							previousImages.some((i) => String(i.id).startsWith('rec-'))
+						) {
+							lodging.images = previousImages;
+						}
+					} else {
+						lodging.images = previousImages;
+					}
+					if (Array.isArray(detail.attachments)) {
+						if (
+							detail.attachments.length === 0 &&
+							previousAttachments.some((a) => String(a.id).startsWith('rec-'))
+						) {
+							lodging.attachments = previousAttachments;
+						}
+					} else {
+						lodging.attachments = previousAttachments;
+					}
 
 					// Mark that a save occurred so close() will notify parent
 					didSave = true;

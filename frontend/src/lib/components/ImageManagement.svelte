@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { ContentImage } from '$lib/types';
-	import { createEventDispatcher } from 'svelte';
+	import { createEventDispatcher, onMount } from 'svelte';
 	import { t } from 'svelte-i18n';
 	import { deserialize } from '$app/forms';
 
@@ -73,6 +73,7 @@
 		try {
 			const res = await fetch(`/locations?/image`, {
 				method: 'POST',
+				credentials: 'same-origin',
 				body: formData
 			});
 
@@ -86,6 +87,48 @@
 			console.error('Upload error:', error);
 			return null;
 		}
+	}
+
+	// Import temporary recommendation images (id starting with 'rec-') once objectId is available
+	export let importInProgress: boolean = false;
+
+	async function importPrefilledImagesIfNeeded() {
+		if (importInProgress) return;
+		if (!objectId || !images || images.length === 0) return;
+		const prefilled = images.filter((img) => img.id && img.id.startsWith('rec-'));
+		if (prefilled.length === 0) return;
+
+		importInProgress = true;
+		for (const img of prefilled) {
+			try {
+				const res = await fetch(img.image);
+				if (!res.ok) throw new Error('Failed to fetch image');
+				const blob = await res.blob();
+				const file = new File([blob], 'image.jpg', { type: blob.type || 'image/jpeg' });
+
+				const newImage = await uploadImageToServer(file);
+				if (newImage) {
+					images = images.map((i) => (i.id === img.id ? newImage : i));
+					dispatch('imagesUpdated', images);
+					addToast('success', $t('adventures.image_upload_success'));
+				} else {
+					throw new Error('Upload failed');
+				}
+			} catch (err) {
+				console.error('Error importing prefilled image:', err);
+				addToast('error', $t('adventures.image_upload_error'));
+			}
+		}
+		importInProgress = false;
+	}
+
+	onMount(() => {
+		importPrefilledImagesIfNeeded();
+	});
+
+	// React to objectId becoming available later
+	$: if (objectId) {
+		importPrefilledImagesIfNeeded();
 	}
 
 	async function fetchImageFromUrl(imageUrl: string): Promise<Blob | null> {
@@ -438,7 +481,7 @@
 		{#if images.length > 0}
 			<div class="divider">Current Images</div>
 			<div class="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-				{#each images as image (image.id)}
+				{#each images as image, i (image.id ?? image.image ?? `img-${i}`)}
 					<div class="relative group">
 						<div
 							class="aspect-square overflow-hidden rounded-lg bg-base-200 border border-base-300"
@@ -461,7 +504,8 @@
 									type="button"
 									class="btn btn-success btn-sm tooltip tooltip-top"
 									data-tip="Make Primary"
-									on:click={() => makePrimaryImage(image.id)}
+									on:click={() => image.id && makePrimaryImage(image.id)}
+									disabled={!image.id}
 								>
 									<Star class="h-4 w-4" />
 								</button>
@@ -471,7 +515,8 @@
 								type="button"
 								class="btn btn-error btn-sm tooltip tooltip-top"
 								data-tip="Remove Image"
-								on:click={() => removeImage(image.id)}
+								on:click={() => image.id && removeImage(image.id)}
+								disabled={!image.id}
 							>
 								<TrashIcon class="h-4 w-4" />
 							</button>

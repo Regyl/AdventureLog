@@ -19,6 +19,10 @@
 	import CloseCircle from '~icons/mdi/close-circle';
 	import Compass from '~icons/mdi/compass';
 	import ImageDisplayModal from '$lib/components/ImageDisplayModal.svelte';
+	import LocationModal from '$lib/components/locations/LocationModal.svelte';
+	import LodgingModal from '$lib/components/lodging/LodgingModal.svelte';
+	import { createEventDispatcher } from 'svelte';
+	import type { Location, Lodging } from '$lib/types';
 
 	export let collection: Collection;
 	export let user: User | null;
@@ -69,6 +73,102 @@
 	let selectedPhotoIndex = 0;
 	let selectedPlaceName = '';
 	let selectedPlaceAddress = '';
+
+	const dispatch = createEventDispatcher();
+
+	// Modals for creating autofilled items
+	let showLocationModal = false;
+	let showLodgingModal = false;
+	let modalLocationToEdit: Location | null = null;
+	let modalLodgingToEdit: Lodging | null = null;
+
+	function mapPhotosToContentImages(photos: string[]): ContentImage[] {
+		return photos.map((url, i) => ({
+			id: `rec-${i}-${Date.now()}`,
+			image: url,
+			is_primary: i === 0,
+			immich_id: null
+		}));
+	}
+
+	function openCreateLocationFromResult(result: RecommendationResult) {
+		modalLocationToEdit = {
+			id: '',
+			name: result.name || '',
+			location: result.address || result.description || '',
+			tags: [],
+			description: result.description || null,
+			rating: result.rating ?? NaN,
+			price: null,
+			price_currency: null,
+			link: result.website || null,
+			images: mapPhotosToContentImages(result.photos || []),
+			visits: [],
+			collections: [collection.id],
+			latitude: result.latitude ?? null,
+			longitude: result.longitude ?? null,
+			is_public: false,
+			user: user ?? null,
+			category: null,
+			attachments: [],
+			trails: []
+		} as Location;
+
+		showLocationModal = true;
+	}
+
+	function openCreateLodgingFromResult(result: RecommendationResult) {
+		modalLodgingToEdit = {
+			id: '',
+			user: user ? user.uuid : '',
+			name: result.name || '',
+			type: '',
+			description: result.description || null,
+			rating: result.rating ?? null,
+			link: result.website || null,
+			check_in: null,
+			check_out: null,
+			timezone: null,
+			reservation_number: null,
+			price: null,
+			price_currency: null,
+			latitude: result.latitude ?? null,
+			longitude: result.longitude ?? null,
+			location: result.address || result.description || null,
+			is_public: false,
+			collection: collection.id,
+			created_at: '',
+			updated_at: '',
+			images: mapPhotosToContentImages(result.photos || []),
+			attachments: []
+		} as Lodging;
+
+		showLodgingModal = true;
+	}
+
+	function handleLocationCreate(e: CustomEvent) {
+		const created: Location = e.detail;
+		showLocationModal = false;
+		modalLocationToEdit = null;
+		collection.locations = [...collection.locations, created];
+	}
+
+	function handleLodgingCreate(e: CustomEvent) {
+		const created: Lodging = e.detail;
+		showLodgingModal = false;
+		modalLodgingToEdit = null;
+		collection.lodging = [...(collection.lodging ?? []), created];
+	}
+
+	function closeLocationModal() {
+		showLocationModal = false;
+		modalLocationToEdit = null;
+	}
+
+	function closeLodgingModal() {
+		showLodgingModal = false;
+		modalLodgingToEdit = null;
+	}
 
 	$: isMetric = user?.measurement_system === 'metric';
 	$: radiusDisplay = isMetric
@@ -263,6 +363,28 @@
 	/>
 {/if}
 
+{#if showLocationModal}
+	<LocationModal
+		{user}
+		{collection}
+		locationToEdit={modalLocationToEdit}
+		on:create={handleLocationCreate}
+		on:save={handleLocationCreate}
+		on:close={closeLocationModal}
+	/>
+{/if}
+
+{#if showLodgingModal}
+	<LodgingModal
+		{user}
+		{collection}
+		lodgingToEdit={modalLodgingToEdit}
+		on:create={handleLodgingCreate}
+		on:close={closeLodgingModal}
+		on:save={handleLodgingCreate}
+	/>
+{/if}
+
 <div class="space-y-6">
 	<!-- Search & Filter Card -->
 	<div class="card bg-base-200 shadow-xl">
@@ -452,7 +574,9 @@
 											>
 												{location.name}
 											</a>
-											<p class="text-xs text-black opacity-70">Your Location</p>
+											<p class="text-xs text-black opacity-70">
+												{$t('recomendations.your_location')}
+											</p>
 										</div>
 									</Popup>
 								</DefaultMarker>
@@ -490,7 +614,8 @@
 											<p class="text-xs text-black opacity-70 mb-2">📍 {result.address}</p>
 										{/if}
 										<p class="text-xs text-black font-semibold">
-											🚶 {formatDistance(result.distance_km)} away
+											🚶 {formatDistance(result.distance_km)}
+											{$t('recomendations.away')}
 										</p>
 									</div>
 								</Popup>
@@ -536,7 +661,7 @@
 						<h3 class="card-title text-lg">
 							{result.name}
 							{#if result.is_open_now}
-								<span class="badge badge-success badge-sm">Open</span>
+								<span class="badge badge-success badge-sm">{$t('recomendations.open')}</span>
 							{/if}
 						</h3>
 
@@ -606,7 +731,7 @@
 								<input type="checkbox" />
 								<div class="collapse-title text-sm font-medium">
 									<ClockOutline class="w-4 h-4 inline" />
-									Hours
+									{$t('recomendations.hours')}
 								</div>
 								<div class="collapse-content text-xs">
 									{#each result.opening_hours as hours}
@@ -644,6 +769,20 @@
 									<OpenInNew class="w-4 h-4" />
 								</a>
 							{/if}
+
+							<!-- Create from recommendation -->
+							<button
+								class="btn btn-sm btn-outline"
+								on:click={() => openCreateLocationFromResult(result)}
+							>
+								{$t('recomendations.add_location')}
+							</button>
+							<button
+								class="btn btn-sm btn-ghost"
+								on:click={() => openCreateLodgingFromResult(result)}
+							>
+								{$t('recomendations.add_lodging')}
+							</button>
 						</div>
 					</div>
 				</div>

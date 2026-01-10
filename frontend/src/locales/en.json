@@ -998,7 +998,13 @@
     "no_results_yet": "No Results Yet",
     "select_location_or_query": "Select a location or enter a search query to discover amazing places nearby!",
     "use_search_instead": "Use search instead",
-    "any": "Any"
+    "any": "Any",
+    "add_location": "Add Location",
+    "add_lodging": "Add Lodging",
+    "hours": "Hours",
+    "open": "Open",
+    "away": "away",
+    "your_location": "Your Location"
   },
   "calendar": {
     "today": "Today",

@@ -27,6 +27,7 @@
 	// Component state
 	let immichIntegration: boolean = false;
 	let copyImmichLocally: boolean = false;
+	let importInProgress: boolean = false;
 
 	const dispatch = createEventDispatcher();
 
@@ -68,6 +69,8 @@
 		} catch (error) {
 			console.error('Error checking integrations:', error);
 		}
+
+		// prefilled import moved into ImageManagement; no-op here
 	});
 </script>
 
@@ -82,6 +85,7 @@
 			{immichIntegration}
 			{copyImmichLocally}
 			on:imagesUpdated={handleImagesUpdated}
+			bind:importInProgress
 		/>
 
 		<!-- Attachment Management Section -->
@@ -97,12 +101,12 @@
 
 		<!-- Action Buttons -->
 		<div class="flex gap-3 justify-end pt-4">
-			<button class="btn btn-neutral-200 gap-2" on:click={handleBack}>
+			<button class="btn btn-neutral-200 gap-2" on:click={handleBack} disabled={importInProgress}>
 				<ArrowLeftIcon class="w-5 h-5" />
 				{$t('adventures.back')}
 			</button>
 
-			<button class="btn btn-primary gap-2" on:click={handleClose}>
+			<button class="btn btn-primary gap-2" on:click={handleClose} disabled={importInProgress}>
 				<CheckIcon class="w-5 h-5" />
 				{$t('adventures.done')}
 			</button>

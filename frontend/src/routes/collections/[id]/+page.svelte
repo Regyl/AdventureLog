@@ -89,6 +89,86 @@
 		collection = { ...collection }; // trigger reactivity so cost summary & UI refresh immediately
 	}
 
+	// Helper to upload prefilled images (temp ids starting with 'rec-') sequentially
+	async function importPrefilledImagesForItem(
+		item: any,
+		contentType: string,
+		collectionKey: 'locations' | 'lodging'
+	) {
+		if (!item || !item.images || item.images.length === 0) return;
+		const prefilled = item.images.filter((img: any) => img.id && String(img.id).startsWith('rec-'));
+		if (prefilled.length === 0) return;
+
+		// If we don't have a server id yet, retry a few times because the modal flow may set it asynchronously.
+		let attempts = 0;
+		const maxAttempts = 6;
+		const attemptDelayMs = 2000;
+
+		while ((!item.id || String(item.id).trim() === '') && attempts < maxAttempts) {
+			attempts += 1;
+			console.debug(`Waiting for server id for item (attempt ${attempts}/${maxAttempts})`);
+			// Try to find an updated item in the collection by matching name and collection membership
+			const candidates = (collection as any)[collectionKey] || [];
+			const match = candidates.find(
+				(c: any) =>
+					c.name === item.name &&
+					(c.collections || c.collection) &&
+					String(c.collections || c.collection || '') === String(collection.id)
+			);
+			if (match && match.id) {
+				item.id = match.id;
+				break;
+			}
+			await new Promise((r) => setTimeout(r, attemptDelayMs));
+		}
+
+		if (!item.id || String(item.id).trim() === '') {
+			console.warn('Unable to obtain server id for item; skipping image import for', item);
+			return;
+		}
+
+		for (const img of prefilled) {
+			try {
+				const res = await fetch(img.image);
+				if (!res.ok) throw new Error('Failed to fetch image');
+				const blob = await res.blob();
+				const file = new File([blob], 'image.jpg', { type: blob.type || 'image/jpeg' });
+				const form = new FormData();
+				form.append('image', file);
+				form.append('object_id', item.id);
+				form.append('content_type', contentType || 'location');
+
+				const upload = await fetch('/locations?/image', {
+					method: 'POST',
+					body: form,
+					credentials: 'same-origin'
+				});
+				if (!upload.ok) throw new Error('Upload failed');
+				const newData = await upload.json();
+				const newImage = newData && newData.data ? newData.data : newData;
+
+				// Replace temporary image in the item and in the collection
+				item.images = item.images.map((i: any) =>
+					String(i.id) === String(img.id)
+						? {
+								id: newImage.id,
+								image: newImage.image,
+								is_primary: newImage.is_primary || false,
+								immich_id: newImage.immich_id || null
+							}
+						: i
+				);
+
+				// Upsert the updated item back into the collection to refresh UI bindings
+				upsertCollectionItem(collectionKey, item);
+				addToast('success', $t('adventures.image_upload_success'));
+			} catch (err) {
+				console.error('Error importing prefilled image for item:', err);
+				addToast('error', $t('adventures.image_upload_error'));
+			}
+		}
+	}
+
 	// View state from URL params
 	type ViewType = 'all' | 'itinerary' | 'map' | 'calendar' | 'recommendations' | 'stats';
 	let currentView: ViewType = 'itinerary';
@@ -1179,7 +1259,7 @@
 
 				<!-- Recommendations View -->
 				{#if currentView === 'recommendations'}
-					<CollectionRecommendationView {collection} user={data.user} />
+					<CollectionRecommendationView bind:collection user={data.user} />
 				{/if}
 			</div>
 
