@@ -20,7 +20,8 @@ def search_google(query):
         headers = {
             'Content-Type': 'application/json',
             'X-Goog-Api-Key': api_key,
-            'X-Goog-FieldMask': 'places.displayName.text,places.formattedAddress,places.location,places.types,places.rating,places.userRatingCount'
+            'X-Goog-FieldMask': 'places.displayName.text,places.formattedAddress,places.location,places.types,places.rating,places.userRatingCount',
+            'User-Agent': f'AdventureLog/{getattr(settings, "ADVENTURELOG_RELEASE_VERSION", "dev")} (https://github.com/seanmorley15/AdventureLog)',
         }
         
         payload = {
@@ -83,7 +84,7 @@ def search_google(query):
         elif response.status_code == 401:
             return {"error": "Authentication failed with Google Maps. Please check API configuration."}
         elif response.status_code == 403:
-            return {"error": "Access forbidden to Google Maps. Please check API permissions.", "details": str(e)}
+            return {"error": "Access forbidden to Google Maps. Please check API permissions."}
         elif response.status_code == 429:
             return {"error": "Too many requests to Google Maps. Please try again later."}
         else:
