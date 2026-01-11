@@ -20,8 +20,7 @@ def search_google(query):
         headers = {
             'Content-Type': 'application/json',
             'X-Goog-Api-Key': api_key,
-            'X-Goog-FieldMask': 'places.displayName.text,places.formattedAddress,places.location,places.types,places.rating,places.userRatingCount',
-            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'X-Goog-FieldMask': 'places.displayName.text,places.formattedAddress,places.location,places.types,places.rating,places.userRatingCount'
         }
         
         payload = {
@@ -29,8 +28,7 @@ def search_google(query):
             "maxResultCount": 20  # Adjust as needed
         }
         
-        response = requests.post(url, json=payload, headers=headers, timeout=(2, 5), proxies={"http": None, "https": None},  # Disable proxy
-        )
+        response = requests.post(url, json=payload, headers=headers, timeout=(2, 5))
         response.raise_for_status()
 
         data = response.json()
