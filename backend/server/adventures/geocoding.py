@@ -83,7 +83,7 @@ def search_google(query):
         elif response.status_code == 401:
             return {"error": "Authentication failed with Google Maps. Please check API configuration."}
         elif response.status_code == 403:
-            return {"error": "Access forbidden to Google Maps. Please check API permissions."}
+            return {"error": "Access forbidden to Google Maps. Please check API permissions.", "details": str(e)}
         elif response.status_code == 429:
             return {"error": "Too many requests to Google Maps. Please try again later."}
         else:
