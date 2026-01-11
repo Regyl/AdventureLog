@@ -12,7 +12,7 @@ def search_google(query):
     try:
         api_key = settings.GOOGLE_MAPS_API_KEY
         if not api_key:
-            return {"error": "Missing Google Maps API key"}
+            return {"error": "Geocoding service unavailable. Please check configuration."}
 
         # Updated to use the new Places API (New) endpoint
         url = "https://places.googleapis.com/v1/places:searchText"
@@ -36,7 +36,7 @@ def search_google(query):
         # Check if we have places in the response
         places = data.get("places", [])
         if not places:
-            return {"error": "No results found"}
+            return {"error": "No locations found for the given query."}
 
         results = []
         for place in places:
@@ -73,11 +73,25 @@ def search_google(query):
 
         return results
 
-    except requests.exceptions.RequestException as e:
-        return {"error": "Network error while contacting Google Maps", "details": str(e)}
-
-    except Exception as e:
-        return {"error": "Unexpected error during Google search", "details": str(e)}
+    except requests.exceptions.Timeout:
+        return {"error": "Request timed out while contacting Google Maps. Please try again."}
+    except requests.exceptions.ConnectionError:
+        return {"error": "Unable to connect to Google Maps service. Please check your internet connection."}
+    except requests.exceptions.HTTPError as e:
+        if response.status_code == 400:
+            return {"error": "Invalid request to Google Maps. Please check your query."}
+        elif response.status_code == 401:
+            return {"error": "Authentication failed with Google Maps. Please check API configuration."}
+        elif response.status_code == 403:
+            return {"error": "Access forbidden to Google Maps. Please check API permissions."}
+        elif response.status_code == 429:
+            return {"error": "Too many requests to Google Maps. Please try again later."}
+        else:
+            return {"error": "Google Maps service error. Please try again later."}
+    except requests.exceptions.RequestException:
+        return {"error": "Network error while contacting Google Maps. Please try again."}
+    except Exception:
+        return {"error": "An unexpected error occurred during Google search. Please try again."}
 
 def _extract_google_category(types):
     # Basic category inference based on common place types
@@ -113,22 +127,50 @@ def _infer_addresstype(type_):
 
 
 def search_osm(query):
-    url = f"https://nominatim.openstreetmap.org/search?q={query}&format=jsonv2"
-    headers = {'User-Agent': 'AdventureLog Server'}
-    response = requests.get(url, headers=headers)
-    data = response.json()
+    try:
+        url = f"https://nominatim.openstreetmap.org/search?q={query}&format=jsonv2"
+        headers = {'User-Agent': 'AdventureLog Server'}
+        response = requests.get(url, headers=headers, timeout=(2, 5))
+        response.raise_for_status()
+        data = response.json()
 
-    return [{
-        "lat": item.get("lat"),
-        "lon": item.get("lon"),
-        "name": item.get("name"),
-        "display_name": item.get("display_name"),
-        "type": item.get("type"),
-        "category": item.get("category"),
-        "importance": item.get("importance"),
-        "addresstype": item.get("addresstype"),
-        "powered_by": "nominatim",
-    } for item in data]
+        return [{
+            "lat": item.get("lat"),
+            "lon": item.get("lon"),
+            "name": item.get("name"),
+            "display_name": item.get("display_name"),
+            "type": item.get("type"),
+            "category": item.get("category"),
+            "importance": item.get("importance"),
+            "addresstype": item.get("addresstype"),
+            "powered_by": "nominatim",
+        } for item in data]
+    except requests.exceptions.Timeout:
+        return {"error": "Request timed out while contacting OpenStreetMap. Please try again."}
+    except requests.exceptions.ConnectionError:
+        return {"error": "Unable to connect to OpenStreetMap service. Please check your internet connection."}
+    except requests.exceptions.HTTPError as e:
+        if response.status_code == 400:
+            return {"error": "Invalid request to OpenStreetMap. Please check your query."}
+        elif response.status_code == 429:
+            return {"error": "Too many requests to OpenStreetMap. Please try again later."}
+        else:
+            return {"error": "OpenStreetMap service error. Please try again later."}
+    except requests.exceptions.RequestException:
+        return {"error": "Network error while contacting OpenStreetMap. Please try again."}
+    except Exception:
+        return {"error": "An unexpected error occurred during OpenStreetMap search. Please try again."}
+
+def search(query):
+    """
+    Unified search function that tries Google Maps first, then falls back to OpenStreetMap.
+    """
+    if getattr(settings, 'GOOGLE_MAPS_API_KEY', None):
+        google_result = search_google(query)
+        if "error" not in google_result:
+            return google_result
+        # If Google fails, fallback to OSM
+    return search_osm(query)
 
 # -----------------
 # REVERSE GEOCODING
@@ -333,15 +375,28 @@ def reverse_geocode_osm(lat, lon, user):
     read_timeout = 5
 
     if not is_host_resolvable("nominatim.openstreetmap.org"):
-        return {"error": "DNS resolution failed"}
+        return {"error": "Unable to resolve OpenStreetMap service. Please check your internet connection."}
 
     try:
         response = requests.get(url, headers=headers, timeout=(connect_timeout, read_timeout))
         response.raise_for_status()
         data = response.json()
         return extractIsoCode(user, data)
+    except requests.exceptions.Timeout:
+        return {"error": "Request timed out while contacting OpenStreetMap. Please try again."}
+    except requests.exceptions.ConnectionError:
+        return {"error": "Unable to connect to OpenStreetMap service. Please check your internet connection."}
+    except requests.exceptions.HTTPError as e:
+        if response.status_code == 400:
+            return {"error": "Invalid request to OpenStreetMap. Please check coordinates."}
+        elif response.status_code == 429:
+            return {"error": "Too many requests to OpenStreetMap. Please try again later."}
+        else:
+            return {"error": "OpenStreetMap service error. Please try again later."}
+    except requests.exceptions.RequestException:
+        return {"error": "Network error while contacting OpenStreetMap. Please try again."}
     except Exception:
-        return {"error": "An internal error occurred while processing the request"}
+        return {"error": "An unexpected error occurred during OpenStreetMap geocoding. Please try again."}
 
 def reverse_geocode_google(lat, lon, user):
     api_key = settings.GOOGLE_MAPS_API_KEY
@@ -352,12 +407,22 @@ def reverse_geocode_google(lat, lon, user):
     params = {"latlng": f"{lat},{lon}", "key": api_key}
 
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=(2, 5))
         response.raise_for_status()
         data = response.json()
 
-        if data.get("status") != "OK":
-            return {"error": "Geocoding failed"}
+        status = data.get("status")
+        if status != "OK":
+            if status == "ZERO_RESULTS":
+                return {"error": "No location found for the given coordinates."}
+            elif status == "OVER_QUERY_LIMIT":
+                return {"error": "Query limit exceeded for Google Maps. Please try again later."}
+            elif status == "REQUEST_DENIED":
+                return {"error": "Request denied by Google Maps. Please check API configuration."}
+            elif status == "INVALID_REQUEST":
+                return {"error": "Invalid request to Google Maps. Please check coordinates."}
+            else:
+                return {"error": "Geocoding failed. Please try again."}
 
         # Convert Google schema to Nominatim-style for extractIsoCode
         first_result = data.get("results", [])[0]
@@ -366,8 +431,25 @@ def reverse_geocode_google(lat, lon, user):
             "address": _parse_google_address_components(first_result.get("address_components", []))
         }
         return extractIsoCode(user, result_data)
+    except requests.exceptions.Timeout:
+        return {"error": "Request timed out while contacting Google Maps. Please try again."}
+    except requests.exceptions.ConnectionError:
+        return {"error": "Unable to connect to Google Maps service. Please check your internet connection."}
+    except requests.exceptions.HTTPError as e:
+        if response.status_code == 400:
+            return {"error": "Invalid request to Google Maps. Please check coordinates."}
+        elif response.status_code == 401:
+            return {"error": "Authentication failed with Google Maps. Please check API configuration."}
+        elif response.status_code == 403:
+            return {"error": "Access forbidden to Google Maps. Please check API permissions."}
+        elif response.status_code == 429:
+            return {"error": "Too many requests to Google Maps. Please try again later."}
+        else:
+            return {"error": "Google Maps service error. Please try again later."}
+    except requests.exceptions.RequestException:
+        return {"error": "Network error while contacting Google Maps. Please try again."}
     except Exception:
-        return {"error": "An internal error occurred while processing the request"}
+        return {"error": "An unexpected error occurred during Google geocoding. Please try again."}
 
 def _parse_google_address_components(components):
     parsed = {}
