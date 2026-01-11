@@ -21,7 +21,7 @@ def search_google(query):
             'Content-Type': 'application/json',
             'X-Goog-Api-Key': api_key,
             'X-Goog-FieldMask': 'places.displayName.text,places.formattedAddress,places.location,places.types,places.rating,places.userRatingCount',
-            'User-Agent': f'AdventureLog/{getattr(settings, "ADVENTURELOG_RELEASE_VERSION", "dev")} (https://github.com/seanmorley15/AdventureLog)',
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         }
         
         payload = {
