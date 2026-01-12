@@ -44,6 +44,7 @@ ALLOWED_HOSTS = ['*']  # In production, restrict to known hosts.
 # Installed Apps
 # ---------------------------------------------------------------------------
 INSTALLED_APPS = (
+    "allauth_ui",
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -51,7 +52,6 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sites',
-    # "allauth_ui",
     'rest_framework',
     'rest_framework.authtoken',
     'allauth',
@@ -61,6 +61,7 @@ INSTALLED_APPS = (
     'allauth.socialaccount',
     'allauth.socialaccount.providers.github',
     'allauth.socialaccount.providers.openid_connect',
+    'invitations',
     'drf_yasg',
     'djmoney',
     'corsheaders',
@@ -70,8 +71,8 @@ INSTALLED_APPS = (
     'integrations',
     'django.contrib.gis',
     # 'achievements', # Not done yet, will be added later in a future update
-    # 'widget_tweaks',
-    # 'slippers',
+    'widget_tweaks',
+    'slippers',
 
 )
 
@@ -220,6 +221,8 @@ TEMPLATES = [
     },
 ]
 
+ALLAUTH_UI_THEME = "dim"
+
 # ---------------------------------------------------------------------------
 # Authentication & Accounts
 # ---------------------------------------------------------------------------
@@ -230,6 +233,9 @@ SOCIALACCOUNT_ALLOW_SIGNUP = getenv('SOCIALACCOUNT_ALLOW_SIGNUP', 'false').lower
 
 AUTH_USER_MODEL = 'users.CustomUser'
 ACCOUNT_ADAPTER = 'users.adapters.CustomAccountAdapter'
+INVITATIONS_ADAPTER = ACCOUNT_ADAPTER
+INVITATIONS_ACCEPT_INVITE_AFTER_SIGNUP = True
+INVITATIONS_EMAIL_SUBJECT_PREFIX = 'AdventureLog: '
 SOCIALACCOUNT_ADAPTER = 'users.adapters.CustomSocialAccountAdapter'
 ACCOUNT_SIGNUP_FORM_CLASS = 'users.form_overrides.CustomSignupForm'
 
@@ -237,6 +243,8 @@ SESSION_SAVE_EVERY_REQUEST = True
 LOGIN_REDIRECT_URL = FRONTEND_URL  # Redirect to frontend after login
 
 SOCIALACCOUNT_LOGIN_ON_GET = True
+INVITATIONS_INVITE_FORM = 'users.form_overrides.UseAdminInviteForm'
+INVITATIONS_SIGNUP_REDIRECT_URL = f"{FRONTEND_URL}/signup"
 
 HEADLESS_FRONTEND_URLS = {
     "account_confirm_email": f"{FRONTEND_URL}/user/verify-email/{{key}}",
