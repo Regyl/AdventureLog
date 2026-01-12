@@ -138,7 +138,10 @@ export default defineConfig({
             link: "/docs/install/kustomize",
           },
           { text: "Unraid 🧡", link: "/docs/install/unraid" },
-          { text: "Dev Container + WSL 🧰", link: "/docs/install/dev_container_wsl" },
+          {
+            text: "Dev Container + WSL 🧰",
+            link: "/docs/install/dev_container_wsl",
+          },
 
           {
             text: "With A Reverse Proxy",
@@ -255,6 +258,10 @@ export default defineConfig({
           {
             text: "Admin Panel",
             link: "/docs/guides/admin_panel",
+          },
+          {
+            text: "Invite a User",
+            link: "/docs/guides/invite_user",
           },
           {
             text: "v0.7.1 Migration Guide",
