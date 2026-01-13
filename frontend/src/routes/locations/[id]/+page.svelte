@@ -68,6 +68,15 @@
 					return 0;
 				}
 			});
+
+			// Sort visits by their start date (oldest first / chronological). Fall back to created_at if start_date is missing.
+			if (adventure.visits && adventure.visits.length > 1) {
+				adventure.visits.sort((a, b) => {
+					const aTs = DateTime.fromISO(a.start_date || a.created_at || '').toMillis() || 0;
+					const bTs = DateTime.fromISO(b.start_date || b.created_at || '').toMillis() || 0;
+					return aTs - bTs; // oldest first (chronological)
+				});
+			}
 		} else {
 			notFound = true;
 		}

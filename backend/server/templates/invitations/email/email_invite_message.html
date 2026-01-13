@@ -4,7 +4,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>You're Invited to AdventureLog!</title>
+    <title>You’re Invited to AdventureLog</title>
     <style>
       body {
         font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -22,67 +22,72 @@
         padding: 40px 30px;
         text-align: center;
       }
-      img.logo {
+      .logo {
         width: 80px;
         height: 80px;
-        margin-bottom: 20px;
+        margin-bottom: 24px;
       }
       h1 {
         font-size: 28px;
         color: #111827;
-        margin-bottom: 20px;
+        margin-bottom: 16px;
       }
       p {
         font-size: 16px;
-        line-height: 1.6;
-        margin-bottom: 25px;
+        line-height: 1.65;
+        margin-bottom: 24px;
+        color: #1f2937;
       }
-      a.button {
+      .highlight {
+        font-weight: 600;
+        color: #4f46e5;
+      }
+      .button {
         display: inline-block;
         padding: 16px 32px;
         background: linear-gradient(90deg, #4f46e5, #6366f1);
-        color: #fff !important;
+        color: #ffffff !important;
         text-decoration: none;
-        font-weight: bold;
+        font-weight: 600;
         font-size: 16px;
         border-radius: 12px;
-        transition: all 0.3s ease;
-      }
-      a.button:hover {
-        background: linear-gradient(90deg, #4338ca, #4f46e5);
-        transform: translateY(-2px);
       }
       .footer {
         margin-top: 40px;
         font-size: 12px;
+        line-height: 1.6;
         color: #9ca3af;
         text-align: center;
       }
-      .adventure {
-        font-weight: bold;
-        color: #4f46e5;
-      }
     </style>
   </head>
+
   <body>
     <div class="container">
       <img
         src="https://adventurelog.app/adventurelog.png"
-        alt="AdventureLog Logo"
+        alt="AdventureLog"
         class="logo"
       />
-      <h1>You're Invited to AdventureLog!</h1>
+
+      <h1>You’re Invited to AdventureLog</h1>
+
       <p>Hello <strong>{{ email }}</strong>,</p>
+
       <p>
         Adventure awaits! You've been invited to join
-        <span class="adventure">AdventureLog</span>, the ultimate travel
+        <span class="highlight">AdventureLog</span>, the ultimate travel
         companion to track, plan, and collaborate on your journeys.
       </p>
       <p>Hit the button below to accept your invitation and start exploring!</p>
       <p><a href="{{ invite_url }}" class="button">Join AdventureLog</a></p>
+
       <div class="footer">
-        If you weren't expecting this email, no worries—you can safely ignore
-        it.
+        You’re receiving this email because someone invited you to join
+        AdventureLog.<br />
+        If you weren’t expecting this invitation, you can safely ignore this
+        email.<br /><br />
+        © 2023–2025 AdventureLog
       </div>
     </div>
   </body>

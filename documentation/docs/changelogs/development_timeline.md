@@ -75,8 +75,6 @@ This was the “frontend-first, learn-by-doing” era. SvelteKit won me because 
 
 - Rapid frontend iteration is fantastic for shaping UX, but for persistent data and file handling, I needed a backend that provided batteries-included features (auth, file storage, admin) — enter Django.
 
----
-
 ## Phase 2 — Django Backend & Early Stability
 
 **Dates:** July 2024 — August 2024  
@@ -181,23 +179,18 @@ This phase is about turning AdventureLog from “a promising tool” into “a d
 ## Lessons, patterns, and a few thoughts
 
 1. **Pick the right tool for the job**
-
    - The SvelteKit prototype phase taught me how fast UI iteration can progress. The Django rewrite taught me you can’t ignore backend primitives (auth, file handling, admin) if you want to ship a stable self-hosted app. Each stack had strengths, use them where they matter.
 
 2. **Community feedback is gold**
-
    - The Reddit launch pushed the project into real usage. Responding to issues and user requests shaped core features more than any design doc ever could.
 
 3. **Keep breaking changes reasonable**
-
    - UUIDs as primary keys were scary, but doing it early saved headaches. Plan big breaking changes early; avoid them once people rely on your software.
 
 4. **Simplicity wins in deployment**
-
    - Removing extra containers and simplifying deployment options made AdventureLog more approachable for hobbyist hosts — which is the core audience.
 
 5. **Iterate visibly**
-
    - Small, visible wins (better login flow, calendar, Immich sync) build momentum and community trust.
 
 ## Current state & what’s next
