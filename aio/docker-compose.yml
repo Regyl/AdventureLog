@@ -1,0 +1,26 @@
+services:
+  aio:
+    build:
+      context: ..
+      dockerfile: aio/Dockerfile
+    container_name: adventurelog-aio
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${APP_PORT:-8015}:80"
+    depends_on:
+      - db
+    volumes:
+      - adventurelog_media:/code/backend/server/media/
+
+  db:
+    image: postgis/postgis:16-3.5
+    container_name: adventurelog-db
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+volumes:
+  postgres_data:
+  adventurelog_media:

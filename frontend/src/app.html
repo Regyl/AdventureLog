@@ -26,5 +26,38 @@
 	</head>
 	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>
+		<script>
+			// Override global fetch to include CSRF token for API requests
+			const originalFetch = window.fetch;
+			window.fetch = function (input, init) {
+				const url =
+					typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+				const method = init?.method?.toUpperCase() || 'GET';
+
+				// Only add CSRF token for API requests that require it
+				if (url.startsWith('/api/') && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+					const csrfToken = getCookie('csrftoken');
+					if (csrfToken) {
+						init = {
+							...init,
+							headers: {
+								...init?.headers,
+								'X-CSRFToken': csrfToken
+							}
+						};
+					}
+				}
+
+				return originalFetch.call(this, input, init);
+			};
+
+			// Helper function to get cookie value
+			function getCookie(name) {
+				const value = `; ${document.cookie}`;
+				const parts = value.split(`; ${name}=`);
+				if (parts.length === 2) return parts.pop().split(';').shift();
+				return null;
+			}
+		</script>
 	</body>
 </html>

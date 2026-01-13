@@ -14,6 +14,19 @@ export const authHook: Handle = async ({ event, resolve }) => {
 
 		const serverEndpoint = PUBLIC_SERVER_URL || 'http://localhost:8000';
 
+		// Fetch CSRF token to set the cookie
+		const csrfFetch = await event.fetch(`${serverEndpoint}/csrf/`);
+		if (csrfFetch.ok) {
+			const csrfData = await csrfFetch.json();
+			const csrfToken = csrfData.csrfToken;
+			event.cookies.set('csrftoken', csrfToken, {
+				path: '/',
+				httpOnly: false, // Allow client-side access
+				sameSite: 'lax',
+				secure: event.url.protocol === 'https:'
+			});
+		}
+
 		const cookie = event.request.headers.get('cookie') || '';
 
 		let userFetch = await event.fetch(`${serverEndpoint}/auth/user-metadata/`, {
