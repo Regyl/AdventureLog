@@ -36,6 +36,15 @@ done
 # If APP_URL is provided, set PUBLIC_URL, FRONTEND_URL and CSRF_TRUSTED_ORIGINS
 # only when they are not already set so user can override individually.
 if [ -n "${APP_URL:-}" ]; then
+  # Remove :80 or :443 from APP_URL if present
+  APP_URL_NOPORT=$(echo "$APP_URL" | sed -E 's#(https?://[^:/]+)(:80|:443)?#\1#')
+  if [ -z "${CSRF_TRUSTED_ORIGINS:-}" ]; then
+    if [[ "$APP_URL" != "$APP_URL_NOPORT" ]]; then
+      export CSRF_TRUSTED_ORIGINS="$APP_URL,$APP_URL_NOPORT"
+    else
+      export CSRF_TRUSTED_ORIGINS="$APP_URL"
+    fi
+  fi
   export PUBLIC_URL="${PUBLIC_URL:-$APP_URL}"
   export FRONTEND_URL="${FRONTEND_URL:-$APP_URL}"
   export CSRF_TRUSTED_ORIGINS="${CSRF_TRUSTED_ORIGINS:-$APP_URL}"
