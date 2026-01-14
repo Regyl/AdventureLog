@@ -1,4 +1,4 @@
-FROM node:22-bullseye-slim AS builder
+FROM node:22-bullseye-slim AS frontend-builder
 
 LABEL maintainer="Sean Morley"
 
@@ -10,7 +10,32 @@ ENV CI=true
 COPY frontend/package.json frontend/pnpm-lock.yaml* frontend/
 COPY frontend/ frontend/
 WORKDIR /app/frontend
-RUN pnpm install --frozen-lockfile --reporter=silent && pnpm run build
+RUN pnpm install --frozen-lockfile --reporter=silent && pnpm run build \
+  && rm -rf node_modules \
+  && pnpm install --prod --frozen-lockfile --reporter=silent
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+WORKDIR /code
+ENV DEBIAN_FRONTEND=noninteractive
+
+FROM python:3.13-slim AS backend-builder
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+WORKDIR /code
+ENV DEBIAN_FRONTEND=noninteractive
+# Install system dependencies needed for build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      git \
+      postgresql-client \
+      gdal-bin \
+      libgdal-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY backend/server/requirements.txt /code/
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
 # --- Final stage: runtime with Python 3.13 ---
 FROM python:3.13-slim
@@ -23,14 +48,13 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
-    build-essential \
-    git \
     postgresql-client \
     gdal-bin \
     libgdal-dev \
     nginx \
     memcached \
     supervisor \
+    dos2unix \
   && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
   && apt-get install -y --no-install-recommends nodejs \
   && apt-get clean \
@@ -40,17 +64,17 @@ RUN apt-get update \
 COPY backend/ /code/backend/
 COPY aio/ /code/aio/
 
-# Copy built frontend from builder
-COPY --from=builder /app/frontend /code/frontend
+# Copy built frontend from frontend-builder
+COPY --from=frontend-builder /app/frontend /code/frontend
 
-# Install Python dependencies
-WORKDIR /code/backend/server
-RUN pip3 install --upgrade pip \
-  && pip3 install --no-cache-dir -r requirements.txt
+# Copy Python packages from backend-builder
+COPY --from=backend-builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=backend-builder /usr/local/bin /usr/local/bin
 
 # Ensure folders and permissions
 RUN mkdir -p /code/backend/media /code/static /code/media \
-  && chmod +x /code/aio/entrypoint.sh || true
+  && chmod +x /code/aio/entrypoint.sh || true \
+  && dos2unix /code/aio/entrypoint.sh || true
 
 # Copy nginx and supervisord configs into system locations from build context
 COPY aio/nginx.conf /etc/nginx/nginx.conf
