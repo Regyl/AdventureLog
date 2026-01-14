@@ -1,14 +1,18 @@
+# Note: The 'aio' service combines both frontend and backend functionalities into a single container. This deployment is simplified for smaller setups, although for larger deployments visit the docker-compose.prod.yml for a more modular approach with separate services for frontend and backend.
 services:
-  web:
-    #build: ./frontend/
-    image: ghcr.io/seanmorley15/adventurelog-frontend:latest
-    container_name: adventurelog-frontend
+  aio:
+    build:
+      context: .
+      dockerfile: aio/Dockerfile
+    container_name: adventurelog-aio
     restart: unless-stopped
     env_file: .env
     ports:
-      - "${FRONTEND_PORT:-8015}:3000"
+      - "${APP_PORT:-8015}:80"
     depends_on:
-      - server
+      - db
+    volumes:
+      - adventurelog_media:/code/backend/server/media/
 
   db:
     image: postgis/postgis:16-3.5
@@ -17,19 +21,6 @@ services:
     env_file: .env
     volumes:
       - postgres_data:/var/lib/postgresql/data/
-
-  server:
-    #build: ./backend/
-    image: ghcr.io/seanmorley15/adventurelog-backend:latest
-    container_name: adventurelog-backend
-    restart: unless-stopped
-    env_file: .env
-    ports:
-      - "${BACKEND_PORT:-8016}:80"
-    depends_on:
-      - db
-    volumes:
-      - adventurelog_media:/code/media/
 
 volumes:
   postgres_data:
