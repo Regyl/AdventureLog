@@ -14,11 +14,6 @@ RUN pnpm install --frozen-lockfile --reporter=silent && pnpm run build \
   && rm -rf node_modules \
   && pnpm install --prod --frozen-lockfile --reporter=silent
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-WORKDIR /code
-ENV DEBIAN_FRONTEND=noninteractive
-
 FROM python:3.13-slim AS backend-builder
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
