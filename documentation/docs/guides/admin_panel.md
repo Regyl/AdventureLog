@@ -9,3 +9,8 @@ Features of the Admin Panel include:
 - **Security**: The Admin Panel enforces access control to ensure that only authorized administrators can access and manage the database. This means that only users with the `is_staff` flag set to `True` can access the Admin Panel.
 
 Note: the `CSRF_TRUSTED_ORIGINS` setting in your `docker-compose.yml` file must include the domain of the server. For example, if your server is hosted at `https://al-server.yourdomain.com`, you should add `al-server.yourdomain.com` to the `CSRF_TRUSTED_ORIGINS` setting.
+
+## Access Admin panel
+To access admin panel, you should authorize under django admin credentials specified at `.env`. Default credentials (specified at `.env.example`) are:
+- Username: `admin`
+- Password `admin`
